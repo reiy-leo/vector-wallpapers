@@ -16,9 +16,8 @@
  * ⭐ 界面主题（浅/深/跟随系统）在顶栏，它作用于整个应用；
  * 图片右上角的是**壁纸本身**的浅底/深底切换，二者作用域不同。
  */
-import { useEffect, useState } from 'react';
-import { LIMITS } from '../shared/constants';
-import { readFavorites, setUI, usePatternDef, useWorkbenchSelector, writeFavorites } from './store';
+import { useEffect } from 'react';
+import { setUI, toggleFavorite as toggleFavoriteInStore, usePatternDef, useWorkbenchSelector } from './store';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
 import { consumeLoginError, loadMe, loginBlocker, logout, requireLogin, startLogin, useAuth } from './auth';
@@ -32,23 +31,15 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const def = usePatternDef();
   const panel = useWorkbenchSelector((s) => s.ui.panel);
   const theme = useWorkbenchSelector((s) => s.ui.theme);
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  // 收藏只在挂载时读一次：它是持久化数据，不参与渲染高频变化
-  useEffect(() => {
-    setFavorites(readFavorites());
-  }, []);
+  // 收藏读 store：顶栏星标与左栏「收藏」分组共用同一份状态（此前顶栏自持一份，左栏不刷新）
+  const favorites = useWorkbenchSelector((s) => s.favorites);
 
   const isFavorite = favorites.includes(def.id);
 
   const toggleFavorite = () => {
     // 收藏需要 Google 登录：未登录时弹出门禁，不改动收藏
     if (!requireLogin('favorite')) return;
-    const next = isFavorite
-      ? favorites.filter((x) => x !== def.id)
-      : [def.id, ...favorites].slice(0, LIMITS.MAX_FAVORITES);
-    writeFavorites(next);
-    setFavorites(next);
+    toggleFavoriteInStore(def.id);
     onNotice(isFavorite ? '已取消收藏' : `已收藏「${def.name}」`, 'success');
   };
 
@@ -72,7 +63,7 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
             { value: 'system', label: '', icon: <IconAuto size={14} />, title: '跟随系统' },
           ]}
         />
-        <Tooltip content={panel === 'right' ? '把面板移到左侧' : '把面板移到右侧'}>
+        <Tooltip side="bottom" content={panel === 'right' ? '把面板移到左侧' : '把面板移到右侧'}>
           <IconButton
             label="切换面板位置"
             aria-pressed={panel === 'left'}
@@ -83,7 +74,7 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
           </IconButton>
         </Tooltip>
 
-        <Tooltip content={isFavorite ? '取消收藏' : '收藏这个母题'}>
+        <Tooltip side="bottom" content={isFavorite ? '取消收藏' : '收藏这个母题'}>
           <IconButton
             label={isFavorite ? '取消收藏' : '收藏'}
             aria-pressed={isFavorite}

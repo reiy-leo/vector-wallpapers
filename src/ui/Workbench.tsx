@@ -107,7 +107,9 @@ export function Workbench() {
     return () => window.clearTimeout(t);
   }, [notice]);
 
-  const { focus } = state.ui;
+  const { focus, panel } = state.ui;
+  // 面板位置：left 时参数栏在最左、母题库在最右（顶栏「切换面板位置」）
+  const panelLeft = panel === 'left';
   const onIOS = platform === 'ios';
 
   return (
@@ -124,13 +126,13 @@ export function Workbench() {
             'grid min-h-full lg:h-full',
             // ≥1280 三栏；768~1279 两栏（母题库隐藏，画布 + 面板）
             'grid-cols-1',
-            'xl:grid-cols-[280px_minmax(0,1fr)_360px]',
+            panelLeft ? 'xl:grid-cols-[360px_minmax(0,1fr)_280px]' : 'xl:grid-cols-[280px_minmax(0,1fr)_360px]',
           ].join(' ')}
         >
           {/* ① 母题库 —— xl 以上与面板同屏；窄屏由底部抽屉承担 */}
           {!focus && (
             <aside
-              className="hidden min-h-0 border-r border-line bg-surface xl:flex xl:flex-col"
+              className={`hidden min-h-0 border-line bg-surface xl:flex xl:flex-col ${panelLeft ? 'xl:order-3 border-l' : 'border-r'}`}
               aria-label="母题库"
             >
               <PatternRail favorites={state.favorites} />
@@ -138,7 +140,7 @@ export function Workbench() {
           )}
 
           {/* ② 画布 —— flex-1，任何断点下都是视觉主角 */}
-          <section id="vw-stage" aria-label="预览画布" className="flex min-h-0 flex-col bg-canvas">
+          <section id="vw-stage" aria-label="预览画布" className="flex min-h-0 flex-col bg-canvas xl:order-2">
             <CanvasStage strategy={strategy} onNotice={onNotice} />
           </section>
 
@@ -148,7 +150,7 @@ export function Workbench() {
               className={[
                 'border-line bg-surface',
                 // xl：独立右栏；lg 以下：画布下方的整宽区块
-                'border-t xl:border-t-0 xl:border-l',
+                panelLeft ? 'border-t xl:order-1 xl:border-t-0 xl:border-r' : 'border-t xl:order-3 xl:border-t-0 xl:border-l',
                 'max-xl:px-5 max-xl:py-6 xl:p-5',
                 'xl:min-h-0 xl:overflow-y-auto',
               ].join(' ')}
