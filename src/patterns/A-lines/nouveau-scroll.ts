@@ -36,7 +36,7 @@ const def: PatternDef = {
   ],
 
   controls: [
-    { key: 'cell', label: '单元尺寸', type: 'range', min: 160, max: 480, step: 10, default: 260, heavy: true },
+    { key: 'cell', label: '单元尺寸', type: 'range', min: 200, max: 900, step: 10, default: 260, heavy: true },
     { key: 'vary', label: '随机度', type: 'range', min: 0, max: 1, step: 0.05, default: 0.6 },
     { key: 'turns', label: '旋转圈数', type: 'range', min: 1.2, max: 3.5, step: 0.1, default: 2.2 },
     { key: 'tighten', label: '收紧系数', type: 'range', min: 0.15, max: 0.6, step: 0.01, default: 0.34 },
@@ -87,7 +87,7 @@ const def: PatternDef = {
     const { width: W, height: H, params, elements, rng } = cfg;
     // 尺寸按短边归一化（1080 基准）→ 与分辨率无关
     const unitPx = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
-    const cell = Math.max(160, Number(params.cell)) * unitPx;
+    const cell = Math.max(200, Number(params.cell)) * unitPx;
     const turns0 = Math.max(1.2, Math.min(3.5, Number(params.turns)));
     const tighten0 = Math.max(0.15, Math.min(0.6, Number(params.tighten)));
     const depth = Math.round(Math.max(1, Math.min(5, Number(params.depth))));
@@ -115,7 +115,8 @@ const def: PatternDef = {
     const curl = (sx: number, sy: number, rot: number, r0: number, dir: number, turns: number, tighten: number) => {
       const cx = sx - r0 * Math.cos(rot);
       const cy = sy - r0 * Math.sin(rot);
-      const steps = Math.max(10, Math.min(30, Math.round(turns * 7 + (r0 / unitPx) / 10)));
+      // 段数随卷半径走：小卷省字节（小单元也能铺满），大卷加密（不出折角）
+      const steps = Math.max(8, Math.min(44, Math.round(turns * 4 + (r0 / unitPx) / 7)));
       let px = R(sx);
       let py = R(sy);
       let d = `M${px} ${py}`;

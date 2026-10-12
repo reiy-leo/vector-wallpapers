@@ -80,17 +80,18 @@ export function CanvasStage({
     <div className="flex h-full min-h-0 flex-col">
       {/* 标题条：左边母题名 + 描述，右边「对这张图做什么」的产物动作。
           换一版 / 复制 CSS / 导出 与当前画面绑定，放在名称行右上角，紧贴画面且一眼可见。 */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3.5">
-        <div className="grid min-w-0 gap-1">
+      {/* 不换行：描述再长也只在左栏内折行（最多两行），三个按钮始终贴右（Rei 2026-10-12） */}
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3.5">
+        <div className="grid min-w-0 flex-1 gap-1">
           {/* ⭐ Kumo heading-case：sentence case */}
-          <h1 className="text-lg font-semibold text-fg">{def.name}</h1>
-          <p className="text-sm text-fg-soft">
+          <h1 className="truncate text-lg font-semibold text-fg">{def.name}</h1>
+          <p className="line-clamp-2 text-sm text-fg-soft" title={def.description}>
             {def.description}
             <code className="ml-2 font-mono text-[0.9em] text-fg-mute">{def.id}</code>
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Tooltip content="换 seed + 按当前策略重排配色">
+          <Tooltip content="换 seed + 从色板重排配色">
             <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
               <IconShuffle size={15} />
               换一版
