@@ -5,15 +5,19 @@
   "type": "module",
   "description": "纯函数 SVG 壁纸生成器 —— 可拆解为可独立配色元件的 Pattern 母题",
   "scripts": {
-    "dev": "node node_modules/vite/bin/vite.js",
-    "build": "node node_modules/vite/bin/vite.js build",
-    "preview": "node node_modules/vite/bin/vite.js preview",
-    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
-    "test": "node node_modules/vitest/vitest.mjs run",
-    "test:watch": "node node_modules/vitest/vitest.mjs",
-    "test:coverage": "node node_modules/vitest/vitest.mjs run --coverage",
-    "verify": "node node_modules/vitest/vitest.mjs run src/__verify__/verify.test.ts",
-    "deploy": "npm run build && node node_modules/wrangler/bin/wrangler.js deploy"
+    "dev": "npm --prefix . run _vite",
+    "build": "npm --prefix . run _vite -- build",
+    "preview": "npm --prefix . run _vite -- preview",
+    "typecheck": "npm --prefix . run _tsc -- --noEmit",
+    "test": "npm --prefix . run _vitest -- run",
+    "test:watch": "npm --prefix . run _vitest",
+    "test:coverage": "npm --prefix . run _vitest -- run --coverage",
+    "verify": "npm --prefix . run _vitest -- run src/__verify__/verify.test.ts",
+    "deploy": "npm run build && npm --prefix . run _wrangler -- deploy",
+    "_vite": "node node_modules/vite/bin/vite.js",
+    "_vitest": "node node_modules/vitest/vitest.mjs",
+    "_tsc": "node node_modules/typescript/bin/tsc",
+    "_wrangler": "node node_modules/wrangler/bin/wrangler.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

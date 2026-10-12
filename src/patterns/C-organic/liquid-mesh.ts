@@ -46,7 +46,19 @@ const def: PatternDef = {
   animatable: true,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'linear', angle: 135, stops: [{ offset: 0, color: '#1e1b4b' }, { offset: 1, color: '#0f172a' }] }, opacity: 1, visible: true, configurable: true },
+    /*
+     * ⭐ `bg` 是**纯色**而非渐变 —— 这是被结构审查抓出来的修正。
+     *
+     * 原来四个元件全是渐变（纯色占比 0%），后果是：
+     * 用户在配色面板看到 4 个色块、4 个都能取色，看起来功能完好，
+     * 但每次改色只染到画面的一半（渐变的另一端仍是旧色），
+     * 换句话说「元件级配色」在这张母题上实质失效。
+     *
+     * mesh gradient 的观感其实来自上层三个渐变团的叠加，
+     * 底色退成纯色后观感几乎不变（渐变团本身已覆盖大半画面），
+     * 却让「换肤」重新成为可能：底色一变，整张图调性立刻跟着走。
+     */
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#1e1b4b' }, opacity: 1, visible: true, configurable: true },
     { id: 'blob_a', label: '渐变团 A', role: 'primary', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#f472b6' }, { offset: 1, color: '#7c3aed' }] }, opacity: 0.75, visible: true, configurable: true },
     { id: 'blob_b', label: '渐变团 B', role: 'secondary', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#22d3ee' }, { offset: 1, color: '#0ea5e9' }] }, opacity: 0.7, visible: true, configurable: true },
     { id: 'blob_c', label: '渐变团 C', role: 'accent', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#fde047' }, { offset: 1, color: '#f97316' }] }, opacity: 0.6, visible: true, configurable: true },
@@ -65,7 +77,9 @@ const def: PatternDef = {
       id: 'aurora',
       label: '极光',
       elements: {
-        bg: { paint: { type: 'linear', angle: 135, stops: [{ offset: 0, color: '#042f2e' }, { offset: 1, color: '#0b1120' }] } },
+        // ⭐ preset 也必须用纯色：否则用户套用 preset 后，
+        // 底色又变回渐变，「换肤」能力被 preset 悄悄夺走。
+        bg: { paint: { type: 'solid', color: '#042f2e' } },
         blob_a: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#5eead4' }, { offset: 1, color: '#0d9488' }] } },
         blob_b: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#a78bfa' }, { offset: 1, color: '#6d28d9' }] } },
         blob_c: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#f0abfc' }, { offset: 1, color: '#c026d3' }] } },
@@ -75,7 +89,7 @@ const def: PatternDef = {
       id: 'sunset',
       label: '落日',
       elements: {
-        bg: { paint: { type: 'linear', angle: 135, stops: [{ offset: 0, color: '#3f0d12' }, { offset: 1, color: '#0c0a09' }] } },
+        bg: { paint: { type: 'solid', color: '#3f0d12' } },
         blob_a: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#fb923c' }, { offset: 1, color: '#dc2626' }] } },
         blob_b: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#facc15' }, { offset: 1, color: '#ea580c' }] } },
         blob_c: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#fda4af' }, { offset: 1, color: '#9f1239' }] } },
@@ -85,7 +99,7 @@ const def: PatternDef = {
       id: 'ocean',
       label: '深海',
       elements: {
-        bg: { paint: { type: 'linear', angle: 135, stops: [{ offset: 0, color: '#082f49' }, { offset: 1, color: '#020617' }] } },
+        bg: { paint: { type: 'solid', color: '#082f49' } },
         blob_a: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#38bdf8' }, { offset: 1, color: '#0369a1' }] } },
         blob_b: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#2dd4bf' }, { offset: 1, color: '#0f766e' }] } },
         blob_c: { paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#818cf8' }, { offset: 1, color: '#3730a3' }] } },
