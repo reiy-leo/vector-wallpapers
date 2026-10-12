@@ -11,8 +11,15 @@
   // 部署时保留控制台里加的变量（GOOGLE_CLIENT_ID 等），不被这里的 vars 覆盖
   "keep_vars": true,
   "vars": {
-    "ALLOWED_EMAIL_DOMAINS": "*"
+    "ALLOWED_EMAIL_DOMAINS": "*",
+    // 可访问 /api/ratings/summary（评分汇总 / CSV）的管理员邮箱，逗号分隔
+    "ADMIN_EMAILS": "reiy.leoz@gmail.com,raylee.stu@gmail.com,ryan.lincs@outlook.com"
   },
+
+  // 「色板 × 母题」评分：每个用户一个 key `u:<userhash>`（见 src/worker/ratings.ts）
+  "kv_namespaces": [
+    { "binding": "RATINGS", "id": "7f7bd2a10ac04582a7be854c535b7a55" }
+  ],
   "observability": {
     "enabled": true
   }

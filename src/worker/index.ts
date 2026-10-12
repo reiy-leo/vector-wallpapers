@@ -6,10 +6,12 @@
  *   GET  /auth/login        → Google
  *   GET  /auth/callback     ← Google，签发会话 cookie
  *   POST /api/auth/logout
+ *   POST /api/ratings · GET /api/ratings/mine · GET /api/ratings/summary   （见 ratings.ts）
  */
 import type { MeResponse } from "../shared/auth-api";
 import { callback, getUser, login, logout } from "./auth";
 import { authMode } from "./env";
+import { getMyRatings, getSummary, postRating } from "./ratings";
 import type { Env } from "./env";
 
 const json = (data: unknown, status = 200) =>
@@ -25,6 +27,12 @@ async function handleMe(req: Request, env: Env): Promise<Response> {
     authMode: authMode(env, req),
   };
   return json(me);
+}
+
+/** 写接口的 CSRF 兜底：带 Origin 头时必须与本站同源（会话 cookie 已是 SameSite=Lax）。 */
+function sameOrigin(req: Request): boolean {
+  const origin = req.headers.get("Origin");
+  return !origin || origin === new URL(req.url).origin;
 }
 
 /** 静态资源的提供方式：默认走 ASSETS 绑定；token 部署时由 worker-inline/ 注入内联资源。 */
@@ -43,6 +51,13 @@ export function createHandler(serveStatic: ServeStatic) {
           return callback(req, env);
         case "POST /api/auth/logout":
           return logout(req);
+        case "POST /api/ratings":
+          if (!sameOrigin(req)) return json({ error: "forbidden" }, 403);
+          return postRating(req, env);
+        case "GET /api/ratings/mine":
+          return getMyRatings(req, env);
+        case "GET /api/ratings/summary":
+          return getSummary(req, env);
       }
       if (pathname.startsWith("/api/") || pathname.startsWith("/auth/")) return json({ error: "Not Found" }, 404);
       return serveStatic(req, env);

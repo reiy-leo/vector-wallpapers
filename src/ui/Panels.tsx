@@ -15,7 +15,8 @@ import { CURATED_SETS, type SetItem } from '../patterns/sets';
 import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
-import { applyPaletteSlots, nextSeed, randomizeColors } from './coloring';
+import { applyPaletteSlots, nextSeed, randomizeColorsWithPalette } from './coloring';
+import { notePalette, noteReroll, rerollExclusions } from './ratings';
 import {
   getConfig,
   setConfig,
@@ -54,7 +55,10 @@ export function PalettePanel() {
                 <li key={p.id}>
                   <button
                     type="button"
-                    onClick={() => setConfig(applyPaletteSlots(cfg, def, p.slots))}
+                    onClick={() => {
+                      setConfig(applyPaletteSlots(cfg, def, p.slots));
+                      notePalette(def.id, p.id);
+                    }}
                     title={p.description}
                     className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left ring-1 ring-line hover:bg-surface-2"
                   >
@@ -254,10 +258,17 @@ export function ParamPanel() {
  * 供顶栏复用的动作（与画布栏共用同一实现，避免两处实现漂移）
  * ───────────────────────────────────────────────────────────────── */
 
-/** 「换一版」：换 seed + 按当前策略重排配色（PRD Q3）。 */
+/**
+ * 「换一版」：换 seed + 按当前策略重排配色（PRD Q3）。
+ *
+ * 评分（Rei 2026-10-12）：本母题里评过 👎 的色板不再抽到；换完后评分条换到新的 (母题, 色板)，
+ * 上一对的最终选择在这一刻提交（见 ratings.ts）。
+ */
 export function shuffleCurrent(strategy: ColorStrategy): void {
   const cfg = getConfig();
   const def = registry.get(cfg.patternId);
   if (!def) return;
-  setConfig(randomizeColors(cfg, def, strategy, nextSeed(cfg.seed)));
+  const out = randomizeColorsWithPalette(cfg, def, strategy, nextSeed(cfg.seed), rerollExclusions(def.id));
+  setConfig(out.cfg);
+  noteReroll(def.id, out.paletteId);
 }

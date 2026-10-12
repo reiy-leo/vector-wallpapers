@@ -11,6 +11,10 @@ export const STORAGE_KEY = {
   recent: 'vw:recent:v1',
   theme: 'vw:theme:v1',
   palettes: 'vw:palettes:v1',
+  /** 「色板 × 母题」评分的本地待提交队列（按登录邮箱分 key：`<此前缀>:<email>`），见 ui/rating-queue.ts。 */
+  ratingQueue: 'vw:rating-queue:v1',
+  /** 上一次批量提交评分的结果（同样按邮箱分 key），见 ui/rating-sync.ts。 */
+  ratingSync: 'vw:rating-sync:v1',
 } as const;
 
 /** URL query 参数名 —— 严格对齐 PRD P0-6。 */

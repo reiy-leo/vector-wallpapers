@@ -21,8 +21,15 @@
   "keep_vars": true,
   "vars": {
     // 允许登录的邮箱域名，逗号分隔；"*" = 任意已验证的 Google 账号
-    "ALLOWED_EMAIL_DOMAINS": "*"
+    "ALLOWED_EMAIL_DOMAINS": "*",
+    // 可访问 /api/ratings/summary（评分汇总 / CSV）的管理员邮箱，逗号分隔
+    "ADMIN_EMAILS": "reiy.leoz@gmail.com,raylee.stu@gmail.com,ryan.lincs@outlook.com"
   },
+
+  // 「色板 × 母题」评分：每个用户一个 key `u:<userhash>`（见 src/worker/ratings.ts）
+  "kv_namespaces": [
+    { "binding": "RATINGS", "id": "7f7bd2a10ac04582a7be854c535b7a55" }
+  ],
 
   // Secrets（绝不提交；wrangler secret put … 或 CF 控制台）：
   //   SESSION_SECRET（必填，随机长串）、GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET

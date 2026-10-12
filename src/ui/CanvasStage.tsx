@@ -20,6 +20,8 @@ import { applyTone, allowedTones, bgTone, type BgTone } from './coloring';
 import { IconButton, Segmented, SelectBox, Tooltip, inputClass } from './primitives';
 import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
+import { RatingBar } from './RatingBar';
+import { RatingSyncStatus } from './RatingSyncStatus';
 import {
   IconClose,
   IconFocus,
@@ -84,7 +86,13 @@ export function CanvasStage({
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3.5">
         <div className="grid min-w-0 flex-1 gap-1">
           {/* ⭐ Kumo heading-case：sentence case */}
-          <h1 className="truncate text-lg font-semibold text-fg">{def.name}</h1>
+          {/* 母题名 + 评分同步状态（紧跟标题，仅登录用户；-my-1 让 32px 图标按钮不撑高标题行） */}
+          <div className="flex min-w-0 items-center gap-1">
+            <h1 className="truncate text-lg font-semibold text-fg">{def.name}</h1>
+            <span className="-my-1 shrink-0">
+              <RatingSyncStatus />
+            </span>
+          </div>
           <p className="line-clamp-2 text-sm text-fg-soft" title={def.description}>
             {def.description}
             <code className="ml-2 font-mono text-[0.9em] text-fg-mute">{def.id}</code>
@@ -124,6 +132,9 @@ export function CanvasStage({
             「这张图看起来多亮」，把它放在舞台角上会让用户把作用域
             误读成「整个应用」。容器角在图片未铺满时离图很远。 */}
         {!focus && uri !== '' && <ThemeSwitchOverlay target={imgRef} />}
+
+        {/* 「色板 × 母题」评分条：贴图片底边居中（换一版 / 切色板后浮出，仅登录用户） */}
+        {!focus && uri !== '' && <RatingOverlay target={imgRef} />}
 
         {/* 聚焦模式：整张 SVG 按窗口尺寸重新渲染并撑满视口，右上角关闭 */}
         {focus && <FocusOverlay onClose={() => setUI({ focus: false })} />}
@@ -298,6 +309,26 @@ function ThemeSwitchOverlay({ target }: { target: React.RefObject<HTMLImageEleme
           ]}
         />
       </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 评分条浮层 —— 贴**图片**底边内侧居中，与主题浮层同一套图片盒子定位：
+ * 评的是「这张图的配色」，挂在舞台容器底部会飘到图片外面。
+ */
+function RatingOverlay({ target }: { target: React.RefObject<HTMLImageElement | null> }) {
+  const box = useImageBox(target);
+  if (box.w === 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <div className="relative" style={{ width: box.w, height: box.h }}>
+        <div className="absolute inset-x-0 bottom-3 flex justify-center">
+          <div className="pointer-events-auto">
+            <RatingBar />
+          </div>
+        </div>
       </div>
     </div>
   );

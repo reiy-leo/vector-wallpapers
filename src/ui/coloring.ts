@@ -104,41 +104,91 @@ export function randomizeColors(
   strategy: ColorStrategy,
   seed: number,
 ): PatternConfig {
+  return randomizeColorsWithPalette(cfg, def, strategy, seed).cfg;
+}
+
+/** 「换一版」的结果 + 这一版取自哪套色板（评分用；生成式和声 / 作者配色骨架为 null）。 */
+export interface RerollResult {
+  cfg: PatternConfig;
+  paletteId: string | null;
+}
+
+const NO_EXCLUDE: ReadonlySet<string> = new Set();
+
+/**
+ * 去掉被排除的色板；全部被排除时返回空数组（由调用方决定退路）。
+ * 不排除任何色板时返回**原数组**：抽签下标与旧实现逐位一致，同 seed 同结果。
+ */
+function withoutExcluded(list: readonly Palette[], exclude: ReadonlySet<string>): readonly Palette[] {
+  return exclude.size === 0 ? list : list.filter((p) => !exclude.has(p.id));
+}
+
+/**
+ * 与 `randomizeColors` 相同，但：
+ *  - 返回这一版用到的色板 id（「色板 × 母题」评分的对象）；
+ *  - `exclude`：本母题里用户评过 👎 的色板，不会被抽到。
+ *    某个池子被排除光时退到另一个池子；两个池子都被排除光则忽略排除（总得给出一版）。
+ */
+export function randomizeColorsWithPalette(
+  cfg: PatternConfig,
+  def: PatternDef,
+  strategy: ColorStrategy,
+  seed: number,
+  exclude: ReadonlySet<string> = NO_EXCLUDE,
+): RerollResult {
   const rng = mulberry32(seed);
   const tone = bgTone(cfg, def);
   // 先掷一次骰子决定这一版走「高饱和生成」还是「作者配色骨架」：
   // 用户反馈「换一版的颜色都太保守」→ 大部分点击给出鲜艳配色，作者配色只偶尔出现。
   const roll = rng();
+  let vividPool = withoutExcluded(VIVID_PALETTES, exclude);
+  let plainPool = withoutExcluded(PALETTES, exclude);
+  if (vividPool.length === 0 && plainPool.length === 0) {
+    vividPool = VIVID_PALETTES;
+    plainPool = PALETTES;
+  }
 
   if (strategy === 'palette') {
-    if (roll < VIVID_SHARE.palette && VIVID_PALETTES.length > 0) {
-      const pal = VIVID_PALETTES[Math.floor(rng() * VIVID_PALETTES.length) % VIVID_PALETTES.length];
-      return vividFromScheme(cfg, def, seed, rng, curatedScheme(pal, rng));
+    if (vividPool.length > 0 && (roll < VIVID_SHARE.palette || plainPool.length === 0)) {
+      const pal = vividPool[Math.floor(rng() * vividPool.length) % vividPool.length];
+      return { cfg: vividFromScheme(cfg, def, seed, rng, curatedScheme(pal, rng)), paletteId: pal.id };
     }
-    if (PALETTES.length > 0) {
-      const pal = PALETTES[Math.floor(rng() * PALETTES.length) % PALETTES.length];
+    if (plainPool.length > 0) {
+      const pal = plainPool[Math.floor(rng() * plainPool.length) % plainPool.length];
       const locked = new Set(cfg.elements.filter((e) => e.locked).map((e) => e.id));
       const slots: Record<string, string> = {};
       for (const [role, hex] of Object.entries(pal.slots)) slots[role] = hex;
       const applied = applyPaletteSlots(cfg, def, slots);
       applied.elements = applied.elements.map((e, i) => (locked.has(e.id) ? cfg.elements[i] : e));
       applied.seed = seed;
-      return keepTone(applied, def, tone);
+      return { cfg: keepTone(applied, def, tone), paletteId: pal.id };
     }
   }
 
   if (strategy === 'full' && roll < VIVID_SHARE.full) {
-    return vividFromScheme(cfg, def, seed, rng, freeScheme(rng));
+    return { cfg: vividFromScheme(cfg, def, seed, rng, freeScheme(rng)), paletteId: null };
   }
   if (strategy === 'analogous' && roll < VIVID_SHARE.analogous) {
     // 生成和声 : 精选色板 ≈ 5 : 3
-    const scheme =
-      rng() < 0.62 || VIVID_PALETTES.length === 0
-        ? harmonyScheme(rng)
-        : curatedScheme(VIVID_PALETTES[Math.floor(rng() * VIVID_PALETTES.length) % VIVID_PALETTES.length], rng);
-    return vividFromScheme(cfg, def, seed, rng, scheme);
+    if (rng() < 0.62 || vividPool.length === 0) {
+      return { cfg: vividFromScheme(cfg, def, seed, rng, harmonyScheme(rng)), paletteId: null };
+    }
+    const pal = vividPool[Math.floor(rng() * vividPool.length) % vividPool.length];
+    return { cfg: vividFromScheme(cfg, def, seed, rng, curatedScheme(pal, rng)), paletteId: pal.id };
   }
 
+  return { cfg: authorRecolor(cfg, def, strategy, seed, rng, tone), paletteId: null };
+}
+
+/** 作者配色骨架整体转色相 / 提饱和度（`randomizeColors` 的非 vivid 分支）。 */
+function authorRecolor(
+  cfg: PatternConfig,
+  def: PatternDef,
+  strategy: ColorStrategy,
+  seed: number,
+  rng: () => number,
+  tone: BgTone,
+): PatternConfig {
   const next = structuredCloneConfig(cfg);
   next.seed = seed;
   const source = pickSource(def, rng, tone);

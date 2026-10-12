@@ -26,6 +26,8 @@ import { clamp } from '../shared/guards';
 import { createDefaultConfig, structuredCloneConfig } from '../engine/render';
 import { registry } from '../patterns';
 import { decodeConfig, encodeConfig, type DecodedState } from './share';
+import { sanitizeDoc, type RatingsDoc } from '../shared/ratings-api';
+import { sanitizeSyncLast, type RatingSyncLast } from './rating-sync';
 import type { PatternConfig, UIState } from '../engine/types';
 import type { PatternDef, ParamValue } from '../patterns/types';
 
@@ -434,6 +436,48 @@ export function writeFavorites(ids: string[]): void {
     localStorage.setItem(STORAGE_KEY.favorites, JSON.stringify(ids.slice(0, LIMITS.MAX_FAVORITES)));
   } catch {
     /* 同上：写入失败仅丢失收藏，不阻断主流程 */
+  }
+}
+
+/* ── 「色板 × 母题」评分的本地待提交队列（见 rating-queue.ts / ratings.ts） ── */
+
+/** 按登录邮箱分 key：换账号登录时不会把上一个账号攒的评分提交到新账号名下。 */
+const ratingQueueKey = (owner: string) => `${STORAGE_KEY.ratingQueue}:${owner.trim().toLowerCase()}`;
+
+export function readRatingQueue(owner: string): RatingsDoc {
+  try {
+    const raw = localStorage.getItem(ratingQueueKey(owner));
+    return raw ? sanitizeDoc(JSON.parse(raw)) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeRatingQueue(owner: string, queue: RatingsDoc): void {
+  try {
+    if (Object.keys(queue).length === 0) localStorage.removeItem(ratingQueueKey(owner));
+    else localStorage.setItem(ratingQueueKey(owner), JSON.stringify(queue));
+  } catch {
+    /* 隐私模式 / 配额满：队列只在内存里，刷新即丢，可接受 */
+  }
+}
+
+const ratingSyncKey = (owner: string) => `${STORAGE_KEY.ratingSync}:${owner.trim().toLowerCase()}`;
+
+export function readRatingSync(owner: string): RatingSyncLast | null {
+  try {
+    const raw = localStorage.getItem(ratingSyncKey(owner));
+    return raw ? sanitizeSyncLast(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeRatingSync(owner: string, last: RatingSyncLast): void {
+  try {
+    localStorage.setItem(ratingSyncKey(owner), JSON.stringify(last));
+  } catch {
+    /* 同上 */
   }
 }
 
