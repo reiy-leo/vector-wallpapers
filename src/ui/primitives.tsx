@@ -650,16 +650,38 @@ export function Tooltip({
   children: ReactNode;
   side?: 'top' | 'bottom';
 }) {
+  /**
+   * 显隐由状态控制（Rei 2026-10-12）：
+   *  - 鼠标移入即显示、移出即隐藏；
+   *  - **点击后立即隐藏**，鼠标不移出也不再出现 —— 点了按钮就不该还挂着说明；
+   *  - 键盘只在 :focus-visible 时显示（Tab 过来），鼠标点击带来的 focus 不显示。
+   */
+  const [show, setShow] = useState(false);
   return (
-    <span className="group/tt relative inline-flex">
+    <span
+      className="relative inline-flex"
+      onPointerEnter={(e) => {
+        if (e.pointerType === 'mouse') setShow(true);
+      }}
+      onPointerLeave={() => setShow(false)}
+      onPointerDown={() => setShow(false)}
+      onFocus={(e) => {
+        if ((e.target as HTMLElement).matches?.(':focus-visible')) setShow(true);
+      }}
+      onBlur={() => setShow(false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') setShow(false);
+      }}
+    >
       {children}
       <span
         role="tooltip"
         className={[
           'pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap',
-          'rounded-xs bg-fg px-2 py-1 text-xs text-fg-inverse opacity-0',
+          'rounded-xs bg-fg px-2 py-1 text-xs text-fg-inverse',
           // 无延迟、极短淡入：hover 即现（Rei 2026-10-12「tooltip 很快」）
-          'transition-opacity duration-75 group-hover/tt:opacity-100 group-focus-within/tt:opacity-100',
+          'transition-opacity duration-75',
+          show ? 'opacity-100' : 'opacity-0',
           side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
         ].join(' ')}
       >
