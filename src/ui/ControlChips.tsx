@@ -15,7 +15,7 @@
 import { useMemo } from 'react';
 import { Popover } from '@cloudflare/kumo/components/popover';
 import { Switch } from '@cloudflare/kumo/components/switch';
-import { IconChevron, IconSliders } from './icons';
+import { IconSliders } from './icons';
 import { setParam, usePatternDef, useWorkbenchSelector } from './store';
 import { Button, SliderChip, inputClass } from './primitives';
 import type { ControlDef, ParamValue } from '../patterns/types';
@@ -45,7 +45,6 @@ export function ControlsPopover() {
             <IconSliders size={15} />
             参数
             <span className="font-mono text-[0.9em] text-fg-mute">{count}</span>
-            <IconChevron dir="up" size={13} />
           </Button>
         }
       />
