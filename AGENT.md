@@ -93,7 +93,7 @@ React 19 + Tailwind v4 + Vite 8 + TypeScript
 
 ## ⛔ 数据契约（一经上线不可改）
 
-复制 CSS链接依赖这些标识的稳定性：
+分享链接依赖这些标识的稳定性：
 
 - **pattern id** 不可改名（已锁定 27 个，见 `src/patterns/types.ts` 的 `PatternId`）
 - **元件 id** 不可改名（如 flow-lines 的 `bg/line_far/line_mid/line_near`）
