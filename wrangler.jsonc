@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "vector-wallpapers",
+
+  // ⚠️ 刻意不配置 "main"：wrangler 不生成任何 Worker 脚本，
+  //    静态资源由 Cloudflare 边缘直接服务 → 免费且无限、不计 CPU、
+  //    不占 100K 请求/天 配额。PRD 的「单文件返回静态资源 + SPA 回退」
+  //    由 assets.not_found_handling 完整满足。
+  //    若将来要加 API 路由，才补 "main": "src/worker/index.ts"
+  "compatibility_date": "2026-10-10",
+
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "html_handling": "auto-trailing-slash"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

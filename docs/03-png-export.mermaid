@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant EM as ExportMenu
+    participant PX as pngExport
+    participant EN as renderStandaloneSVG
+    participant OS as OffscreenCanvas/主线程
+    participant DL as download
+
+    U->>EM: 选择 @3x 并点击导出 PNG
+    EM->>PX: exportPng(def, cfg, {scale:3})
+    PX->>PX: guardCanvasSize(3840,2160,3) = 74.6M px > 16.7M
+    PX-->>U: ⚠ 提示「3 倍率超出浏览器上限，已降为 2 倍」
+    PX->>EN: renderStandaloneSVG(def, cfg, {animate:false})
+    EN-->>PX: 完整 SVG 文本（width/height/viewBox 齐备）
+    PX->>PX: new Blob([svg], 'image/svg+xml;charset=utf-8')
+    PX->>OS: URL.createObjectURL(blob)
+    OS-->>PX: blob:...
+    PX->>OS: img.src = url → await img.decode()
+    alt 支持 OffscreenCanvas
+        PX->>OS: transferControlToOffscreen() → 绘制（不在主线程）
+    else 不支持
+        PX->>OS: 主线程 canvas 绘制，前后 yield 分片
+    end
+    OS-->>PX: 完成
+    PX->>PX: canvas.toBlob('image/png')
+    PX->>PX: finally → URL.revokeObjectURL(url)
+    PX-->>EM: Blob
+    EM->>DL: download(blob, 'dusk-ridges-3840x2160@2x.png')
+    DL->>DL: a.download → click → 临时 URL 立即 revoke
+    DL-->>U: 文件已保存

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+*.local
+.DS_Store
+.vite/
+*.log
+.env
+.env.*
+!.env.example
+# 诊断用临时脚本
+_c.mjs

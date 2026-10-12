@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SVG 壁纸生成器 · Phase 1 产物预览</title>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #17171a;
+    --border: rgba(255,255,255,0.1);
+    --text: #f0f0f2;
+    --muted: #9a9aa2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 24px 64px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  header { max-width: 1400px; margin: 0 auto 36px; }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 500; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .meta { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 4px 10px; border-radius: 999px; font-size: 12px;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  }
+  .cat { max-width: 1400px; margin: 0 auto 14px; }
+  .cat > h2 {
+    font-size: 13px; font-weight: 500; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .grid {
+    max-width: 1400px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .thumb { aspect-ratio: 16/9; background: #000; }
+  .thumb img, .thumb object { width: 100%; height: 100%; display: block; }
+  .info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .nm { font-size: 13px; font-weight: 500; }
+  .id { font-size: 11px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .st { font-size: 11px; color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SVG 壁纸生成器 — Phase 1 产物预览</h1>
+  <div class="sub">12 个 pattern 的真实渲染产物（默认配置，2560×1440）。全部为引擎 <code>renderStandaloneSVG</code> 的直接输出，未经任何后处理。</div>
+  <div class="meta">
+    <span class="chip">体积红线 20KB · 最大 5451B（27%）</span>
+    <span class="chip">54 个元件 · 改色命中率 100%</span>
+    <span class="chip">首屏 JS gzip 95.5KB</span>
+    <span class="chip">264项测试 · 覆盖率 94.78%</span>
+  </div>
+</header>
+
+<div id="app"></div>
+
+<script>
+const GROUPS = [
+  { cat: '极简线条', items: [
+    { id: 'flow-lines',      name: '流线曲',     bytes: 5433, el: 4, n: 0 },
+    { id: 'offset-grid',     name: '错位方格',   bytes: 1020, el: 4, n: 0 },
+    { id: 'arc-composition', name: '弧光构成',   bytes: 1920, el: 5, n: 1 },
+    { id: 'contour-rings',   name: '等高线圈',   bytes: 3118, el: 4, n: 1 },
+    { id: 'bauhaus-blocks',  name: '包豪斯块面', bytes: 686,  el: 4, n: 0 },
+  ]},
+  { cat: '波点网格', items: [
+    { id: 'polka-dots',      name: '波点圆点',   bytes: 629,  el: 4, n: 0 },
+    { id: 'hex-grid',        name: '六边形网格', bytes: 1065, el: 4, n: 0 },
+    { id: 'diamond-lattice', name: '菱形格纹',   bytes: 829,  el: 4, n: 0 },
+    { id: 'triangle-tiling', name: '三角铺排',   bytes: 838,  el: 4, n: 1 },
+    { id: 'checker-mesh',    name: '棋盘格',     bytes: 1124, el: 4, n: 1 },
+  ]},
+  { cat: '渐变流体', items: [
+    { id: 'dusk-ridges',     name: '山峦日落',   bytes: 3182, el: 6, n: 0 },
+    { id: 'liquid-mesh',     name: '流体渐变',   bytes: 2970, el: 4, n: 0 },
+    { id: 'aurora-wave',     name: '极光波浪',   bytes: 9584, el: 4, n: 0 },
+    { id: 'cloud-bands',     name: '云层带',     bytes: 3041, el: 5, n: 1 },
+    { id: 'blob-field',      name: '有机斑点场', bytes: 4879, el: 4, n: 1 },
+  ]},
+  { cat: '像素复古', items: [
+    { id: 'memphis-grid',    name: '孟菲斯网格', bytes: 1072, el: 6, n: 0 },
+    { id: 'neon-pixels',     name: '霓虹像素',   bytes: 985,  el: 5, n: 0 },
+    { id: 'new-wave-sunset', name: '新浪潮落日', bytes: 1881, el: 5, n: 0 },
+    { id: 'pixel-terrain',   name: '像素地形',   bytes: 8869, el: 5, n: 1 },
+  ]},
+];
+
+document.getElementById('app').innerHTML = GROUPS.map(g => `
+  <section class="cat">
+    <h2>${g.cat}</h2>
+    <div class="grid">
+      ${g.items.map(p => `
+        <div class="card">
+          <div class="thumb"><img src="previews/${p.id}.svg" alt="${p.name}" loading="lazy"></div>
+          <div class="info">
+            <div>
+              <div class="nm">${p.name}${p.n ? ' <span style="color:#EF9F27;font-size:10px;">新增</span>' : ''}</div>
+              <div class="id">${p.id}</div>
+            </div>
+            <div class="st">${p.el} 元件 · ${p.bytes}B</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </section>`).join('');
+</script>
+</body>
+</html>

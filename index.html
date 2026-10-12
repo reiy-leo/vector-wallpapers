@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <title>Vector Wallpapers · SVG 壁纸生成器</title>
+    <meta
+      name="description"
+      content="在线生成 SVG 桌面壁纸：选择 Pattern 母题，逐个元件独立配色与调参，实时预览后导出 SVG / PNG。纯静态、无后端、配置可分享。"
+    />
+    <meta name="theme-color" content="#0b1020" />
+
+    <!-- Open Graph / Twitter：单页 + 静态 meta，不做 SSR（PRD NFR） -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vector Wallpapers" />
+    <meta property="og:title" content="Vector Wallpapers · SVG 壁纸生成器" />
+    <meta
+      property="og:description"
+      content="把 Pattern 母题拆成可独立配色的元件：调色，而不是找图。"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!--
+      PRD P0-8「首屏无主题闪烁」：防闪烁脚本必须是**外链独立文件**，
+      因为 public/_headers 的 CSP `script-src` 不含 'unsafe-inline'。
+      同步 <script src> 仍是阻塞式执行，效果与内联一致。
+    -->
+    <script src="/theme-boot.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

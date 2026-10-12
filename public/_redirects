@@ -1,0 +1,3 @@
+# SPA 回退（Cloudflare Workers 由 assets.not_found_handling 承担；
+# 本文件用于兼容 Pages / Netlify / 静态托管等环境，双保险不冲突）。
+/*  /index.html  200

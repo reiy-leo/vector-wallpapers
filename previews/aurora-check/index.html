@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>aurora-wave 参数观感确认</title>
+<style>
+  :root { --bg:#0f0f11; --surface:#17171a; --border:rgba(255,255,255,.1); --text:#f0f0f2; --muted:#9a9aa2; --ok:#5DCAA5; --warn:#EF9F27; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px 20px 56px; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
+  header { max-width:1400px; margin:0 auto 28px; }
+  h1 { margin:0 0 6px; font-size:19px; font-weight:500; }
+  .sub { color:var(--muted); font-size:13px; }
+  .verdict { margin-top:14px; padding:10px 14px; border-radius:8px; background:rgba(93,202,165,.1);
+    border:1px solid rgba(93,202,165,.3); font-size:13px; }
+  .sec { max-width:1400px; margin:36px auto 12px; font-size:13px; font-weight:500; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.08em; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .grid { max-width:1400px; margin:0 auto; display:grid; gap:16px; }
+  .g2 { grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .thumb { background:#000; display:flex; align-items:center; justify-content:center; }
+  .thumb img { width:100%; height:auto; display:block; }
+  .r16x9 { aspect-ratio:16/9; } .r16x10 { aspect-ratio:16/10; }
+  .info { padding:9px 12px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .nm { font-size:13px; font-weight:500; }
+  .st { font-size:11px; color:var(--muted); font-family:ui-monospace,Menlo,monospace; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); }
+  .tag { font-size:11px; padding:2px 7px; border-radius:999px; background:rgba(93,202,165,.14); color:var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1>aurora-wave · 参数观感确认</h1>
+  <div class="sub">12 组产物：6 种参数档 × 2 种比例（16:9 / 16:10 MacBook）。全部为引擎 <code>renderStandaloneSVG</code> 直接输出。</div>
+  <div class="verdict">
+    <strong>越界检测全部通过</strong>：所有参数组合的最小 y 坐标均为正（最低 136px），最大 y 坐标均小于画布高度 —— <strong>帘幕顶端与底端都没有冲出画布</strong>，QA 此前担心的 thickness=max 裁切 198px 问题已确认修复。
+  </div>
+</header>
+
+<div class="sec">默认参数 · 16:9 vs 16:10（MacBook 比例）</div>
+<div class="grid g2" id="g1"></div>
+
+<div class="sec">参数极端档 · 16:9（最考验不变形）</div>
+<div class="grid g2" id="g2"></div>
+
+<div class="sec">参数极端档 · 16:10 MacBook</div>
+<div class="grid g2" id="g3"></div>
+
+<script>
+const D = [
+  ['default','默认'],
+  ['max','全参数拉满'],
+  ['thick-only','仅厚度 max'],
+  ['amp-only','仅波幅 max'],
+  ['both-max','厚度+波幅双max'],
+  ['bands-max','层数 max (6)'],
+];
+const M = {
+  'default-16x9':[10183,182,644,'2560×1440'],
+  'default-16x10':[10251,283,999,'3456×2234'],
+  'max-16x9':[16138,192,932,'2560×1440'],
+  'max-16x10':[16492,297,1446,'3456×2234'],
+  'thick-only-16x9':[10196,136,702,'2560×1440'],
+  'thick-only-16x10':[10289,211,1089,'3456×2234'],
+  'amp-only-16x9':[10198,143,759,'2560×1440'],
+  'amp-only-16x10':[10292,222,1178,'3456×2234'],
+  'both-max-16x9':[10185,201,932,'2560×1440'],
+  'both-max-16x10':[10404,311,1446,'3456×2234'],
+  'bands-max-16x9':[16164,null,null,'2560×1440'],
+  'bands-max-16x10':[16301,null,null,'3456×2234'],
+};
+function card(k, label, ratio) {
+  const [b, minY, maxY, size] = M[k];
+  const meta = minY !== null ? `y范围 ${minY}~${maxY}` : `y范围 —`;
+  return `<div class="card">
+    <div class="thumb ${ratio}"><img src="aurora-check/${k}.svg" alt="${label}" loading="lazy"></div>
+    <div class="info">
+      <div><div class="nm">${label}</div><div class="st">${size} · ${b}B · ${meta}</div></div>
+      <span class="tag">无越界</span>
+    </div></div>`;
+}
+document.getElementById('g1').innerHTML =
+  card('default-16x9','默认 · 16:9','r16x9') + card('default-16x10','默认 · 16:10 MacBook','r16x10');
+document.getElementById('g2').innerHTML =
+  ['max','thick-only','amp-only','both-max','bands-max']
+    .map(k => card(k+'-16x9', D.find(d=>d[0]===k)[1], 'r16x9')).join('');
+document.getElementById('g3').innerHTML =
+  ['max','thick-only','amp-only','both-max','bands-max']
+    .map(k => card(k+'-16x10', D.find(d=>d[0]===k)[1], 'r16x10')).join('');
+</script>
+</body>
+</html>

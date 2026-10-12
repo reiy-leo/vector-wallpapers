@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant ER as ElementRow
+    participant ST as configStore
+    participant SEL as useStore selector
+    participant PC as PreviewCanvas
+    participant EN as renderSVG
+    participant DEFS as DefsRegistry
+
+    U->>ER: 拖动色卡 / 修改色标（连续 input）
+    ER->>ER: normalizeHex 校验 + 阻止非法字符
+    ER->>ST: setPaint(elementId, paintSpec)
+    ST->>ST: 不可变更新（复制 elements 数组）
+    ST-->>SEL: selector 订阅通知
+    SEL->>SEL: 浅比较，仅重渲染受影响订阅者
+    alt elements 引用变化
+        SEL->>PC: 传入新 config
+        PC->>PC: requestAnimationFrame 合并同帧多次变更
+        PC->>EN: renderSVG(def, cfg, {animate})
+        EN->>EN: resolveControls → resolveElements(按 id 对齐)
+        loop 每个 visible 元件
+            EN->>DEFS: linear()/radial() 注册渐变
+            DEFS-->>EN: 'url(#g-xxxx)'（同内容自动去重复用）
+        end
+        EN->>EN: def.render() → body
+        EN->>EN: budgetGuard（>20KB 抛错）
+        EN-->>PC: { body }
+        PC->>PC: innerHTML = `<svg width height viewBox><defs/>${body}</svg>`
+    else 仅面板 UI 需更新
+        SEL-->>ER: 跳过（不重渲染 SVG）
+    end
+    PC-->>U: 画面更新（60fps）
+    PC->>ST: debounce(300ms) → replaceState(写入 cols/params)

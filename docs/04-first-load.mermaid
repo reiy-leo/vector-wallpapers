@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    participant BR as 浏览器
+    participant IH as index.html 内联脚本
+    participant MA as main.tsx
+    participant UC as urlCodec
+    participant LS as persistence
+    participant RG as registry
+
+    BR->>IH: GET /?p=dusk-ridges&w=3440&...
+    IH->>LS: 读 localStorage 主题
+    IH->>IH: 立即 <html data-theme> 预置（早于 React，避免闪烁）
+    IH-->>BR: 首屏 HTML + CSS（防 FOUC）
+    BR->>MA: 执行 main.tsx
+    MA->>UC: resolveInitialConfig(location.search)
+    UC->>UC: 解析 p/w/h/seed/cols/params/ui
+    UC->>RG: get(patternId)
+    RG-->>UC: PatternDef（其 elements 数组为长度基准）
+    UC->>UC: cols 数量校验 → 不符则整段丢弃回落默认
+    UC->>UC: sanitize：按 id 对齐、clamp、填默认
+    alt URL 无参数
+        UC->>LS: readRecent() 取最近使用
+        UC->>RG: list()[0] 作兜底默认
+    end
+    UC-->>MA: { config, ui }
+    MA->>MA: ThemeProvider + store 初始化
+    MA->>MA: render(<App/>) —— 首屏即刻出画布，无白屏

@@ -1,0 +1,19 @@
+graph LR
+    subgraph ENC["分享者侧"]
+        A1["调参完成<br/>PatternConfig"] --> A2["paletteSlots 语义映射<br/>随机/批量改色"]
+        A2 --> A3["urlCodec.encode<br/>diff 编码 + 渐变简写"]
+        A3 --> A4["?p=&w=&h=&seed=&cols=&params=&ui="]
+        A4 --> A5["ShareButton 复制链接"]
+    end
+    subgraph DEC["新访客侧"]
+        B1["打开 URL"] --> B2["parse + 数量校验"]
+        B2 --> B3["resolveControls<br/>clamp + 枚举校验"]
+        B3 --> B4["resolveElements<br/>按 id 对齐（非下标）"]
+        B4 --> B5["合并默认 + 落 store"]
+        B5 --> B6["首屏即刻出画布"]
+    end
+    A5 -.复制粘贴.-> B1
+    B6 --> B7["改色 → 新 URL → 继续分享"]
+
+    style ENC fill:#e8f5e9,stroke:#43a047
+    style DEC fill:#e3f2fd,stroke:#1e88e5

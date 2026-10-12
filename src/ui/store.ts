@@ -1,0 +1,345 @@
+/**
+ * 工作台状态容器 —— 零依赖 external store。
+ *
+ * 为什么不引Zustand / Redux：本项目首屏 JS gzip 预算 300KB，
+ * 一个状态库就是 1~3KB gzip，加上它的 selector 缓存逻辑反而比自己写更重。
+ * React 19 自带的 `useSyncExternalStore` 已经能正确处理
+ * 并发渲染下的 tearing 问题 —— 这正是 Redux 曾经自研出来的部分。
+ *
+ * 两条设计纪律：
+ *  1. **renderSVG 的产物不进 store**。SVG 字符串体积大、变更频繁，
+ *     放进 state 会让所有订阅者一起重渲染。改为由组件自己
+ *     `useMemo(cfg)` 派生，store 只存「用户意图」。
+ *  2. **所有 mutator 返回新对象**，不做原地修改 —— 这样 `useSyncExternalStore`
+ *     的引用比较才有意义。
+ */
+import { useSyncExternalStore } from 'react';
+import {
+  DEFAULT_PATTERN_ID,
+  DEFAULT_SEED,
+  DEFAULT_SIZE,
+  LIMITS,
+  STORAGE_KEY,
+  URL_WRITE_DEBOUNCE_MS,
+} from '../shared/constants';
+import { clamp } from '../shared/guards';
+import { createDefaultConfig, structuredCloneConfig } from '../engine/render';
+import { registry } from '../patterns';
+import { decodeConfig, encodeConfig } from './share';
+import type { PatternConfig, UIState } from '../engine/types';
+import type { PatternDef, ParamValue } from '../patterns/types';
+
+export interface WorkbenchState {
+  cfg: PatternConfig;
+  ui: UIState;
+  /** 当前高亮的分类；'all' 表示显示全部。 */
+  category: string;
+  search: string;
+  /** 收藏的母题 id。 */
+  favorites: string[];
+}
+
+/** 读取 URL / localStorage 得到首屏状态 —— 无 window 时退回默认值。 */
+function initialState(): WorkbenchState {
+  const base: WorkbenchState = {
+    cfg: createDefaultConfig(registry.get(DEFAULT_PATTERN_ID)!, {
+      width: DEFAULT_SIZE.w,
+      height: DEFAULT_SIZE.h,
+      seed: DEFAULT_SEED,
+    }),
+    ui: { theme: readStoredTheme(), panel: 'right', focus: false, grid: false },
+    category: 'all',
+    search: '',
+    favorites: readFavorites(),
+  };
+
+  /**
+   * ⭐ URL 水合在**模块初始化时同步完成**，而不是挂载后再 effect。
+   *
+   * 若等到 useEffect，用户会先看到一帧默认母题再跳到链接指定的母题 ——
+   * 分享链接的「打开即所见」体验就没了。模块初始化早于首次渲染，
+   * 因此首帧就是正确画面。
+   */
+  if (typeof window !== 'undefined') {
+    const decoded = decodeConfig(window.location.search);
+    if (decoded.cfg) base.cfg = decoded.cfg;
+    if (decoded.ui.theme) base.ui.theme = decoded.ui.theme;
+    if (decoded.ui.panel) base.ui.panel = decoded.ui.panel;
+    if (decoded.ui.grid !== undefined) base.ui.grid = decoded.ui.grid;
+  }
+  return base;
+}
+
+let state: WorkbenchState = initialState();
+const listeners = new Set<() => void>();
+function emit(): void {
+  for (const l of listeners) l();
+}
+
+function set(patch: Partial<WorkbenchState>): void {
+  state = { ...state, ...patch };
+  emit();
+}
+
+/* ── 配置 mutator（全部返回新对象） ────────────────────────────── */
+
+function patchCfg(patch: Partial<PatternConfig>): void {
+  set({ cfg: { ...state.cfg, ...patch } });
+}
+
+/** 替换单个元件的字段。 */
+export function patchElement(id: string, patch: Partial<PatternConfig['elements'][number]>): void {
+  set({
+    cfg: {
+      ...state.cfg,
+      elements: state.cfg.elements.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    },
+  });
+}
+
+/** 批量替换元件列表（引擎的 recolorByRole / applyPaletteSlots 返回整体新配置）。 */
+export function setConfig(next: PatternConfig): void {
+  set({ cfg: next });
+}
+
+export function setParam(key: string, value: ParamValue): void {
+  set({ cfg: { ...state.cfg, params: { ...state.cfg.params, [key]: value } } });
+}
+
+export function setSize(width: number, height: number): void {
+  patchCfg({
+    width: clamp(Math.round(width), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION),
+    height: clamp(Math.round(height), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION),
+  });
+}
+
+export function setSeed(seed: number): void {
+  patchCfg({ seed: clamp(Math.round(seed), 0, 999_999) });
+}
+
+/**
+ * 切换母题。
+ *
+ * ⚠️ 不做「保留当前配色」：不同母题的元件集合完全不同，
+ * 强行按 id 套用会留下大量无意义的状态。切母题即回到该母题的默认态，
+ * 这也是用户预期的心智模型。
+ */
+export function selectPattern(id: string, keepSize = true): void {
+  const def = registry.get(id);
+  if (!def) return;
+  const next = createDefaultConfig(def, {
+    width: keepSize ? state.cfg.width : DEFAULT_SIZE.w,
+    height: keepSize ? state.cfg.height : DEFAULT_SIZE.h,
+    seed: state.cfg.seed,
+  });
+  set({ cfg: next, search: '' });
+}
+
+/** 恢复当前母题的默认配置（保留尺寸与 seed）。 */
+export function resetConfig(): void {
+  const def = registry.get(state.cfg.patternId);
+  if (!def) return;
+  set({
+    cfg: createDefaultConfig(def, {
+      width: state.cfg.width,
+      height: state.cfg.height,
+      seed: state.cfg.seed,
+    }),
+  });
+}
+
+/* ── UI mutator ───────────────────────────────────────────────── */
+
+export function setUI(patch: Partial<UIState>): void {
+  set({ ui: { ...state.ui, ...patch } });
+}
+
+export function setSearch(search: string): void {
+  set({ search });
+}
+
+export function setCategory(category: string): void {
+  set({ category });
+}
+
+/** 收藏切换 —— 收藏是 store 的一部分，右栏与顶栏因此能读到同一份状态。 */
+export function toggleFavorite(id: string): boolean {
+  const cur = state.favorites;
+  const next = cur.includes(id)
+    ? cur.filter((x) => x !== id)
+    : [id, ...cur].slice(0, LIMITS.MAX_FAVORITES);
+  writeFavorites(next);
+  set({ favorites: next });
+  return next.includes(id);
+}
+
+/* ── 主题持久化 ───────────────────────────────────────────────── */
+
+/**
+ * 应用主题到 <html>。
+ *
+ * ⚠️ `'system'` 时必须**移除** data-theme 属性而不是写 `data-theme="system"`——
+ * CSS 里是 `[data-theme='dark']` 精确匹配，写上 system 会让深色规则失效。
+ */
+export function applyTheme(theme: UIState['theme']): void {
+  const root = document.documentElement;
+  if (theme === 'system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', theme);
+}
+
+function readStoredTheme(): UIState['theme'] {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY.theme);
+    return v === 'light' || v === 'dark' ? v : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+export function persistTheme(theme: UIState['theme']): void {
+  try {
+    localStorage.setItem(STORAGE_KEY.theme, theme);
+  } catch {
+    /* 隐私模式下 localStorage 会抛错，主题偏好丢失可接受，不影响功能 */
+  }
+}
+
+/** 首屏挂载时调用：把持久化的主题落回 store 与 DOM。 */
+export function initTheme(): void {
+  const theme = readStoredTheme();
+  applyTheme(theme);
+  if (theme !== state.ui.theme) setUI({ theme });
+}
+
+/* ── URL 同步 ─────────────────────────────────────────────────── */
+
+let urlTimer = 0;
+
+/**
+ * 把配置写入地址栏。
+ *
+ * 用 `replaceState` 而非 `pushState`：拖动滑块会连续触发，
+ * pushState 会让浏览器后退键需要按几十次才能离开页面。
+ * 300ms 防抖保证高频操作不会每帧都碰历史记录（PRD P0-6）。
+ */
+export function scheduleUrlSync(getConfig: () => PatternConfig, ui: UIState): void {
+  if (typeof window === 'undefined') return;
+  window.clearTimeout(urlTimer);
+  urlTimer = window.setTimeout(() => {
+    const qs = encodeConfig(getConfig(), ui);
+    const url = window.location.pathname + (qs ? `?${qs}` : '');
+    window.history.replaceState(null, '', url);
+  }, URL_WRITE_DEBOUNCE_MS);
+}
+
+/* ── React 绑定 ───────────────────────────────────────────────── */
+
+const subscribe = (cb: () => void): (() => void) => {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+};
+
+const getSnapshot = (): WorkbenchState => state;
+
+/**
+ * SSR / 预渲染快照。
+ *
+ * ⚠️ 必须是**同一个对象**，不能每次调用 `initialState()` ——
+ * `useSyncExternalStore` 依赖引用相等判断是否变化，每次新建会让
+ * React 认为状态一直在变，在预渲染阶段触发无限循环。
+ */
+const serverSnapshot: WorkbenchState = {
+  cfg: createDefaultConfig(registry.get(DEFAULT_PATTERN_ID)!, {
+    width: DEFAULT_SIZE.w,
+    height: DEFAULT_SIZE.h,
+    seed: DEFAULT_SEED,
+  }),
+  ui: { theme: 'system', panel: 'right', focus: false, grid: false },
+  category: 'all',
+  search: '',
+  favorites: [],
+};
+
+/** 订阅整个 store —— 适合读多个字段的面板。 */
+export function useWorkbench(): WorkbenchState {
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverSnapshot);
+}
+
+/**
+ * 订阅单个字段 —— 适合只关心一件事的组件。
+ *
+ * ⚠️ selector 必须返回**原始值或稳定引用**。
+ * 返回 `new Set(...)` / 对象字面量会让每次渲染都判定为「变了」，
+ * 触发无限重渲染 —— 这是 useSyncExternalStore 最常见的误用。
+ */
+export function useWorkbenchSelector<T>(selector: (s: WorkbenchState) => T): T {
+  return useSyncExternalStore(subscribe, () => selector(state), () => selector(serverSnapshot));
+}
+
+/** 当前母题定义。 */
+export function usePatternDef(): PatternDef {
+  const id = useWorkbenchSelector((s) => s.cfg.patternId);
+  return registry.get(id) ?? registry.first()!;
+}
+
+/** 就地读取当前配置（给命令式调用点用，避免订阅）。 */
+export function getConfig(): PatternConfig {
+  return state.cfg;
+}
+
+export function getState(): WorkbenchState {
+  return state;
+}
+
+export function subscribeToStore(cb: () => void): () => void {
+  return subscribe(cb);
+}
+
+/** 收藏（PRD P0-7）：存 pattern id 列表。 */
+export function readFavorites(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY.favorites);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeFavorites(ids: string[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY.favorites, JSON.stringify(ids.slice(0, LIMITS.MAX_FAVORITES)));
+  } catch {
+    /* 同上：写入失败仅丢失收藏，不阻断主流程 */
+  }
+}
+
+/** 最近使用（PRD P0-7：最多 8 个）。 */
+export function pushRecent(id: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY.recent);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    const prev = Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+    const next = [id, ...prev.filter((x) => x !== id)].slice(0, LIMITS.MAX_RECENT);
+    localStorage.setItem(STORAGE_KEY.recent, JSON.stringify(next));
+  } catch {
+    /* 忽略 */
+  }
+}
+
+export function readRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY.recent);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export { structuredCloneConfig };
+export type { PatternConfig, UIState };

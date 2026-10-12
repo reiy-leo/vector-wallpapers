@@ -1,0 +1,71 @@
+graph TB
+    subgraph UI["UI 层 · src/ui（React + MUI）"]
+        TOP["TopBar<br/>分类/合集/画廊/收藏/主题/分享/导出"]
+        LIB["PatternLibrary 280px<br/>搜索+分类Tab+缩略图网格"]
+        CAN["PreviewCanvas<br/>实时SVG + 工具条"]
+        EPA["ElementPanel 340px<br/>元件级配色（核心）"]
+        PRP["ParamControls<br/>参数化控件"]
+        PAL["PaletteBar<br/>预设色板/随机/锁定"]
+        SRC["SourcePanel<br/>源码查看与复制"]
+        FAV["Gallery / Favorites / Sets"]
+    end
+
+    subgraph STATE["状态层 · src/state"]
+        ST["configStore<br/>自研 external store"]
+        ACT["actions<br/>setPaint/setParam/setSize/regenerate"]
+        URL["urlCodec<br/>PRD 格式 ⇄ PatternConfig"]
+        PER["persistence<br/>localStorage 收藏/最近/主题/色板"]
+    end
+
+    subgraph REG["Pattern Registry · src/patterns"]
+        RG["registry<br/>register/get/listByCategory"]
+        PA["A-lines × 5"]
+        PB["B-repeat × 5"]
+        PC["C-organic × 5"]
+        PD["D-pixel × 4"]
+    end
+
+    subgraph ENGINE["渲染引擎（纯函数）· src/engine"]
+        REND["renderSVG<br/>唯一渲染入口"]
+        DEFS["DefsRegistry<br/>渐变/图案/裁剪 + 去重"]
+        SB["svgBuilder<br/>el/rect/circle/path/use"]
+        RNG["mulberry32<br/>确定性随机"]
+        MAP["paintToPaintAttr<br/>PaintSpec → fill/stroke"]
+        GUA["budgetGuard<br/>20KB 硬断言"]
+    end
+
+    subgraph EXPORT["导出层 · src/export"]
+        SE["svgExport"]
+        PE["pngExport<br/>分片 + OffscreenCanvas"]
+        CP["clipboard<br/>SVG/CSS/HTML/data-URI"]
+    end
+
+    PRE["scripts/prerender.mjs<br/>P2 可选：SEO 预渲染"]
+
+    TOP & LIB & CAN & EPA & PRP & PAL & SRC & FAV --> ST
+    ST --> ACT
+    ST --> URL
+    ST --> PER
+    ST --> REND
+
+    REND --> RG
+    REND --> DEFS
+    REND --> SB
+    REND --> RNG
+    REND --> MAP
+    REND --> GUA
+
+    RG --> PA & PB & PC & PD
+    PA & PB & PC & PD -.实现 PatternDef.-> REND
+
+    SE --> REND
+    PE --> REND
+    CP --> REND
+    PRE -.构建期调用同一引擎.-> REND
+
+    classDef pure fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    classDef ui fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1
+    classDef st fill:#fff3e0,stroke:#fb8c00,color:#e65100
+    class REND,DEFS,SB,RNG,MAP pure
+    class TOP,LIB,CAN,EPA,PRP,PAL,SRC,FAV ui
+    class ST,ACT,URL,PER st

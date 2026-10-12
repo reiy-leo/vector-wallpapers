@@ -1,0 +1,133 @@
+classDiagram
+    direction TB
+
+    class PatternDef {
+        <<interface>>
+        +PatternId id
+        +string name
+        +PatternCategory category
+        +ElementSpec[] elements
+        +ControlDef[] controls
+        +boolean seedable
+        +boolean animatable
+        +Record paletteSlots
+        +render(def, cfg, api) RenderResult
+    }
+
+    class ElementSpec {
+        +string id
+        +string label
+        +ElementRole role
+        +PaintSpec paint
+        +number opacity
+        +boolean visible
+        +boolean locked
+    }
+
+    class PaintSpec {
+        <<union>>
+        +solid: color
+        +linear: angle, stops
+        +radial: cx, cy, r, stops
+        +none
+    }
+
+    class ControlDef {
+        <<discriminated union>>
+        +string key
+        +string label
+        +range / toggle / select / angle
+        +min, max, step
+        +ParamValue default
+        +boolean heavy
+    }
+
+    class PatternConfig {
+        +PatternId patternId
+        +number width
+        +number height
+        +number seed
+        +ElementConfig[] elements
+        +Record params
+    }
+
+    class ElementConfig {
+        +string id
+        +PaintSpec paint
+        +number opacity
+        +boolean visible
+        +boolean locked
+    }
+
+    class ResolvedConfig {
+        +number width
+        +number height
+        +number seed
+        +boolean animate
+        +Map elements
+        +Record params
+        +Function rng
+    }
+
+    class ResolvedElement {
+        +string id
+        +ElementRole role
+        +string paintValue
+        +number opacity
+        +boolean visible
+    }
+
+    class RenderApi {
+        <<interface>>
+        +linear(p) string
+        +radial(p) string
+        +tile(t) string
+        +clip(id, shape) string
+        +n(v) string
+    }
+
+    class DefsRegistry {
+        +linear(p) string
+        +radial(p) string
+        +tile(t) string
+        +keyframes(name, css)
+        +serialize() string
+    }
+
+    class PatternRegistry {
+        <<interface>>
+        +register(defs)
+        +get(id) PatternDef
+        +list() PatternDef[]
+        +listByCategory(c)
+        +search(q)
+    }
+
+    class ConfigStore {
+        +getState()
+        +setPaint(id, paint)
+        +setParam(key, value)
+        +setSize(w, h)
+        +regenerateSeed()
+        +toggleFavorite()
+    }
+
+    PatternDef "1" *-- "n" ElementSpec : declares
+    PatternDef "1" *-- "n" ControlDef : declares
+    ElementSpec "1" --> "1" PaintSpec : holds
+    PatternDef "1" --> "1" RenderResult : produces
+
+    PatternConfig "1" *-- "n" ElementConfig : ordered array
+    ElementConfig "1" --> "1" PaintSpec : holds
+
+    ResolvedConfig "1" --> "n" ResolvedElement : resolves
+    ResolvedConfig "1" --> "1" DefsRegistry : via api
+
+    PatternRegistry "1" o-- "n" PatternDef : holds
+    ConfigStore "1" --> "1" PatternConfig : owns
+    ConfigStore "1" --> "1" PatternDef : current
+
+    classDef iface fill:#e8f5e9,stroke:#43a047,color:#1b5e20
+    classDef store fill:#fff3e0,stroke:#fb8c00,color:#e65100
+    class PatternDef,PatternRegistry,RenderApi iface
+    class ConfigStore store

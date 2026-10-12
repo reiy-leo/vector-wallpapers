@@ -1,0 +1,504 @@
+/**
+ * 设计 token 层 —— 工作台的唯一视觉真源。
+ *
+ * 三条集成铁律（架构 §1.2）：
+ *  1. **只导入 utilities，跳过 preflight** —— `@import "tailwindcss/preflight.css"`
+ *     被显式注释掉，改为不引入；否则 Tailwind 的 reset 会破坏 MUI 组件结构。
+ *     ⚠️ 代价：preflight 提供的重置要在这里手工补齐（见下方「preflight 替代品」）。
+ *  2. MUI Theme 与 Tailwind 共用同一套 `--vw-*` 变量（唯一耦合点）。
+ *  3. 组件内禁止字面色值，一律用语义 token。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 设计原则：「暗房」
+ * 界面外壳保持中性、去饱和，把所有色彩预算留给画布里的壁纸。
+ * 因此 --vw-brand 只用于「选中 / 焦点 / 主操作」三类状态，
+ * 不参与任何装饰性表达 —— 用户看到的第一个彩色物体应该是壁纸本身。
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/**
+ * Tailwind v4 token 映射。
+ *
+ * ⚠️ 必须用 `inline`：本项目的 token 值是 CSS 变量的引用（`var(--vw-*)`），
+ * 而这些变量会随[data-theme] 在运行时切换。若写成普通 `@theme`，
+ * Tailwind 会在**构建期**把值解析成静态字面量，深色主题将永远失效。
+ * `inline` 让引用原样进入产物，运行时才求值 —— 这是深色模式能工作的前提。
+ */
+@theme inline {
+  /* 表面：从最深的画布底到最高的浮层 */
+  --color-canvas: var(--vw-canvas);
+  --color-surface: var(--vw-surface);
+  --color-surface-2: var(--vw-surface-2);
+  --color-surface-3: var(--vw-surface-3);
+  --color-overlay: var(--vw-overlay);
+
+  /* 描边 */
+  --color-line: var(--vw-line);
+  --color-line-strong: var(--vw-line-strong);
+  /* 表单控件描边：≥3:1（WCAG 1.4.11），与装饰性分隔线区分开 */
+  --color-line-input: var(--vw-line-input);
+
+  /* 文字 */
+  --color-fg: var(--vw-text);
+  --color-fg-soft: var(--vw-text-soft);
+  --color-fg-mute: var(--vw-text-mute);
+  --color-fg-inverse: var(--vw-text-inverse);
+
+  /* 品牌：仅用于选中 / 焦点 / 主操作 */
+  --color-brand: var(--vw-brand);
+  --color-brand-hover: var(--vw-brand-hover);
+  --color-brand-active: var(--vw-brand-active);
+  --color-brand-tint: var(--vw-brand-tint);
+  --color-on-brand: var(--vw-on-brand);
+
+  /* 状态 */
+  --color-danger: var(--vw-danger);
+  --color-danger-tint: var(--vw-danger-tint);
+  --color-warning: var(--vw-warning);
+  --color-warning-tint: var(--vw-warning-tint);
+  --color-success: var(--vw-success);
+  --color-success-tint: var(--vw-success-tint);
+
+  /* 字体：系统栈，零 Web Font（PRD P0-9） */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /**
+   * 字号阶梯。
+   * ⚠️ Kumo 规则 `content-text-size`：正文、按钮、数据、可交互控件一律 14px，
+   * 16px 及以上**只允许**用于标题与副标题。12/13px 仅限纯装饰性的元信息
+   * （计数、时间戳），不承载可交互文案。
+   */
+  --text-2xs: 11px; /* 徽标计数，最小号 */
+  --text-xs: 12px; /* 次要元信息 */
+  --text-sm: 13px; /* 密集表格 / 次要标签 */
+  --text-base: 14px; /* ← 正文、按钮、输入框、数据的默认档 */
+  --text-md: 16px; /* 副标题 */
+  --text-lg: 18px; /* 区块标题 */
+  --text-xl: 20px; /* 页面标题 */
+  --text-2xl: 24px; /* 展示型标题 */
+
+  /* 间距：4px 基准 */
+  --spacing: 4px;
+
+  /* 圆角：同心圆角规则的取值集合（外= 内 + padding） */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* 阴影：只用于浮层（弹窗/菜单）与画布中的作品，不与描边同时出现 */
+  --shadow-pop: 0 8px 24px oklch(0 0 0 / 0.28), 0 2px 6px oklch(0 0 0 / 0.18);
+  --shadow-canvas: 0 8px 32px oklch(0 0 0 / 0.32), 0 1px 3px oklch(0 0 0 / 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 主题变量
+ * --------------------------------------------------------------------- */
+
+/** 浅色（默认声明） */
+:root {
+  --vw-canvas: oklch(0.985 0.002 264);
+  --vw-surface: oklch(1 0 0);
+  --vw-surface-2: oklch(0.972 0.003 264);
+  --vw-surface-3: oklch(0.945 0.004 264);
+  --vw-overlay: oklch(0.3 0.02 264 / 0.45);
+
+  --vw-line: oklch(0.912 0.005 264);
+  --vw-line-strong: oklch(0.8 0.008 264);
+  --vw-line-input: oklch(0.56 0.008 264);
+
+  --vw-text: oklch(0.22 0.014 264);
+  --vw-text-soft: oklch(0.44 0.016 264);
+  --vw-text-mute: oklch(0.52 0.016 264);
+  --vw-text-inverse: oklch(0.99 0.002 264);
+
+  --vw-brand: oklch(0.5 0.19 256);
+  --vw-brand-hover: oklch(0.44 0.19 256);
+  --vw-brand-active: oklch(0.56 0.18 256);
+  --vw-brand-tint: oklch(0.5 0.19 256 / 0.1);
+  --vw-on-brand: oklch(0.99 0.002 264);
+
+  --vw-danger: oklch(0.55 0.2 25);
+  --vw-danger-tint: oklch(0.55 0.2 25 / 0.1);
+  --vw-warning: oklch(0.52 0.14 70);
+  --vw-warning-tint: oklch(0.52 0.14 70 / 0.12);
+  --vw-success: oklch(0.52 0.14 155);
+  --vw-success-tint: oklch(0.52 0.14 155 / 0.12);
+}
+
+/**
+ * 深色（显式选择）。
+ *
+ * 界面外壳刻意压到L≈0.18~0.31 的窄区间：够暗能让作品「浮起来」，
+ * 又不能暗到与画布内的深色壁纸糊在一起，因此画布容器比外壳更亮一档。
+ */
+:root[data-theme='dark'] {
+  --vw-canvas: oklch(0.18 0.012 264);
+  --vw-surface: oklch(0.222 0.014 264);
+  --vw-surface-2: oklch(0.268 0.016 264);
+  --vw-surface-3: oklch(0.31 0.018 264);
+  --vw-overlay: oklch(0.12 0.01 264 / 0.72);
+
+  --vw-line: oklch(0.32 0.016 264);
+  --vw-line-strong: oklch(0.44 0.022 264);
+  --vw-line-input: oklch(0.6 0.02 264);
+
+  --vw-text: oklch(0.97 0.003 264);
+  --vw-text-soft: oklch(0.78 0.014 264);
+  --vw-text-mute: oklch(0.68 0.016 264);
+  --vw-text-inverse: oklch(0.18 0.014 264);
+
+  --vw-brand: oklch(0.7 0.16 256);
+  --vw-brand-hover: oklch(0.78 0.15 256);
+  --vw-brand-active: oklch(0.62 0.17 256);
+  --vw-brand-tint: oklch(0.7 0.16 256 / 0.14);
+  --vw-on-brand: oklch(0.16 0.02 256);
+
+  --vw-danger: oklch(0.7 0.18 22);
+  --vw-danger-tint: oklch(0.7 0.18 22 / 0.14);
+  --vw-warning: oklch(0.8 0.15 85);
+  --vw-warning-tint: oklch(0.8 0.15 85 / 0.14);
+  --vw-success: oklch(0.74 0.16 155);
+  --vw-success-tint: oklch(0.74 0.16 155 / 0.14);
+}
+
+/**
+ * 跟随系统。
+ * ⚠️ `:not([data-theme='light'])` 是必要的：显式选「浅色」时，
+ * 系统为深色也必须被尊重，否则「浅色」这个选项在深色系统上会失效。
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --vw-canvas: oklch(0.18 0.012 264);
+    --vw-surface: oklch(0.222 0.014 264);
+    --vw-surface-2: oklch(0.268 0.016 264);
+    --vw-surface-3: oklch(0.31 0.018 264);
+    --vw-overlay: oklch(0.12 0.01 264 / 0.72);
+
+    --vw-line: oklch(0.32 0.016 264);
+    --vw-line-strong: oklch(0.44 0.022 264);
+    --vw-line-input: oklch(0.6 0.02 264);
+
+    --vw-text: oklch(0.97 0.003 264);
+    --vw-text-soft: oklch(0.78 0.014 264);
+    --vw-text-mute: oklch(0.68 0.016 264);
+    --vw-text-inverse: oklch(0.18 0.014 264);
+
+    --vw-brand: oklch(0.7 0.16 256);
+    --vw-brand-hover: oklch(0.78 0.15 256);
+    --vw-brand-active: oklch(0.62 0.17 256);
+    --vw-brand-tint: oklch(0.7 0.16 256 / 0.14);
+    --vw-on-brand: oklch(0.16 0.02 256);
+
+    --vw-danger: oklch(0.7 0.18 22);
+    --vw-danger-tint: oklch(0.7 0.18 22 / 0.14);
+    --vw-warning: oklch(0.8 0.15 85);
+    --vw-warning-tint: oklch(0.8 0.15 85 / 0.14);
+    --vw-success: oklch(0.74 0.16 155);
+    --vw-success-tint: oklch(0.74 0.16 155 / 0.14);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * preflight 替代品
+ *
+ * preflight 被刻意跳过（见文件头），因此它原本提供的重置必须手工补齐。
+ * 缺任何一条都会出现「按钮字体不继承 / 列表有默认项目符号」这类脏样式。
+ * ───────────────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--vw-canvas);
+  color: var(--vw-text);
+  font-family: var(--font-sans);
+  font-size: 14px; /* Kumo content-text-size：正文统一 14px */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/**
+ * `[hidden]` 必须显式复原为 `display: none`。
+ *
+ * ⚠️ 这条是被真实截图抓出来的 bug：因为本项目**跳过了 preflight**，
+ * 浏览器默认样式表里的 `[hidden] { display: none }` 在我们自己的
+ * author stylesheet 面前优先级不足 —— 只要元素上带了 `display:flex`
+ * 之类的工具类，`hidden` 属性就完全失效，弹窗会常驻在页面上。
+ *
+ * 用 `!important` 是因为 Tailwind 工具类的特异性同样压过浏览器默认值，
+ * 常规声明赢不了它。这与「Kumo 不条件渲染弹窗」的规则直接相关：
+ * 我们靠 `hidden` 控制显隐，这条一失效，整个弹窗动画策略就散了。
+ */
+[hidden] {
+  display: none !important;
+}
+
+/**
+ * 表单元素字体继承。
+ *
+ * ⚠️ 浏览器给button / input / select / textarea 的默认 font 是系统 UI 字体，
+ * 且**不继承** body —— 不写这条，按钮文字会与旁边的正文对不上字号与字重，
+ * 这是 preflight 最常被依赖的一条规则，务必保留。
+ */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/**
+ * 焦点态必须可见（PRD P0-9 可访问性 · WCAG 2.4.7）。
+ * 用 outline 而非 box-shadow —— 前者在 Windows 高对比度模式下依然存在。
+ */
+:focus-visible {
+  outline: 2px solid var(--vw-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/** 仅供读屏软件（Kumo：图标必须有无障碍名称）。 */
+.vw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/** 跳到主内容（键盘用户的第一个 Tab 停靠点）。 */
+.vw-skip-link {
+  position: absolute;
+  top: -100px;
+  left: 12px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--vw-brand);
+  color: var(--vw-on-brand);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.vw-skip-link:focus {
+  top: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 组件级样式：原生控件的跨浏览器统一
+ * 放在这里而非 @apply，是因为这些选择器（::-webkit-slider-thumb 等）
+ * 在 Tailwind 工具类里没有对应物。
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 滑块。
+ *
+ * Kumo 规则`hover-color-transitions`：hover 的颜色变化必须瞬时完成。
+ * 这里只对滑块「位置」加过渡，轨道与拇指的颜色一律瞬时切换 ——
+ * 拖动时拇指跟手的观感来自位置过渡，颜色若也跟着渐变就会显得黏。
+ */
+.vw-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.vw-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--vw-surface-3);
+}
+
+.vw-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--vw-surface-3);
+}
+
+.vw-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px; /* (4 - 14) / 2，让拇指与 4px 轨道垂直居中 */
+  border-radius: 999px;
+  background: var(--vw-brand);
+  border: 0;
+  transition: transform 120ms ease;
+}
+
+.vw-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--vw-brand);
+  border: 0;
+  box-sizing: border-box;
+}
+
+.vw-slider:hover::-webkit-slider-thumb {
+  background: var(--vw-brand-hover);
+}
+
+.vw-slider:hover::-moz-range-thumb {
+  background: var(--vw-brand-hover);
+}
+
+.vw-slider:active::-webkit-slider-thumb {
+  background: var(--vw-brand-active);
+  transform: scale(1.15);
+}
+
+.vw-slider:active::-moz-range-thumb {
+  background: var(--vw-brand-active);
+}
+
+.vw-slider:focus-visible {
+  outline-offset: -2px;
+}
+
+/** 数值输入框：去掉数字输入框的上下箭头，避免与「拖动调值」语义冲突。 */
+.vw-number {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.vw-number::-webkit-outer-spin-button,
+.vw-number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/**
+ * 原生取色器。
+ * 缩到 1px 并用绝对定位外框承接点击 —— 保留系统取色器（含无障碍与
+ * 键盘操作），同时让视觉呈现完全由外层样式控制。
+ */
+.vw-color-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/** 滚动条：细、低对比，不与内容抢注意力。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vw-line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--vw-line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--vw-text-mute);
+  background-clip: content-box;
+}
+
+/**
+ * 画布背板。
+ * 极淡的棋盘格 —— 只为让**浅色**壁纸也有清晰边界，几乎不可见但有效。
+ */
+.vw-stage {
+  background-color: var(--vw-surface);
+  background-image:
+    linear-gradient(45deg, var(--vw-surface-2) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--vw-surface-2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--vw-surface-2) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--vw-surface-2) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+/**
+ * 减少动效。
+ * 壁纸本身是「静态导出」的产品（PRD Q1），动效只用于界面反馈，
+ * 因此这里关掉界面动效不影响任何产品能力。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

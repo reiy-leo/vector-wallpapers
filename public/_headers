@@ -1,0 +1,28 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()
+
+  # CSP 说明（架构 §11.2）：
+  #  · script-src 不加 'unsafe-inline' —— Vite 产物全为外部文件；
+  #    index.html 的防闪烁脚本已外置为 /theme-boot.js（见 index.html 注释）。
+  #  · style-src 需 'unsafe-inline' —— Tailwind v4 运行时注入 CSS 变量，
+  #    MUI/Emotion 运行时注入组件样式，SVG 内部亦可能带 <style> 动画。
+  #  · img-src 需 data: blob: —— 缩略图 data URI 与 PNG 导出的 Blob URL。
+  #  · 不设任何外部域 —— PRD NFR「无第三方请求」。
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+
+# hash 化产物 → 永久不可变
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML 绝不缓存：状态全在 query string，不影响缓存键，保证新版本立即生效
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon.svg
+  Cache-Control: public, max-age=86400
+
+/theme-boot.js
+  Cache-Control: public, max-age=0, must-revalidate
