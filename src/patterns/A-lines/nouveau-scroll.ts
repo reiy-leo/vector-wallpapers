@@ -9,17 +9,22 @@
  *  - `flow-lines` 是**开放平行流线**，无递归、无卷曲
  *  - 本母题是**递归 + 有端点 + 螺旋收紧**，三者皆不同
  *
- * ⭐ 节点控制：递归深度直接决定节点数，故上限较严（默认 4 层）。
- * 深度是显式参数而非写死，用户调到 6 层时仍需确认不破 60 上限。
+ * 2026-10-12 改版（Rei：每块形状可以随机）：不再用 <pattern> 平铺同一单元，
+ * 整幅 best-candidate 散布卷草簇，每簇的圈数 / 收紧 / 方向 / 旋向 / 大小按「随机度」各自偏离；
+ * 压边簇在对边用同一子种子复制 → 可无缝平铺。同元件合成一条 path，节点数恒定；BYTE_CAP 兜体积。
  */
-import { g, path, rect } from '../../engine/svg';
-import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
+import { path, rect } from '../../engine/svg';
+import { mulberry32 } from '../../engine/rng';
+import type { PatternDef, ResolvedConfig, RenderResult } from '../types';
+
+/** path 数据体积上限：保证任意尺寸/参数都不击穿 20KB。 */
+const BYTE_CAP = 16500;
 
 const def: PatternDef = {
   id: 'nouveau-scroll',
   name: '涡卷曲线',
   category: 'A-lines',
-  description: '自相似递归的对数螺线涡卷，层层收紧的卷草纹，优雅有机。',
+  description: '自相似递归的对数螺线涡卷随意散布，每簇的圈数、方向、大小都不同，优雅有机。',
   seedable: true,
   animatable: false,
 
@@ -31,7 +36,8 @@ const def: PatternDef = {
   ],
 
   controls: [
-    { key: 'cell', label: '单元尺寸', type: 'range', min: 80, max: 320, step: 10, default: 180, heavy: true },
+    { key: 'cell', label: '单元尺寸', type: 'range', min: 160, max: 480, step: 10, default: 260, heavy: true },
+    { key: 'vary', label: '随机度', type: 'range', min: 0, max: 1, step: 0.05, default: 0.6 },
     { key: 'turns', label: '旋转圈数', type: 'range', min: 1.2, max: 3.5, step: 0.1, default: 2.2 },
     { key: 'tighten', label: '收紧系数', type: 'range', min: 0.15, max: 0.6, step: 0.01, default: 0.34 },
     { key: 'depth', label: '递归层数', type: 'range', min: 1, max: 5, step: 1, default: 3 },
@@ -77,149 +83,136 @@ const def: PatternDef = {
 
   paletteSlots: { bg: ['bg'], primary: ['stem'], secondary: ['scroll'], accent: ['bud'] },
 
-  render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
+  render(_def, cfg: ResolvedConfig): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const cell = Math.max(80, Number(params.cell));
-    const turns = Math.max(1.2, Math.min(3.5, Number(params.turns)));
-    const tighten = Math.max(0.15, Math.min(0.6, Number(params.tighten)));
+    // 尺寸按短边归一化（1080 基准）→ 与分辨率无关
+    const unitPx = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
+    const cell = Math.max(160, Number(params.cell)) * unitPx;
+    const turns0 = Math.max(1.2, Math.min(3.5, Number(params.turns)));
+    const tighten0 = Math.max(0.15, Math.min(0.6, Number(params.tighten)));
     const depth = Math.round(Math.max(1, Math.min(5, Number(params.depth))));
     const sides = Number(params.sides) === 1 ? 1 : Number(params.sides) === 4 ? 4 : 2;
+    const vary = Math.max(0, Math.min(1, Number(params.vary ?? 0.6)));
 
     const bg = elements.get('bg')!;
     const stem = elements.get('stem')!;
     const scroll = elements.get('scroll')!;
     const bud = elements.get('bud')!;
 
-    const marks: string[] = [];
+    // 同一元件的所有涡卷合成一条 path（节点数恒定）
+    let stemD = '';
+    let scrollD = '';
+    let budD = '';
+    // 大画布取整到 1px，小画布保留 1 位小数：肉眼无差，体积省一截
+    const q = unitPx >= 1 ? 1 : 10;
+    const R = (v: number): number => Math.round(v * q) / q;
 
     /**
-     * 对数螺线涡卷。
-     *
-     * `r(θ) = r0 · tighten^(θ/2π)` —— 每转一圈半径乘以 `tighten`，
-     * 因此收紧是**指数**的，这正是涡卷「越卷越小」的观感来源。
-     * 采样 24 段贝塞尔足够，段数再增只是浪费字节。
+     * 对数螺线卷：**从起点 (sx,sy) 向内卷**，r(t) = r0 · tighten^(t·turns)。
+     * 圆心放在起点沿 rot 的反方向 r0 处，于是曲线恰好从给定点出发 —— 子卷能从母卷身上「长出来」。
+     * 返回折线 d 与曲线上的采样点（供子卷取出芽点）。
      */
-    const spiral = (
-      cx0: number,
-      cy0: number,
-      r0: number,
-      rot: number,
-      dir: number,
-      stroke: string,
-      widthScale: number,
-      opacity: number,
-    ): { d: string; tipX: number; tipY: number } => {
-      const steps = 26;
-      let d = '';
-      let lastX = cx0;
-      let lastY = cy0;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const theta = rot + dir * turns * Math.PI * 2 * t;
+    const curl = (sx: number, sy: number, rot: number, r0: number, dir: number, turns: number, tighten: number) => {
+      const cx = sx - r0 * Math.cos(rot);
+      const cy = sy - r0 * Math.sin(rot);
+      const steps = Math.max(10, Math.min(30, Math.round(turns * 7 + (r0 / unitPx) / 10)));
+      let px = R(sx);
+      let py = R(sy);
+      let d = `M${px} ${py}`;
+      const pts: Array<[number, number, number]> = [[sx, sy, rot]];
+      for (let i = 1; i <= steps; i++) {
+        // 外圈弧长大、内圈小：采样向外圈加密（u^1.7），同样段数下外圈不再折角
+        const t = Math.pow(i / steps, 1.7);
+        const th = rot + dir * turns * Math.PI * 2 * t;
         const r = r0 * Math.pow(tighten, t * turns);
-        const x = cx0 + r * Math.cos(theta);
-        const y = cy0 + r * Math.sin(theta);
-        d += `${i === 0 ? 'M' : 'L'}${api.n(x)} ${api.n(y)}`;
-        lastX = x;
-        lastY = y;
+        const x = cx + r * Math.cos(th);
+        const y = cy + r * Math.sin(th);
+        pts.push([x, y, th]);
+        const nx = R(x);
+        const ny = R(y);
+        d += `l${R(nx - px)} ${R(ny - py)}`;
+        px = nx;
+        py = ny;
       }
-      marks.push(
-        path(d, {
-          fill: 'none',
-          stroke,
-          'stroke-width': Math.max(0.7, cell * 0.009 * widthScale),
-          'stroke-opacity': opacity,
-          'stroke-linecap': 'round',
-        }),
-      );
-      return { d, tipX: lastX, tipY: lastY };
+      return { d, pts };
     };
-
-    const unit = cell;
-    const cx = unit / 2;
-    const cy = unit / 2;
-    const baseR = unit * 0.34;
 
     /**
-     * 递归：在涡卷末端再生一个缩小版。
-     *
-     * 缩放比取 `1 - tighten × 0.5` —— 与收紧系数联动，
-     * 参数调到更紧时子涡卷也相对更小，保持整体的螺旋韵律。
+     * 一簇卷草：从簇心向 sides 个方向各甩出一支主卷（双支时左右旋向相反 → S 形卷）；
+     * 每支主卷靠外的一段再「出芽」长出反向的小卷，递归 depth 层，最末端点花苞。
+     * 「随机度」让每簇的圈数、收紧、方向、旋向、大小、出芽位置各自偏离 → 每块形状都不同。
      */
-    const childScale = 1 - tighten * 0.5;
+    const cluster = (cx: number, cy: number, rr: () => number) => {
+      const scale = 1 + (rr() - 0.5) * 0.9 * vary;
+      const turns = turns0 * (1 + (rr() - 0.5) * 0.5 * vary);
+      const tighten = Math.max(0.15, Math.min(0.6, tighten0 * (1 + (rr() - 0.5) * 0.6 * vary)));
+      const spin = rr() * Math.PI * 2 * Math.min(1, vary * 1.5);
+      const base = sides === 1 ? [0] : sides === 4 ? [0, Math.PI / 2, Math.PI, -Math.PI / 2] : [0, Math.PI];
+      const flip = rr() < 0.5 ? 1 : -1;
+      const grow = (sx: number, sy: number, rot: number, r0: number, dir: number, level: number) => {
+        const primary = level === 0;
+        const el = primary ? stem : scroll;
+        // 体积兜底放在每一支上：最坏参数（四向 × 5 层）下单簇就有数 KB
+        if (!el.visible || stemD.length + scrollD.length + budD.length > BYTE_CAP) return;
+        const c = curl(sx, sy, rot, r0, dir, primary ? turns : turns * 0.85, tighten);
+        if (primary) stemD += c.d;
+        else scrollD += c.d;
+        if (level < depth - 1) {
+          // 在曲线外侧 15%~35% 处出芽，反向卷
+          const k = Math.max(1, Math.round(c.pts.length * (0.15 + rr() * 0.2)));
+          const [bx, by, th] = c.pts[k];
+          grow(bx, by, th + Math.PI, r0 * (0.42 + rr() * 0.12), -dir, level + 1);
+        } else if (bud.visible) {
+          const [tx, ty] = c.pts[c.pts.length - 1];
+          budD += `M${R(tx)} ${R(ty)}h0`;
+        }
+      };
+      base.forEach((b, idx) => {
+        const rot = b + spin + (rr() - 0.5) * 0.8 * vary;
+        const dir = (sides === 2 && idx === 1 ? -1 : 1) * flip;
+        const r0 = cell * 0.3 * scale * (1 + (rr() - 0.5) * 0.4 * vary);
+        grow(cx, cy, rot, r0, dir, 0);
+      });
+    };
 
-    const branch = (
-      sx: number,
-      sy: number,
-      r: number,
-      rot: number,
-      dir: number,
-      level: number,
-      primary: boolean,
-    ): void => {
-      const el = primary ? stem : scroll;
-      if (!el.visible) return;
-      const tip = spiral(sx, sy, r, rot, dir, el.paintValue, level === 0 ? 1 : 0.72, el.opacity);
-
-      if (level < depth - 1) {
-        branch(tip.tipX, tip.tipY, r * childScale, rot + dir * 1.5, dir, level + 1, !primary);
-      } else if (bud.visible) {
-        // 递归末端点一朵花苞
-        marks.push(
-          path(`M${api.n(tip.tipX)} ${api.n(tip.tipY)} m${api.n(-cell * 0.016)} 0 a${api.n(cell * 0.016)} ${api.n(cell * 0.016)} 0 1 0 ${api.n(cell * 0.032)} 0 a${api.n(cell * 0.016)} ${api.n(cell * 0.016)} 0 1 0 ${api.n(-cell * 0.032)} 0 Z`, {
-            fill: bud.paintValue,
-            'fill-opacity': bud.opacity,
-          }),
-        );
+    // 簇心：best-candidate 均匀随机落位；压边的簇在对边复制 → 四边可无缝平铺
+    const count = Math.max(4, Math.min(40, Math.round((W * H) / (cell * cell * 1.3))));
+    const reach = cell * 0.75;
+    const centers: Array<[number, number]> = [];
+    for (let i = 0; i < count; i++) {
+      let best: [number, number] = [0, 0];
+      let bestD = -1;
+      for (let k = 0; k < 8; k++) {
+        const x = rng() * W;
+        const y = rng() * H;
+        let dmin = Infinity;
+        for (const [qx, qy] of centers) {
+          const dx = Math.min(Math.abs(qx - x), W - Math.abs(qx - x));
+          const dy = Math.min(Math.abs(qy - y), H - Math.abs(qy - y));
+          dmin = Math.min(dmin, dx * dx + dy * dy);
+        }
+        if (dmin > bestD) {
+          bestD = dmin;
+          best = [x, y];
+        }
       }
-    };
-
-    // 主干：自单元中心向左下引出，末端开始递归。
-    // 起点高度由 seed 微调（±8%），让卷草的出手位置有细微变化 ——
-    // 手工卷草纹的每一次落笔都略有不同。
-    const rootJitter = 1 + (rng() - 0.5) * 0.16;
-    if (stem.visible) {
-      marks.push(
-        path(
-          `M${api.n(cx + baseR * 0.2)} ${api.n(cy)}` +
-            ` Q${api.n(cx - baseR * 0.4)} ${api.n(cy - baseR * 0.3 * rootJitter)}` +
-            ` ${api.n(cx - baseR * 0.75)} ${api.n(cy - baseR * 0.1 * rootJitter)}`,
-          {
-            fill: 'none',
-            stroke: stem.paintValue,
-            'stroke-width': Math.max(0.9, cell * 0.011),
-            'stroke-opacity': stem.opacity,
-            'stroke-linecap': 'round',
-          },
-        ),
-      );
+      centers.push(best);
+    }
+    for (const [x0, y0] of centers) {
+      if (stemD.length + scrollD.length + budD.length > BYTE_CAP) break;
+      // 每个副本用同一随机序列 → 接缝两侧形状一致
+      const xs = [x0, ...(x0 - reach < 0 ? [x0 + W] : []), ...(x0 + reach > W ? [x0 - W] : [])];
+      const ys = [y0, ...(y0 - reach < 0 ? [y0 + H] : []), ...(y0 + reach > H ? [y0 - H] : [])];
+      const seed = Math.floor(rng() * 4294967296);
+      for (const x of xs) for (const y of ys) cluster(x, y, mulberry32(seed));
     }
 
-    // 各方向的涡卷组：双支镜像 / 四向
-    const angles =
-      sides === 1
-        ? [Math.PI]
-        : sides === 4
-          ? [Math.PI, 0, -Math.PI / 2, Math.PI / 2]
-          : [Math.PI * 0.85, Math.PI * 0.15];
-
-    for (const a of angles) {
-      branch(cx, cy, baseR, a, 1, 0, true);
-    }
-
-    const tileRef = api.tile({
-      key: `nvs-${api.n(cell)}-${api.n(turns)}-${api.n(tighten)}-${depth}-${sides}`,
-      w: unit,
-      h: unit,
-      content: g({}, marks.join('')),
-    });
-
-    return {
-      body: [
-        rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }),
-        rect(0, 0, W, H, { fill: tileRef }),
-      ].join(''),
-    };
+    const sw = Math.max(0.9, cell * 0.011);
+    const parts = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
+    if (stemD) parts.push(path(stemD, { fill: 'none', stroke: stem.paintValue, 'stroke-opacity': stem.opacity, 'stroke-width': sw, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    if (scrollD) parts.push(path(scrollD, { fill: 'none', stroke: scroll.paintValue, 'stroke-opacity': scroll.opacity, 'stroke-width': sw * 0.72, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    if (budD) parts.push(path(budD, { fill: 'none', stroke: bud.paintValue, 'stroke-opacity': bud.opacity, 'stroke-width': cell * 0.034, 'stroke-linecap': 'round' }));
+    return { body: parts.join('') };
   },
 };
 
