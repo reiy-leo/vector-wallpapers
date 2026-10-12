@@ -241,4 +241,6 @@ export type PatternId =
   | 'blob-contours'
   | 'topo-lines'
   | 'wave-stripes'
-  | 'tv-static';
+  | 'tv-static'
+  | 'christmas-trees'
+  | 'pine-forest';

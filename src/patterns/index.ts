@@ -63,6 +63,8 @@ import blobContours from './C-organic/blob-contours';
 import topoLines from './A-lines/topo-lines';
 import waveStripes from './A-lines/wave-stripes';
 import tvStatic from './D-pixel/tv-static';
+import christmasTrees from './C-organic/christmas-trees';
+import pineForest from './C-organic/pine-forest';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -116,6 +118,8 @@ const ALL: PatternDef[] = [
   topoLines,
   waveStripes,
   tvStatic,
+  christmasTrees,
+  pineForest,
 ];
 
 export const registry = createRegistry();
