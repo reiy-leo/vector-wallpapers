@@ -20,8 +20,8 @@
     "_wrangler": "node node_modules/wrangler/bin/wrangler.js"
   },
   "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@mui/material": "^9.5.0",
+    "@cloudflare/kumo": "^2.14.0",
+    "@phosphor-icons/react": "^2.1.10",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

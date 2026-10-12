@@ -66,7 +66,7 @@ export function createRegistry(): PatternRegistry {
   };
 }
 
-/** PRD 锁定的 19 个 id —— 断言实现与产品定义未漂移。 */
+/** PRD 锁定的 19 个 id + 第二批新增 —— 断言实现与产品定义未漂移。 */
 export const ALL_PATTERN_IDS: readonly PatternId[] = [
   'flow-lines',
   'offset-grid',
@@ -87,9 +87,14 @@ export const ALL_PATTERN_IDS: readonly PatternId[] = [
   'neon-pixels',
   'new-wave-sunset',
   'pixel-terrain',
+  // 第二批（2026-10-12）
+  'girih-star',
+  'halftone',
+  'papercut',
+  'glitch-rgb',
 ];
 
-/** 已实现的 id 清单（19 个全部落地）。 */
+/** 已实现的 id 清单（原 19 个 + 第二批新增）。 */
 export const IMPLEMENTED_PATTERN_IDS = [
   'flow-lines',
   'offset-grid',
@@ -109,6 +114,10 @@ export const IMPLEMENTED_PATTERN_IDS = [
   'neon-pixels',
   'new-wave-sunset',
   'pixel-terrain',
+  'girih-star',
+  'halftone',
+  'papercut',
+  'glitch-rgb',
 ] as const satisfies readonly PatternId[];
 
 /** 按 role 批量取元件 id —— 供 UI 的「强调色 ×2」一键改色使用（PRD P0-2）。 */

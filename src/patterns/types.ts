@@ -185,9 +185,16 @@ export interface RenderResult {
 }
 
 /**
- * PatternId 全集 = PRD 的 19 个锁定 id。
- * 19 个 id 已全部落地（见 `patterns/index.ts`），
- * 共享链接的 id 契约因此不会因实现顺序而漂移。
+ * PatternId 全集 = PRD 的 19 个原始 id + 第二批新增 8 个。
+ *
+ * 19 个 id 已全部落地（见 `patterns/index.ts`）。
+ *
+ * ⚠️ 第二批（2026-10-12，依据 `docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口）
+ * 的 id 在**首次上线前**仍可调整；一旦分享链接流出即锁定，
+ * 与其余 19 个遵守同一条「一经上线不可重命名」的契约。
+ *
+ * 待第二批剩余 4 个（`art-deco-fan` / `nouveau-scroll` /
+ * `isometric-voxel` / `lowpoly-facet`）落地时在此追加。
  */
 export type PatternId =
   | 'flow-lines'
@@ -208,4 +215,8 @@ export type PatternId =
   | 'memphis-grid'
   | 'neon-pixels'
   | 'new-wave-sunset'
-  | 'pixel-terrain';
+  | 'pixel-terrain'
+  | 'girih-star'
+  | 'halftone'
+  | 'papercut'
+  | 'glitch-rgb';

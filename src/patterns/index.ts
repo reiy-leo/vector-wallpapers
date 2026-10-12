@@ -20,6 +20,9 @@ import triangleTiling from './B-repeat/triangle-tiling';
 import checkerMesh from './B-repeat/checker-mesh';
 import hexGrid from './B-repeat/hex-grid';
 import diamondLattice from './B-repeat/diamond-lattice';
+import girihStar from './B-repeat/girih-star';
+import halftone from './B-repeat/halftone';
+import papercut from './B-repeat/papercut';
 
 // C 渐变流体 / 有机形态
 import duskRidges from './C-organic/dusk-ridges';
@@ -33,6 +36,7 @@ import memphisGrid from './D-pixel/memphis-grid';
 import neonPixels from './D-pixel/neon-pixels';
 import newWaveSunset from './D-pixel/new-wave-sunset';
 import pixelTerrain from './D-pixel/pixel-terrain';
+import glitchRgb from './D-pixel/glitch-rgb';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -55,6 +59,11 @@ const ALL: PatternDef[] = [
   neonPixels,
   newWaveSunset,
   pixelTerrain,
+  // 第二批（2026-10-12，依据 docs/STYLE-100-ANALYSIS.md §4.2 的结构缺口）
+  girihStar,
+  halftone,
+  papercut,
+  glitchRgb,
 ];
 
 export const registry = createRegistry();
