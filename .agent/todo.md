@@ -63,8 +63,9 @@
 
 ### ☐ 8 个新母题的视觉复核
 
-`girih-star` / `halftone` / `papercut` / `glitch-rgb` / `art-deco-fan` /
+`girih-star` / `halftone` / `papercut` / `art-deco-fan` /
 `nouveau-scroll` / `isometric-voxel` / `lowpoly-facet`
+（`glitch-rgb` 已于 2026-10-12 经 Rei 批准整体替换为 `dither-gradient`「抖动渐变」）
 
 **现状**：结构正确 + 测试全绿 + 体积达标，但**视觉问题尚未修**。
 

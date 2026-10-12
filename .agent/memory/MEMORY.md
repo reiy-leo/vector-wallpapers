@@ -11,6 +11,7 @@ SVG **桌面壁纸生成器**（不是素材库）。核心差异化：**母题�
 
 ## 用户已确认的决策（不要擅自更改）
 1. **pattern id 一经上线不可改名**；已有元件 id、控件 key、preset id 同理（分享链接依赖）。
+   例外须 Rei 明确批准：2026-10-12 `glitch-rgb`（通道错位）被**删除并替换**为新母题 `dither-gradient`（抖动渐变，D-pixel），旧分享链接里的 `glitch-rgb` 会落到未知 id 兜底。
 2. 母题四分类：A 极简线条 / B 重复纹样 / C 渐变流体 / D 像素复古。
    当前清单以 `src/patterns/index.ts` 与 `registry.ts` 为准，**不在这里抄数字**。
 3. PRD §5 产品决策：
@@ -58,7 +59,7 @@ SVG **桌面壁纸生成器**（不是素材库）。核心差异化：**母题�
 1. **URL 分隔符冲突**：`ElementPatch` 字段原用 `,`，与渐变色标冲突 → 静默截断。已改 `~`，回归在 `share.test.ts`。
 2. **不引 preflight 的代价**：`[hidden]` 被 `display:flex` 压制，弹窗常驻。theme.css 已补 `[hidden]{display:none!important}`。
 3. **渐变元件陷阱**：元件全是渐变时，改色只染一半，肉眼和测试都看不出 → 必须量化纯色占比。
-4. **dead element**：元件声明可配色但从不出现在产物（neon-pixels px_d、glitch-rgb 通道、lowpoly dark）。测试必须是**行为层**：同 seed 改色 → 产物字节必须变。
+4. **dead element**：元件声明可配色但从不出现在产物（neon-pixels px_d、旧 glitch-rgb 通道〔已删〕、lowpoly dark）。测试必须是**行为层**：同 seed 改色 → 产物字节必须变。
 5. **defs 去重会塌层**：内容逐字节相同的多个 `<pattern>` 会被签名去重合并，差异要写进签名（如 `patternTransform`）。
 6. **体积估算要实测**：单个 `<circle>` 约 73 字节而非 48，阈值由实测反推。
 7. 新母题 id 必须同时加进 `types.ts` 的 `PatternId`、`registry.ts`（两处清单）、`index.ts`，并更新 `patterns.test.ts` 的 `TOTAL_EXPECTED` 与 `CATEGORY_EXPECTED`。

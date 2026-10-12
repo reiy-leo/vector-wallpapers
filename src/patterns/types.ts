@@ -224,7 +224,7 @@ export type PatternId =
   | 'girih-star'
   | 'halftone'
   | 'papercut'
-  | 'glitch-rgb'
+  | 'dither-gradient'
   | 'art-deco-fan'
   | 'nouveau-scroll'
   | 'isometric-voxel'

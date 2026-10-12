@@ -42,7 +42,7 @@ import memphisGrid from './D-pixel/memphis-grid';
 import neonPixels from './D-pixel/neon-pixels';
 import newWaveSunset from './D-pixel/new-wave-sunset';
 import pixelTerrain from './D-pixel/pixel-terrain';
-import glitchRgb from './D-pixel/glitch-rgb';
+import ditherGradient from './D-pixel/dither-gradient';
 import isometricVoxel from './D-pixel/isometric-voxel';
 
 // 第三批（2026-10-12）
@@ -94,7 +94,7 @@ const ALL: PatternDef[] = [
   girihStar,
   halftone,
   papercut,
-  glitchRgb,
+  ditherGradient,
   artDecoFan,
   nouveauScroll,
   isometricVoxel,
