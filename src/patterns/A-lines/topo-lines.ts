@@ -7,16 +7,25 @@
  *     → 线上满是细小折角与台阶；
  *  ❷ 真·地形高度场有大片平地：等值面稀疏的地方整块留白，陡的地方挤成一团，还有小岛噪点。
  *
- * v2 做法：
- *  - **近似等梯度的标量场**：若干 seeded 中心的距离场做 smooth-min（log-sum-exp），
- *    距离场梯度恒为 1 → 等值线天然**等间距**铺满全画面；中心附近形成嵌套的涡旋圈，
- *    远处中心（画布外）贡献大段平行流动的带状线；smooth-min 把 Voronoi 交界的尖角揉圆。
- *  - **平滑域扭曲**：采样坐标先经过几组低频正弦（C∞）位移，位移梯度 ≤ ~0.45，
- *    线条有机流动但线距只在 ±50% 内「呼吸」，不会出现空洞或挤压。
- *  - **丝滑曲线**：marching squares 细网格（格 ≈ 线距/3）→ 线段串成长折线（闭环或出界）
- *    → 按弧长均匀重采样 → 均匀 Catmull-Rom → 三次贝塞尔，用 `s` 指令输出：
- *    s 的首控制点由上一段末控制点镜像而来，取整后**仍严格 C1 连续**，节点处零折角。
- *  - 周长 < 4.5 倍线距的小圈剔除（无小岛噪点）。
+ * v3（2026-10-12 同日二改）。用户反馈：「右边有很多平行的线，去掉这个，都用类等高线，
+ * 而且很多线转角都很尖，更圆润一点」。病根：v2 有 65% 的种子在画布外远处放一个中心
+ * → 画面一侧大段平行直带；log-sum-exp 半径只有 ~1 线距 → 交界折痕处等值线起尖。
+ *
+ * v3 做法：
+ *  - **只用画内/画边的中心**：抖动网格（格距 = 纹理尺度 L，外沿多一圈）→ 覆盖均匀，
+ *    每个中心带随机深度偏移、梯度尺度、椭圆度；没有任何远中心，也就没有平行直带。
+ *  - **三次多项式 smooth-min（C2）**，半径 0.3·L（≈3 线距）：折痕揉成圆弧；
+ *    距离场梯度 ≈ 1 → 线距近似均匀。半径再大会在 Voronoi 顶点摊出平顶空洞（实测 0.55·L 时
+ *    空洞直径 5+ 线距），所以剩余的急弯交给下面的圆角兜底。
+ *  - **更强的低频域扭曲**：两组正弦位移，大尺度位移梯度上限 ~0.75（×flow），形状更有机。
+ *  - **丝滑曲线**：marching squares（格 = 线距/3）→ 串链 → 按弧长细采样（线距/4）→ 牛顿投影回
+ *    解析等值线 → **圆角兜底**：离散曲率半径 < 0.9 线距的点连同邻域做局部拉普拉斯平滑并周期性
+ *    按弧长重新均布，直到全线达标（鞍点附近的等值线理论上曲率半径 → 0，必须兜底）；
+ *    仍不达标的扁小圈/短线头整条丢弃，周长 < 2π·0.97 线距的小圈也丢弃（无小岛噪点）。
+ *  - **自适应节点**：累计转角 ≥ 0.42rad 或弧长 ≥ 1.1 线距落一个节点，相邻弦长比 ≤ 2；
+ *    切线取细采样中心差分，两侧等长手柄 → `s` 指令（镜像控制点，取整后仍 C1）。
+ *  - 网格外沿留 ≈1.7 线距让线头也能被揉圆，输出前裁掉画外首尾省字节。
+ *  验收量化：对输出贝塞尔按 0.15 线距重采样测曲率半径，画内最小值 ≈ 0.6–0.75 线距。
  *
  * 坐标系：内部统一用「短边 = 2160」的归一化空间（1 单位 ≈ 1080p 下 0.5px，取整误差不可见），整数相对坐标；非 1080 画布用
  * path 的 transform="scale(q)" 缩放 → 体积与分辨率解耦。BYTE_CAP 兜底：超限时
@@ -26,6 +35,8 @@ import { path, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderResult } from '../types';
 
 const BYTE_CAP = 17000;
+/** 圆角平滑的最大轮数（窄舌头要多轮才能缩回去） */
+const MAX_PASS_DEFAULT = 400;
 const SHORT = 2160;
 
 type Pt = [number, number];
@@ -57,7 +68,7 @@ const def: PatternDef = {
   id: 'topo-lines',
   name: '流动等高线',
   category: 'A-lines',
-  description: '等间距的流动曲线铺满整幅画面，嵌套的涡旋与平行的流带交织，像等高线却没有空白，丝滑圆润，每个种子都不同。',
+  description: '近似等间距的类等高线铺满整幅画面，一组组嵌套的圆润闭环与有机的轮廓相互交融，没有尖角，每个种子都不同。',
   seedable: true,
   animatable: false,
 
@@ -154,83 +165,85 @@ const def: PatternDef = {
     const NH = H / q;
     const diag = Math.hypot(NW, NH);
 
-    // ── seeded 场：中心（best-candidate 散布）+ 画布外远中心（流带）+ 域扭曲 ──
+    // ── seeded 场：抖动网格中心（铺满画布及其外沿一圈）+ 低频域扭曲 ──
+    // v3：去掉 v2 的「画布外远中心」（会在画面一侧拉出大段平行直带）。
     const gap0 = SHORT / density;
-    // 纹理尺度（中心间距）至少 3.5 倍线距：否则一圈涡旋装不下几条线，等值线会被相邻中心挤得疙疙瘩瘩
-    const L = Math.max(520 * (SHORT / 1080) * terrain, gap0 * 3.5);
-    const nLocal = Math.max(2, Math.min(28, Math.round((NW * NH) / (L * L))));
-    type Src = { x: number; y: number; s: number; o: number };
+    // 纹理尺度（中心间距）至少 4 倍线距：否则一圈涡旋装不下几条线
+    const L = Math.max(520 * (SHORT / 1080) * terrain, gap0 * 4);
+    // 每个中心：位置、梯度尺度 s、深度偏移 o、椭圆度（单位方向 c/sn + 长短轴比 e）
+    type Src = { x: number; y: number; s: number; o: number; c: number; sn: number; e: number };
     const srcs: Src[] = [];
-    const pad = L * 0.25;
-    for (let i = 0; i < nLocal; i++) {
-      let best: Pt = [0, 0];
-      let bestD = -1;
-      for (let c = 0; c < 8; c++) {
-        const x = -pad + rng() * (NW + 2 * pad);
-        const y = -pad + rng() * (NH + 2 * pad);
-        let dmin = Infinity;
-        for (const s of srcs) dmin = Math.min(dmin, Math.hypot(s.x - x, s.y - y));
-        if (dmin > bestD) {
-          bestD = dmin;
-          best = [x, y];
+    {
+      const cols = Math.max(1, Math.round(NW / L));
+      const rows = Math.max(1, Math.round(NH / L));
+      const cw = NW / cols;
+      const chh = NH / rows;
+      // 外沿多放一圈（-1..cols），画布边缘也是嵌套圈的一部分而不是被拉直的带
+      for (let r = -1; r <= rows; r++) {
+        for (let c = -1; c <= cols; c++) {
+          const edge = r < 0 || r >= rows || c < 0 || c >= cols;
+          const jx = (rng() - 0.5) * 0.7;
+          const jy = (rng() - 0.5) * 0.7;
+          const x = (c + 0.5 + jx) * cw;
+          const y = (r + 0.5 + jy) * chh;
+          const a = rng() * Math.PI;
+          srcs.push({ x, y, s: 0.92 + rng() * 0.16, o: (edge ? 0.15 : 0) * L + rng() * L * 0.3, c: Math.cos(a), sn: Math.sin(a), e: 0.86 + rng() * 0.28 });
         }
       }
-      srcs.push({ x: best[0], y: best[1], s: 0.85 + rng() * 0.3, o: rng() * L * 0.35 });
     }
-    // 1~2 个远中心：画布外很远处，在画面里表现为大段近乎平行的流带
-    const nFar = rng() < 0.65 ? 1 : 0;
-    for (let i = 0; i < nFar; i++) {
-      const a = rng() * Math.PI * 2;
-      const R = diag * (1.6 + rng());
-      const x = NW / 2 + Math.cos(a) * R;
-      const y = NH / 2 + Math.sin(a) * R;
-      // 偏移使其在画布中心的取值与局部中心的典型取值相当 → 与涡旋分庭抗礼
-      srcs.push({ x, y, s: 1, o: -R + L * (0.45 + rng() * 0.4) });
-    }
-    const wx1 = sineField(rng, L * 0.9);
-    const wy1 = sineField(rng, L * 0.9);
-    const wx2 = sineField(rng, L * 0.45);
-    const wy2 = sineField(rng, L * 0.45);
-    // 位移梯度 ≈ D/L：大尺度 0.5，小尺度 0.12（×flow）
-    const D1 = 0.5 * L * 0.9 * flow;
-    const D2 = 0.12 * L * 0.45 * flow;
+    const wx1 = sineField(rng, L * 1.1);
+    const wy1 = sineField(rng, L * 1.1);
+    const wx2 = sineField(rng, L * 0.5);
+    const wy2 = sineField(rng, L * 0.5);
+    // 位移梯度上限 ≈ D·f：大尺度 ≤ 0.81、小尺度 ≤ 0.16（×flow），合计 < 1 → 雅可比恒正，不折叠
+    const D1 = 0.62 * L * 1.1 * flow;
+    const D2 = 0.12 * L * 0.5 * flow;
+    // 三次多项式 smooth-min 半径 ≈ 0.3 倍中心间距（≈3 线距）：交界的折痕揉成圆弧；
+    // 再大会在 Voronoi 顶点处摊出平顶留白（实测 0.55 时空洞直径 5+ 线距），剩下的急弯交给下面的圆角兜底
+    const K = L * 0.3;
 
     const phase = rng();
 
     const contourEl = elements.get('contour')!;
     const majorEl = elements.get('major')!;
 
-    // 解析标量场（以线距为单位）：域扭曲 → 加权距离 → smooth-min
-    const ds = new Float64Array(srcs.length);
-    const evalF = (px: number, py: number, gap: number, k: number): number => {
+    // 解析标量场（以线距为单位）：域扭曲 → 加权距离 → 三次 smooth-min 逐个折叠（C2 连续，曲率连续）
+    const rawF = (px: number, py: number): number => {
       const x = px + D1 * wx1(px, py) + D2 * wx2(px, py);
       const y = py + D1 * wy1(px, py) + D2 * wy2(px, py);
       let m = Infinity;
       for (let s = 0; s < srcs.length; s++) {
         const S = srcs[s];
-        const d = Math.hypot(x - S.x, y - S.y) * S.s + S.o;
-        ds[s] = d;
-        if (d < m) m = d;
+        const dx = x - S.x;
+        const dy = y - S.y;
+        const d = Math.hypot((dx * S.c + dy * S.sn) * S.e, (dy * S.c - dx * S.sn) / S.e) * S.s + S.o;
+        if (m === Infinity) {
+          m = d;
+          continue;
+        }
+        const h = K - Math.abs(m - d);
+        m = Math.min(m, d);
+        if (h > 0) {
+          const u = h / K;
+          m -= (u * u * u * K) / 6;
+        }
       }
-      let sum = 0;
-      for (let s = 0; s < srcs.length; s++) sum += Math.exp(-(ds[s] - m) / k);
-      return (m - k * Math.log(sum)) / gap;
+      return m;
     };
+    const evalF = (px: number, py: number, gap: number): number => rawF(px, py) / gap;
 
     const build = (gap: number): { minor: string; major: string } => {
-      // smooth-min 半径 ≈ 0.95 线距：交界尖角揉成圆弧，又不至于在鞍部摊出大片低梯度空白
-      const k = gap * 0.95;
       const cell = gap / 3;
-      const x0 = -cell * 2;
-      const y0 = -cell * 2;
-      const nx = Math.ceil((NW + cell * 4) / cell) + 1;
-      const ny = Math.ceil((NH + cell * 4) / cell) + 1;
+      const x0 = -cell * 5;
+      const y0 = -cell * 5;
+      const nx = Math.ceil((NW + cell * 10) / cell) + 1;
+      const ny = Math.ceil((NH + cell * 10) / cell) + 1;
       const field = new Float64Array(nx * ny);
       let lo = Infinity;
       let hi = -Infinity;
       for (let j = 0; j < ny; j++) {
         for (let i = 0; i < nx; i++) {
-          const v = evalF(x0 + i * cell, y0 + j * cell, gap, k);
+          const v = evalF(x0 + i * cell, y0 + j * cell, gap);
           field[j * nx + i] = v;
           if (v < lo) lo = v;
           if (v > hi) hi = v;
@@ -241,7 +254,11 @@ const def: PatternDef = {
 
       let minor = '';
       let major = '';
-      const minLoop = gap * 4.5;
+      // 曲率半径下限 0.9 线距：低于它的局部急弯要被揉圆
+      const MAX_PASS = MAX_PASS_DEFAULT;
+      const RMIN = gap * 0.9;
+      // 周长 < 2π·1.08·RMIN 的小圈本身就是个急弯（平滑只会让它越缩越小）→ 剔除
+      const minLoop = Math.PI * 2 * RMIN * 1.08;
 
       for (let lv = Math.ceil(lo - phase); lv + phase < hi; lv++) {
         const t = lv + phase;
@@ -357,9 +374,14 @@ const def: PatternDef = {
           }
           const len = cum[segs];
           if (closed && len < minLoop) continue;
-          if (!closed && len < gap) continue;
-          // 均匀重采样：段长 ≈ 0.9 线距，闭环至少 8 段
-          const nSeg = Math.max(closed ? 8 : 1, Math.round(len / (gap * 0.9)));
+          if (!closed) {
+            if (len < gap) continue;
+            // 两端都落在画布内部的短开链 = 没闭合上的小圈碎片
+            const inside = (p: Pt) => p[0] > 0 && p[1] > 0 && p[0] < NW && p[1] < NH;
+            if (len < minLoop && inside(raw[0]) && inside(raw[n0 - 1])) continue;
+          }
+          // ① 细采样：步长 ≈ 线距/4
+          const nSeg = Math.max(closed ? 24 : 2, Math.round(len / (gap * 0.25)));
           const P: Pt[] = [];
           let si = 0;
           const nPts = closed ? nSeg : nSeg + 1;
@@ -372,13 +394,15 @@ const def: PatternDef = {
             const u = Math.min(1, Math.max(0, (target - cum[si]) / sl));
             P.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]);
           }
-          // 牛顿投影：把重采样点精确拉回解析等值线上（消除线性插值带来的细小波纹）
-          const hst = cell * 0.25;
+          // ② 牛顿投影：把采样点精确拉回解析等值线上（消除线性插值带来的细小波纹）
+          const hst = cell * 0.1;
           for (const pt of P) {
-            for (let it = 0; it < 3; it++) {
-              const f0 = evalF(pt[0], pt[1], gap, k) - t;
-              const gx = (evalF(pt[0] + hst, pt[1], gap, k) - evalF(pt[0] - hst, pt[1], gap, k)) / (2 * hst);
-              const gy = (evalF(pt[0], pt[1] + hst, gap, k) - evalF(pt[0], pt[1] - hst, gap, k)) / (2 * hst);
+            for (let it = 0; it < 2; it++) {
+              const fc = evalF(pt[0], pt[1], gap);
+              const f0 = fc - t;
+              if (Math.abs(f0) < 2e-4) break;
+              const gx = (evalF(pt[0] + hst, pt[1], gap) - fc) / hst;
+              const gy = (evalF(pt[0], pt[1] + hst, gap) - fc) / hst;
               const g2 = gx * gx + gy * gy;
               if (g2 < 1e-12) break;
               let dx = (f0 * gx) / g2;
@@ -390,34 +414,234 @@ const def: PatternDef = {
               }
               pt[0] -= dx;
               pt[1] -= dy;
-              if (dl < 0.02) break;
+              if (dl < 0.05) break;
             }
           }
-          const N = P.length;
-          const at = (i: number): Pt => {
-            if (closed) return P[((i % N) + N) % N];
-            if (i < 0) return [2 * P[0][0] - P[1][0], 2 * P[0][1] - P[1][1]];
-            if (i >= N) return [2 * P[N - 1][0] - P[N - 2][0], 2 * P[N - 1][1] - P[N - 2][1]];
-            return P[i];
+          let N = P.length;
+          const idx = (i: number) => (closed ? ((i % N) + N) % N : Math.max(0, Math.min(N - 1, i)));
+          // ③ 圆角兜底：鞍点附近的等值线可能有局部急弯（理论上曲率半径 → 0）。
+          // 对离散曲率半径 R = 弦长 / (2·sin(θ/2)) < RMIN 的点连同 ±4 邻域做拉普拉斯平滑，
+          // 迭代直到全部达标。急弯只出现在鞍点附近，那里线距本来就宽，挪一点不会撞线。
+          const turnLen = (i: number): [number, number] => {
+            const a = P[idx(i - 1)];
+            const b = P[i];
+            const c = P[idx(i + 1)];
+            const ux = b[0] - a[0], uy = b[1] - a[1];
+            const vx = c[0] - b[0], vy = c[1] - b[1];
+            const lu = Math.hypot(ux, uy) || 1e-9, lv = Math.hypot(vx, vy) || 1e-9;
+            return [Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (lu * lv)))), (lu + lv) / 2];
           };
-          // 均匀 Catmull-Rom → 三次贝塞尔；首段 c，其余 s（镜像控制点 → 取整后仍 C1）
-          let cx = Math.round(P[0][0]);
-          let cy = Math.round(P[0][1]);
+          const turn = (i: number): number => turnLen(i)[0];
+          // 离散曲率半径：平均弦长 / (2·sin(θ/2))
+          const radius = (i: number): number => {
+            const [th, l] = turnLen(i);
+            return th < 1e-9 ? Infinity : l / (2 * Math.sin(th / 2));
+          };
+          {
+            const lo = closed ? 0 : 1;
+            const hiI = closed ? N : N - 1;
+            // 首轮全查；之后只复查上一轮动过的点 ±6 的窗口（急弯是局部的）。用时间戳数组代替 Set。
+            const markStamp = new Int32Array(N);
+            const winStamp = new Int32Array(N);
+            let check: number[] | null = null;
+            let doomed = false;
+            const nx2 = new Float64Array(N);
+            const ny2 = new Float64Array(N);
+            for (let pass = 1; pass <= MAX_PASS; pass++) {
+              const mark: number[] = [];
+              const test = (i: number) => {
+                if (radius(i) >= RMIN) return;
+                for (let o = -4; o <= 4; o++) {
+                  const j = closed ? idx(i + o) : i + o;
+                  if (j >= lo && j < hiI && markStamp[j] !== pass) {
+                    markStamp[j] = pass;
+                    mark.push(j);
+                  }
+                }
+              };
+              if (!check) for (let i = lo; i < hiI; i++) test(i);
+              else for (const i of check) test(i);
+              if (!mark.length) break;
+              const nextCheck: number[] = [];
+              for (const i of mark) for (let o = -6; o <= 6; o++) {
+                const j = closed ? idx(i + o) : i + o;
+                if (j >= lo && j < hiI && winStamp[j] !== pass) {
+                  winStamp[j] = pass;
+                  nextCheck.push(j);
+                }
+              }
+              check = nextCheck;
+              // 两次 Jacobi 拉普拉斯（λ = 0.5）
+              for (let sweep = 0; sweep < 2; sweep++) {
+                for (const i of mark) {
+                  const a = P[idx(i - 1)];
+                  const c = P[idx(i + 1)];
+                  nx2[i] = P[i][0] * 0.5 + (a[0] + c[0]) * 0.25;
+                  ny2[i] = P[i][1] * 0.5 + (a[1] + c[1]) * 0.25;
+                }
+                for (const i of mark) P[i] = [nx2[i], ny2[i]];
+              }
+              // 拉普拉斯会把点沿切向挤成一团（急弯处越挤越「尖」）→ 每 4 轮按弧长重新均布
+              if (pass % 4 === 0) {
+                const ns = closed ? N : N - 1;
+                const ca = new Float64Array(ns + 1);
+                for (let i = 0; i < ns; i++) {
+                  const a = P[i];
+                  const b = P[(i + 1) % N];
+                  ca[i + 1] = ca[i] + Math.hypot(b[0] - a[0], b[1] - a[1]);
+                }
+                const tl = ca[ns];
+                if (closed && tl < minLoop * 0.9) {
+                  doomed = true;
+                  break;
+                }
+                const R2: Pt[] = [];
+                let k = 0;
+                for (let r = 0; r < N; r++) {
+                  const target = (r / ns) * tl;
+                  while (k < ns - 1 && ca[k + 1] < target) k++;
+                  const a = P[k];
+                  const b = P[(k + 1) % N];
+                  const u = Math.min(1, Math.max(0, (target - ca[k]) / (ca[k + 1] - ca[k] || 1)));
+                  R2.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]);
+                }
+                for (let i = 0; i < N; i++) P[i] = R2[i];
+              }
+            }
+            if (doomed) continue;
+          }
+          {
+            // 平滑仍压不下去的急弯只会出现在扁小圈 / 贴边短线头上 → 整条丢弃（长开链不丢，免得留白）
+            let rMin = Infinity;
+            // 只看画布内（画外的急弯看不见，不该连累整条线被丢）
+            for (let i = closed ? 0 : 1; i < (closed ? N : N - 1); i++) {
+              const [x, y] = P[i];
+              if (x > -gap * 0.3 && y > -gap * 0.3 && x < NW + gap * 0.3 && y < NH + gap * 0.3) rMin = Math.min(rMin, radius(i));
+            }
+            if (rMin < RMIN * 0.9 && len < minLoop * (closed ? 4 : 1.5)) continue;
+          }
+          if (!closed) {
+            // 网格外沿留得宽（≈1.7 线距，让线头的急弯也能被揉圆），输出前把画外的首尾裁掉省字节
+            const m = gap * 0.15;
+            const vis = (p: Pt) => p[0] > -m && p[1] > -m && p[0] < NW + m && p[1] < NH + m;
+            let a = 0;
+            while (a < P.length && !vis(P[a])) a++;
+            let b = P.length - 1;
+            while (b > a && !vis(P[b])) b--;
+            if (a >= b) continue;
+            const cut = P.slice(Math.max(0, a - 1), Math.min(P.length, b + 2));
+            P.length = 0;
+            P.push(...cut);
+            if (P.length < 3) continue;
+            N = P.length;
+          }
+          if (closed) {
+            // 平滑会让急弯小圈收缩：收缩后不够大的圈直接丢弃
+            let l2 = 0;
+            for (let i = 0; i < N; i++) l2 += Math.hypot(P[(i + 1) % N][0] - P[i][0], P[(i + 1) % N][1] - P[i][1]);
+            if (l2 < minLoop * 0.9) continue;
+          }
+          // ④ 自适应抽稀：累计转角 ≥ 0.42rad 或弧长 ≥ 1.1 线距就落一个节点；
+          // 再细分相邻弦长比 > 2 的段 → 两侧等长手柄（s 指令）不会在长短段交界处过冲出尖角
+          let keep: number[] = [0];
+          {
+            const arcAt = [0];
+            for (let i = 1; i <= N; i++) {
+              if (!closed && i === N) break;
+              const a = P[i - 1];
+              const b = P[i % N];
+              arcAt.push(arcAt[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+            }
+            let acc = 0;
+            let arc = 0;
+            const last = closed ? N : N - 1;
+            for (let i = 1; i < last; i++) {
+              acc += turn(i);
+              arc += arcAt[i] - arcAt[i - 1];
+              if (acc >= 0.42 || arc >= gap * 1.1) {
+                keep.push(i);
+                acc = 0;
+                arc = 0;
+              }
+            }
+            if (!closed) keep.push(N - 1);
+            if (closed && keep.length < 6) {
+              keep = [];
+              for (let r = 0; r < 6; r++) keep.push(Math.round((r * N) / 6) % N);
+            }
+            const span = (r: number): number => {
+              const k = keep.length;
+              if (closed) {
+                const i0 = keep[((r % k) + k) % k];
+                const i1 = keep[(((r + 1) % k) + k) % k];
+                return i1 > i0 ? arcAt[i1] - arcAt[i0] : arcAt[N] - arcAt[i0] + arcAt[i1];
+              }
+              return arcAt[keep[r + 1]] - arcAt[keep[r]];
+            };
+            const RATIO = 2;
+            for (let it = 0; it < 6; it++) {
+              const k = keep.length;
+              const nseg = closed ? k : k - 1;
+              const next: number[] = [];
+              let changed = false;
+              for (let r = 0; r < nseg; r++) {
+                next.push(keep[r]);
+                const me = span(r);
+                const nbMin = Math.min(closed || r > 0 ? span(r - 1) : Infinity, closed || r < nseg - 1 ? span(r + 1) : Infinity);
+                const i0 = keep[r];
+                const i1 = closed ? keep[(r + 1) % k] : keep[r + 1];
+                const gapIdx = i1 > i0 ? i1 - i0 : i1 + N - i0;
+                if (me > nbMin * RATIO && gapIdx > 1) {
+                  next.push((i0 + Math.floor(gapIdx / 2)) % N);
+                  changed = true;
+                }
+              }
+              if (!closed) next.push(keep[k - 1]);
+              keep = next;
+              if (!changed) break;
+            }
+          }
+          const K2 = keep.length;
+          // ⑤ 每个节点的切线取细采样的中心差分；手柄长 = 相邻弦长几何平均 / 3（两侧相等 → 可用 s 指令）
+          const node = (r: number): Pt => P[keep[closed ? ((r % K2) + K2) % K2 : r]];
+          const tang = (r: number): Pt => {
+            const i = keep[closed ? ((r % K2) + K2) % K2 : r];
+            const a = P[idx(i - 1)];
+            const c = P[idx(i + 1)];
+            const tx = c[0] - a[0], ty = c[1] - a[1];
+            const tl = Math.hypot(tx, ty) || 1;
+            return [tx / tl, ty / tl];
+          };
+          const chord = (r: number): number => {
+            // 节点 r → r+1 的弦长
+            const a = node(r);
+            const b = node(r + 1);
+            return Math.hypot(b[0] - a[0], b[1] - a[1]);
+          };
+          const handle = (r: number): number => {
+            const cn = closed || r < K2 - 1 ? chord(r) : chord(r - 1);
+            const cp = closed || r > 0 ? chord(r - 1) : cn;
+            return Math.min(Math.sqrt(cp * cn) / 3, 0.45 * Math.min(cp, cn));
+          };
+          let cx = Math.round(node(0)[0]);
+          let cy = Math.round(node(0)[1]);
           d += `M${cx} ${cy}`;
-          const nOut = closed ? N : N - 1;
+          const nOut = closed ? K2 : K2 - 1;
           const sNums: number[] = [];
           for (let s = 0; s < nOut; s++) {
-            const p0 = at(s - 1);
-            const p1 = at(s);
-            const p2 = at(s + 1);
-            const p3 = at(s + 2);
-            const c2x = Math.round(p2[0] - (p3[0] - p1[0]) / 6);
-            const c2y = Math.round(p2[1] - (p3[1] - p1[1]) / 6);
+            const p2 = node(s + 1);
+            const t2 = tang(s + 1);
+            const h2 = handle(closed ? s + 1 : s + 1);
+            const c2x = Math.round(p2[0] - t2[0] * h2);
+            const c2y = Math.round(p2[1] - t2[1] * h2);
             const ex = Math.round(p2[0]);
             const ey = Math.round(p2[1]);
             if (s === 0) {
-              const c1x = Math.round(p1[0] + (p2[0] - p0[0]) / 6);
-              const c1y = Math.round(p1[1] + (p2[1] - p0[1]) / 6);
+              const p1 = node(0);
+              const t1 = tang(0);
+              const h1 = handle(0);
+              const c1x = Math.round(p1[0] + t1[0] * h1);
+              const c1y = Math.round(p1[1] + t1[1] * h1);
               d += `c${joinNums([c1x - cx, c1y - cy, c2x - cx, c2y - cy, ex - cx, ey - cy])}`;
             } else {
               sNums.push(c2x - cx, c2y - cy, ex - cx, ey - cy);
