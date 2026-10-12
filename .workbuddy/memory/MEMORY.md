@@ -48,10 +48,20 @@ React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算
    已验证无效的绕过：crossOrigin=anonymous、html2canvas allowTaint、toBlob替代 toDataURL、WASM 读像素
 4. **禁止 `<text>` 元素**（字体依赖破坏导出纯净度）；像素类用 `shape-rendering="crispEdges"`
 5. **平铺类必须用 `<pattern>`**，不复制 N 份
-6. render 中**禁止硬编码具体像素**（如 1920），用 W/H 比例推导
+6. render 中**禁止硬编码具体像素**（如 1920），用 W/H 比例推导。
+   ⚠️ **2026-10-12 补强**：铁律 6 的盲区是「`stroke-width` 用绝对 px」。
+   flow-lines 曾把 `stroke-width` 写成 1.2px 的绝对值，在 2560 宽的画布上只有 0.84px，
+   等于发丝 —— 这不违反铁律 6 的字面，却完全违背其**意图**（尺寸无关）。
+   ✅ 正确做法：`unit = clamp(min(W,H)/1080, 0.5, 4)`，一切线宽乘 `unit`。
+   取**短边**而非宽边（壁纸从竖屏到带鱼屏跨度极大）。
 7. `URL.revokeObjectURL()` 必须放 `finally`块，防blob 泄漏
 8. 导出的 SVG 根标签必须带 `xmlns` + `width`/`height` + `viewBox`，否则按 300×150 渲染
 9. 单 pattern SVG 体积 < 20KB（开发期 throw 级断言）
+   ⚠️ **必须测「控件全部拉满」而非默认配置** —— 体积是各控件的**乘积效应**，
+   单独测每个都不超线、叠起来就超。art-deco-fan 曾默认 9094B（看着正常）、
+   拉满 20965B 超线 485B。由 `src/__verify__/budget.guard.test.ts` 强制。
+   ⚠️ 节点数上限的语义是「body **顶层**子节点」，**必须用引擎的 `countTopLevelNodes(body)`**；
+   裸正则会把 `<pattern>`/`<g>` 内部节点也算进去，结论可差一个数量级。
 10. UI 层零硬编码：grep `src/ui/` 不得出现任何 pattern id / element id（证明 registry 抽象真实成立）
 11. **纯色元件占比 ≥50%** 是母题硬指标。渐变可做「层」不可做「面」——
     纯色元件改色=整块变色（换肤），渐变元件改色=只染一端（染色）。
@@ -61,6 +71,12 @@ React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算
     （我曾误判「该类从未定义 → 规则沉默失效」并去"修复"，差点制造回归；`kumo.guard.test.ts` 已反转断言钉死）
 13. **所有输入类控件走 `primitives.inputClass()`**：白底 + `ring-line` + 聚焦 `ring-2 brand`。
     禁止自堆 `bg-surface-2 + ring-line-input`（那是旧的反模式，灰底深描边让输入框比按钮重）。
+14. **控件高度只有三档**（`CONTROL_H`=32 / `CHIP_H`=28 / `CONTROL_H_LG`=36）。
+    Kumo 16 条规则**没有**控件高度条目，但高度差造成的视觉重量差与描边问题同源。
+    历史教训：曾同时存在 26/28/30/32/36/38px 六种。`kumo.guard.test.ts` 以白名单断言看守。
+15. **按钮实现入口唯一**：业务组件禁止裸写 `<button>`，一律走 `Button`/`IconButton`/`Chip`。
+    例外白名单（结构性卡片按钮）：ThumbCard / PalettePanel / CuratedSetsPanel。
+16. **与当前画面绑定的操作，紧贴当前画面**：分享 / 导出 / 换一版 / 主题切换都在画布栏，不在顶栏。
 
 ## Cloudflare Workers 限制（2026-10 核实，与旧文档不同）
 - Worker size: **64 MiB**（不是旧文档的 1MB）
@@ -171,6 +187,12 @@ T1+T2+T3+Lab 完成。**最终校验：typecheck 0 error / test 264 passed / bui
 - ✅ **正解：作用域栈** —— 定位所属顶层声明（`function` / `const X = {` / `const X: T = {`），
   向下扫到下一个顶层声明为止，这段区间继承该声明的语义标记。
 凡是要写"这段代码是不是 X"这类门禁，先问一句：**X 这个语义是写在单行里的吗？**
+
+⚠️ **豁免规则要按「语义归属」写，不要按「代码长相」写**。
+2026-10-12 第 5 次假绿补强：高度门禁改作用域栈后精确命中，但连带误报 3 条
+（色板色条 `h-6 w-4`、合集缩略图 `h-10 w-16 object-cover`、Switch 轨道 `h-5 w-9` 与拇指 `h-4 w-4`）。
+三种写法形态各异，按正则猜长相写了三轮仍漏 → 改为 `ownerOf()` 取顶层函数名判定（`owner === 'Switch'` 直接豁免）。
+**代码长相会变，语义归属不会。**
 
 ## QA 的变异测试方法（必须沿用）
 QA 三轮共注入 **20 个变异**，是本项目最有效的验证手段。做法：备份 src → 注入缺陷 → 跑测试 → `diff -rq` 校验还原。

