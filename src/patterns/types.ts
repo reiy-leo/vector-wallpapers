@@ -246,7 +246,6 @@ export type PatternId =
   | 'halftone'
   | 'papercut'
   | 'dither-gradient'
-  | 'art-deco-fan'
   | 'nouveau-scroll'
   | 'isometric-voxel'
   | 'lowpoly-facet'

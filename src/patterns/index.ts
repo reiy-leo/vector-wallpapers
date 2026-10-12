@@ -27,7 +27,6 @@ import diamondLattice from './B-repeat/diamond-lattice';
 import girihStar from './B-repeat/girih-star';
 import halftone from './B-repeat/halftone';
 import papercut from './B-repeat/papercut';
-import artDecoFan from './B-repeat/art-deco-fan';
 
 // C 渐变流体 / 有机形态
 import duskRidges from './C-organic/dusk-ridges';
@@ -142,7 +141,6 @@ const ALL: PatternDef[] = [
   halftone,
   papercut,
   ditherGradient,
-  artDecoFan,
   nouveauScroll,
   isometricVoxel,
   lowpolyFacet,

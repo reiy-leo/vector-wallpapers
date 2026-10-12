@@ -53,12 +53,12 @@ function maxConfig(patternId: string) {
  * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
  * 写死字面量会让人下意识以为是测试写错了。
  */
-const TOTAL_EXPECTED = 95;
+const TOTAL_EXPECTED = 94;
 
 /** 分类分布（2026-10-12 重组后：线条 / 几何 / 流体 / 风景 / 像素）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
   'A-lines': 9,
-  'B-repeat': 21,
+  'B-repeat': 20,
   'C-organic': 7,
   'E-scene': 16,
   'D-pixel': 6,
@@ -260,7 +260,7 @@ describe('<pattern> 平铺覆盖', () => {
    */
   const MUST_TILE = [
     'polka-dots', 'triangle-tiling', 'checker-mesh', 'hex-grid', 'diamond-lattice',
-    'girih-star', 'halftone', 'papercut', 'art-deco-fan', 'chevron', 'fish-scales',
+    'girih-star', 'halftone', 'papercut', 'chevron', 'fish-scales',
     'square-rings', 'raised-tiles', 'tortoise-grid', 'arrow-repeat',
   ] as const;
 
