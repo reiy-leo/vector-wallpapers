@@ -110,6 +110,11 @@ export const ALL_PATTERN_IDS: readonly PatternId[] = [
   'arrow-repeat',
   'pyramid-facets',
   'conic-mesh',
+  // 第四批：不规则色块
+  'scatter-blobs',
+  'pebble-field',
+  'terrazzo',
+  'blob-contours',
 ];
 
 /** 已实现的 id 清单（原 19 个 + 第二批新增）。 */
@@ -153,6 +158,11 @@ export const IMPLEMENTED_PATTERN_IDS = [
   'arrow-repeat',
   'pyramid-facets',
   'conic-mesh',
+  // 第四批：不规则色块
+  'scatter-blobs',
+  'pebble-field',
+  'terrazzo',
+  'blob-contours',
 ] as const satisfies readonly PatternId[];
 
 /** 按 role 批量取元件 id —— 供 UI 的「强调色 ×2」一键改色使用（PRD P0-2）。 */

@@ -234,4 +234,8 @@ export type PatternId =
   | 'tortoise-grid'
   | 'arrow-repeat'
   | 'pyramid-facets'
-  | 'conic-mesh';
+  | 'conic-mesh'
+  | 'scatter-blobs'
+  | 'pebble-field'
+  | 'terrazzo'
+  | 'blob-contours';

@@ -32,14 +32,24 @@ export function nextSeed(current: number): number {
  * 改为每次都回到作者的配色骨架：明暗关系与对比度是作者调好的，
  * 换一版只换色相/饱和度，永远不会越点越灰。
  */
-function pickSource(def: PatternDef, rng: () => number): Map<string, PaintSpec> {
-  const base = new Map<string, PaintSpec>(def.elements.map((e) => [e.id, e.paint]));
-  const choices = def.presets.length;
-  const k = Math.floor(rng() * (choices + 1));
-  if (k < choices) {
-    for (const [id, o] of Object.entries(def.presets[k].elements)) base.set(id, o.paint);
+function pickSource(def: PatternDef, rng: () => number, tone: BgTone): Map<string, PaintSpec> {
+  // 只从与当前浅/深底一致的作者配色里挑：换一版不应把用户选的底色明暗换掉
+  const all = authorSources(def);
+  const same = all.filter((m) => toneOf(m, def) === tone);
+  const pool = same.length > 0 ? same : all;
+  return pool[Math.floor(rng() * pool.length) % pool.length];
+}
+
+/** 作者调过的全部配色：默认配色 + 每个 preset（preset 未覆盖的元件沿用默认）。 */
+function authorSources(def: PatternDef): Map<string, PaintSpec>[] {
+  const defaults = new Map<string, PaintSpec>(def.elements.map((e) => [e.id, e.paint]));
+  const out = [defaults];
+  for (const pr of def.presets) {
+    const m = new Map(defaults);
+    for (const [id, o] of Object.entries(pr.elements)) m.set(id, o.paint);
+    out.push(m);
   }
-  return base;
+  return out;
 }
 
 /** 对一种颜色做「保明度」的重新着色。 */
@@ -83,6 +93,7 @@ export function randomizeColors(
   seed: number,
 ): PatternConfig {
   const rng = mulberry32(seed);
+  const tone = bgTone(cfg, def);
 
   if (strategy === 'palette' && PALETTES.length > 0) {
     const pal = PALETTES[Math.floor(rng() * PALETTES.length) % PALETTES.length];
@@ -92,12 +103,12 @@ export function randomizeColors(
     const applied = applyPaletteSlots(cfg, def, slots);
     applied.elements = applied.elements.map((e, i) => (locked.has(e.id) ? cfg.elements[i] : e));
     applied.seed = seed;
-    return applied;
+    return keepTone(applied, def, tone);
   }
 
   const next = structuredCloneConfig(cfg);
   next.seed = seed;
-  const source = pickSource(def, rng);
+  const source = pickSource(def, rng, tone);
   // 色相整体转 40°~320°：太小看不出「换了一版」，正好 360° 又等于没换
   const hueShift = 40 + rng() * 280;
   const satScale = 0.85 + rng() * 0.35;
@@ -114,7 +125,15 @@ export function randomizeColors(
       e.paint = mapPaint(src, (hex) => recolorHex(hex, hueShift, satScale, isBg ? 0 : 0.18));
     }
   }
-  return next;
+  return keepTone(next, def, tone);
+}
+
+/** 换色后若浅/深底被改变（色板、无同色调配色等情况），按明度翻转回原来的底色类别。 */
+function keepTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
+  if (bgTone(cfg, def) === tone) return cfg;
+  const flipped = flipLightness(cfg, def, tone);
+  // 翻转仍不达标（前景占比大的母题）→ 退回作者的同色调配色，保证底色类别一定不跳
+  return bgTone(flipped, def) === tone ? flipped : applyTone(cfg, def, tone);
 }
 
 /** 只重写 solid 的颜色；渐变则重写首个色标，其余保持不变。 */
@@ -233,14 +252,7 @@ export function applyTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): Pa
   const next = structuredCloneConfig(cfg);
   const bgSet = new Set(bgIds(def));
 
-  const sources: Map<string, PaintSpec>[] = [];
-  const defaults = new Map<string, PaintSpec>(def.elements.map((e) => [e.id, e.paint]));
-  sources.push(defaults);
-  for (const pr of def.presets) {
-    const m = new Map(defaults);
-    for (const [id, o] of Object.entries(pr.elements)) m.set(id, o.paint);
-    sources.push(m);
-  }
+  const sources = authorSources(def);
   const matching = sources.filter((m) => toneOf(m, def) === tone);
 
   const firstHue = (p: PaintSpec | undefined): number | null => {
@@ -268,7 +280,13 @@ export function applyTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): Pa
     }
     return next;
   }
+  return flipLightness(cfg, def, tone);
+}
 
+/** 按明度翻转到目标底色：底色压到很暗 / 很亮，前景 l → 1 − l，色相饱和度不动；锁定元件不改。 */
+function flipLightness(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
+  const next = structuredCloneConfig(cfg);
+  const bgSet = new Set(bgIds(def));
   for (const e of next.elements) {
     if (e.locked) continue;
     const isBg = bgSet.has(e.id);

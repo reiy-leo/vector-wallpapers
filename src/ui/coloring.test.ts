@@ -62,3 +62,20 @@ describe('浅底 / 深底：每张图都能切', () => {
     });
   }
 });
+
+describe('换一版：保持用户选的浅底 / 深底', () => {
+  for (const def of registry.list()) {
+    it(`${def.id}：切到相反底色后连点换一版，底色类别不跳回`, () => {
+      const base = createDefaultConfig(def);
+      for (const tone of ['light', 'dark'] as const) {
+        let cfg = applyTone(base, def, tone);
+        for (const strategy of ['analogous', 'palette', 'full'] as const) {
+          for (let i = 0; i < 4; i++) {
+            cfg = randomizeColors(cfg, def, strategy, nextSeed(cfg.seed));
+            expect(bgTone(cfg, def), `${strategy} 第 ${i + 1} 次`).toBe(tone);
+          }
+        }
+      }
+    });
+  }
+});

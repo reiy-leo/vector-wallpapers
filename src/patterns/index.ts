@@ -56,6 +56,10 @@ import tortoiseGrid from './B-repeat/tortoise-grid';
 import arrowRepeat from './B-repeat/arrow-repeat';
 import pyramidFacets from './C-organic/pyramid-facets';
 import conicMesh from './C-organic/conic-mesh';
+import scatterBlobs from './C-organic/scatter-blobs';
+import pebbleField from './C-organic/pebble-field';
+import terrazzo from './C-organic/terrazzo';
+import blobContours from './C-organic/blob-contours';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -101,6 +105,10 @@ const ALL: PatternDef[] = [
   arrowRepeat,
   pyramidFacets,
   conicMesh,
+  scatterBlobs,
+  pebbleField,
+  terrazzo,
+  blobContours,
 ];
 
 export const registry = createRegistry();

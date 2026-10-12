@@ -53,18 +53,18 @@ function maxConfig(patternId: string) {
  * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
  * 写死字面量会让人下意识以为是测试写错了。
  */
-const TOTAL_EXPECTED = 40;
+const TOTAL_EXPECTED = 44;
 
 /** 分类分布：B 类增量最多（4 个新母题都落在重复纹样）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
   'A-lines': 11,
   'B-repeat': 15,
-  'C-organic': 8,
+  'C-organic': 12,
   'D-pixel': 6,
 };
 
 describe('实现数量与 id 契约', () => {
-  it(`共 ${TOTAL_EXPECTED} 个 pattern（首批 19 + 第二批 8 + 第三批 13）`, () => {
+  it(`共 ${TOTAL_EXPECTED} 个 pattern（首批 19 + 第二批 8 + 第三批 13 + 第四批 4）`, () => {
     expect(ALL).toHaveLength(TOTAL_EXPECTED);
   });
 
