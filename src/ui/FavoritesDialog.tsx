@@ -3,7 +3,7 @@
  *
  * 收藏的是「具体的一张壁纸」（配色 + 参数 + seed），所以这里按原比例渲染
  * **真实 SVG**（不是母题库那种小缩略图），点一张进入聚焦预览：按视口尺寸重渲染、
- * 带动画，可左右翻页、复制 CSS 或删除。
+ * 带动画，可左右翻页、复制 CSS、套用到画布（再导出）或删除。
  *
  * ⭐ 外壳常驻 DOM、用 hidden 控制显隐（与 Dialog 同一纪律）；
  *   但卡片内容只在打开时渲染 —— 200 张 SVG 不该在关着的时候白算。
@@ -14,7 +14,7 @@ import { renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { clamp } from '../shared/guards';
 import { LIMITS } from '../shared/constants';
-import { removeSaved, savedToConfig, useWorkbenchSelector, type SavedWallpaper } from './store';
+import { applySaved, removeSaved, savedToConfig, useWorkbenchSelector, type SavedWallpaper } from './store';
 import { copyBackgroundCSS } from './exporters';
 import { Button, IconButton } from './primitives';
 import { IconChevron, IconClose, IconFocus } from './icons';
@@ -49,6 +49,19 @@ export function FavoritesDialog({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, focusIdx, onClose]);
+
+  // 套用到画布：导出 SVG / PNG 走画布，所以「套用」必须保留（Rei 2026-10-12）
+  const apply = useCallback(
+    (item: SavedWallpaper) => {
+      if (applySaved(item)) {
+        onNotice('已套用到画布，可直接导出', 'success');
+        onClose();
+      } else {
+        onNotice('这张收藏的母题已不存在', 'warning');
+      }
+    },
+    [onClose, onNotice],
+  );
 
   // 复制这张收藏的 CSS 背景（Rei 2026-10-12：管理收藏里用「复制 CSS」替代「套用」）
   const copyCss = useCallback(
@@ -110,6 +123,7 @@ export function FavoritesDialog({
                       item={item}
                       onFocus={() => setFocusIdx(i)}
                       onCopy={() => copyCss(item)}
+                      onApply={() => apply(item)}
                       onRemove={() => remove(item)}
                     />
                   </li>
@@ -126,6 +140,7 @@ export function FavoritesDialog({
               onPrev={() => setFocusIdx((focusIdx - 1 + saved.length) % saved.length)}
               onNext={() => setFocusIdx((focusIdx + 1) % saved.length)}
               onCopy={() => copyCss(saved[focusIdx])}
+              onApply={() => apply(saved[focusIdx])}
               onClose={() => setFocusIdx(null)}
             />
           )}
@@ -139,11 +154,13 @@ function SavedCard({
   item,
   onFocus,
   onCopy,
+  onApply,
   onRemove,
 }: {
   item: SavedWallpaper;
   onFocus: () => void;
   onCopy: () => void;
+  onApply: () => void;
   onRemove: () => void;
 }) {
   const def = registry.get(item.patternId);
@@ -183,6 +200,9 @@ function SavedCard({
           <Button variant="secondary" size="sm" onClick={onCopy} disabled={!cfg}>
             复制 CSS
           </Button>
+          <Button variant="primary" size="sm" onClick={onApply} disabled={!cfg}>
+            套用
+          </Button>
         </div>
       </figcaption>
     </figure>
@@ -196,6 +216,7 @@ function SavedFocus({
   onPrev,
   onNext,
   onCopy,
+  onApply,
   onClose,
 }: {
   item: SavedWallpaper;
@@ -204,6 +225,7 @@ function SavedFocus({
   onPrev: () => void;
   onNext: () => void;
   onCopy: () => void;
+  onApply: () => void;
   onClose: () => void;
 }) {
   const def = registry.get(item.patternId);
@@ -239,8 +261,11 @@ function SavedFocus({
       {uri ? <img src={uri} alt={`${def?.name ?? ''} 全屏预览`} className="block h-full w-full" /> : null}
 
       <div className="absolute right-4 top-4 flex items-center gap-2">
-        <Button variant="primary" size="sm" className="rounded-full shadow-pop" onClick={onCopy}>
+        <Button variant="secondary" size="sm" className="rounded-full shadow-pop" onClick={onCopy}>
           复制 CSS
+        </Button>
+        <Button variant="primary" size="sm" className="rounded-full shadow-pop" onClick={onApply}>
+          套用到画布
         </Button>
         <IconButton autoFocus label="退出聚焦（Esc）" className={chrome} onClick={onClose}>
           <IconClose size={18} />
