@@ -4,7 +4,7 @@
  *信息层级（从左到右对应「身份 → 视图偏好 → 账户」）：
  *   品牌 │ 面板·收藏 │ 账户
  *
- *⭐ **产物动作（分享/导出）与形态参数已迁到画布工具条**：
+ *⭐ **产物动作（复制 CSS/导出）与形态参数已迁到画布工具条**：
  * 它们描述的是「当前这张图」，不是「整个应用」。放在顶栏会让用户
  * 以为分享的是整个应用，而实际上分享的是当前母题 + 当前配色。
  * 「与当前画面绑定的操作，紧贴当前画面」是布局的基本原则。
@@ -21,7 +21,7 @@ import { LIMITS } from '../shared/constants';
 import { readFavorites, setUI, usePatternDef, useWorkbenchSelector, writeFavorites } from './store';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
-import { consumeLoginError, loadMe, logout, startLogin, useAuth } from './auth';
+import { consumeLoginError, loadMe, loginBlocker, logout, requireLogin, startLogin, useAuth } from './auth';
 import { IconAuto, IconGoogle, IconMoon, IconPanel, IconStar, IconSun } from './icons';
 import type { UIState } from '../engine/types';
 
@@ -42,6 +42,8 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const isFavorite = favorites.includes(def.id);
 
   const toggleFavorite = () => {
+    // 收藏需要 Google 登录：未登录时弹出门禁，不改动收藏
+    if (!requireLogin('favorite')) return;
     const next = isFavorite
       ? favorites.filter((x) => x !== def.id)
       : [def.id, ...favorites].slice(0, LIMITS.MAX_FAVORITES);
@@ -118,12 +120,9 @@ function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
   if (!user) {
     const onLogin = () => {
       if (auth.status === 'loading') return;
-      if (auth.status === 'unavailable') {
-        onNotice('当前环境没有登录服务（用 npm run dev:worker 启动 Worker）。', 'warning');
-        return;
-      }
-      if (auth.me.authMode === 'unconfigured') {
-        onNotice('站点尚未配置 Google 登录（缺少 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / SESSION_SECRET）。', 'warning');
+      const blocker = loginBlocker(auth);
+      if (blocker) {
+        onNotice(blocker, 'warning');
         return;
       }
       startLogin();

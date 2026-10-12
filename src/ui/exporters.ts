@@ -11,7 +11,7 @@
  *     破坏「导出与预览逐像素一致」这条验收标准）。
  */
 import { renderStandaloneSVG } from '../engine/render';
-import { downloadBlob, downloadText, exportFilename } from '../shared/download';
+import { downloadBlob, downloadText, exportFilename, svgToCssBackground } from '../shared/download';
 import { detectPlatform, guardCanvasSize, IOS_PNG_UNSUPPORTED_HINT } from '../shared/guards';
 import type { ExportScale } from '../shared/guards';
 import type { PatternConfig } from '../engine/types';
@@ -119,6 +119,24 @@ export async function copySVGSource(def: PatternDef, cfg: PatternConfig): Promis
   const svg = renderStandaloneSVG(def, cfg);
   try {
     await navigator.clipboard.writeText(svg);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 复制 CSS 背景声明 —— 取代原「分享」按钮（Rei 2026-10-12：分享替换成复制 CSS）。
+ * 与「导出 SVG」同一份静态产物（animate:false），不是预览里带动画的那份。
+ */
+export function buildBackgroundCSS(def: PatternDef, cfg: PatternConfig): string {
+  const svg = renderStandaloneSVG(def, cfg);
+  return svgToCssBackground(svg, `Vector Wallpapers · ${def.name} · ${cfg.width}×${cfg.height}`);
+}
+
+export async function copyBackgroundCSS(def: PatternDef, cfg: PatternConfig): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(buildBackgroundCSS(def, cfg));
     return true;
   } catch {
     return false;

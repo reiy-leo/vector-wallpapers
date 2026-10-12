@@ -1,57 +1,62 @@
 /**
- * 产物动作（分享 / 导出 / 源码）—— 挂在画布工具条末端。
+ * 产物动作（复制 CSS / 导出 / 源码）—— 挂在画布工具条末端。
  *
- * ⭐ 为什么独立成文件：这三个动作的**触发按钮**在画布栏（与参数、换一版同一条），
+ * ⭐ 为什么独立成文件：这些动作的**触发按钮**在画布栏（与参数、换一版同一条），
  * 而它们的**对话框**需要被渲染在顶层（fixed定位，不受工具条 overflow 影响）。
  * 抽出来既让 TopBar 与 CanvasStage 都能挂载它，也避免两份实现漂移。
  *
  * ⭐ Kumo `dialog-rendering`：两个 Dialog 都**永不条件渲染**，
  * 始终挂载、由 `open` 决定显隐 —— 否则开合动画每次都是「突然出现」。
+ *
+ * ⭐ 登录门禁（Rei 2026-10-12）：**每一个**导出出口（复制 CSS / 打开导出 / SVG / PNG /
+ * 查看与复制源码）都先过 `requireLogin('export')`，未登录弹出登录提醒、动作不执行。
+ * 只在入口按钮拦一次不够：会话可能在对话框打开期间过期（另一标签页退出登录）。
+ *
+ * 原「分享」按钮已替换为「复制 CSS」；分享链接的 URL 解析（share.ts）保留，旧链接照常可打开。
  */
 import { useEffect, useState } from 'react';
 import { registry } from '../patterns';
 import { detectPlatform, guardCanvasSize, type ExportScale } from '../shared/guards';
-import { copySVGSource, exportPNG, exportSVG } from './exporters';
+import { copyBackgroundCSS, copySVGSource, exportPNG, exportSVG } from './exporters';
 import { getConfig, usePatternDef, useWorkbenchSelector } from './store';
-import { shareUrl } from './share';
+import { requireLogin } from './auth';
 import { Button, Dialog, Segmented } from './primitives';
 import { IconCode } from './icons';
 import type { NoticeFn } from './TopBar';
 
+/** 导出类动作的登录守卫：未登录时弹出门禁并跳过动作。 */
+function gated<A extends unknown[]>(fn: (...args: A) => void): (...args: A) => void {
+  return (...args: A) => {
+    if (requireLogin('export')) fn(...args);
+  };
+}
+
 /**
  * 触发按钮组。
  *
- * 顺序 = 意图强度递增：查看源码（最轻）→ 分享（给他人）→ 导出（拿走产物）。
- * 导出是唯一的主操作（primary），其余降为 secondary。
+ * 顺序 = 意图强度递增：复制 CSS（拿一段代码）→ 导出（拿走产物）。
+ * 导出是唯一的主操作（primary），复制 CSS 降为 secondary。
  */
 export function ProductActions({ onNotice }: { onNotice: NoticeFn }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const theme = useWorkbenchSelector((s) => s.ui.theme);
-  const panel = useWorkbenchSelector((s) => s.ui.panel);
+  const def = usePatternDef();
 
-  const copyLink = async () => {
-    const url = shareUrl(getConfig(), {
-      theme: theme === 'system' ? 'system' : theme,
-      panel,
+  const copyCss = gated(() => {
+    void copyBackgroundCSS(def, getConfig()).then((ok) => {
+      if (ok) onNotice('CSS 已复制到剪贴板', 'success');
+      else onNotice('复制失败：剪贴板不可用（需 https 且允许剪贴板权限）', 'warning');
     });
-    try {
-      await navigator.clipboard.writeText(url);
-      onNotice('分享链接已复制', 'success');
-    } catch {
-      // 剪贴板在非 https / 无权限时不可用，退回展示让用户手动复制
-      window.prompt('复制此链接分享当前壁纸：', url);
-    }
-  };
+  });
 
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={() => void copyLink()}>
-        分享
+      <Button variant="secondary" size="sm" onClick={copyCss}>
+        复制 CSS
       </Button>
 
       {/* 导出：单个主动作，对话框里再选格式 */}
-      <Button variant="primary" size="sm" onClick={() => setExportOpen(true)}>
+      <Button variant="primary" size="sm" onClick={gated(() => setExportOpen(true))}>
         导出
       </Button>
 
@@ -90,11 +95,11 @@ function ExportDialog({
   const guard = guardCanvasSize(cfg.width, cfg.height, scale);
   const finalPixels = (guard.width * guard.height / 1_000_000).toFixed(1);
 
-  const onSVG = () => {
+  const onSVG = gated(() => {
     exportSVG(def, cfg);
     onNotice(`已导出 ${cfg.width}×${cfg.height} 的 SVG`, 'success');
     onClose();
-  };
+  });
 
   const onPNG = async () => {
     setBusy(true);
@@ -107,10 +112,10 @@ function ExportDialog({
   };
 
   /** 源码对话框叠在导出对话框之上：两个都是同一份产物的出口。 */
-  const openSource = () => {
+  const openSource = gated(() => {
     onClose();
     onOpenSource();
-  };
+  });
 
   return (
     <Dialog
@@ -151,7 +156,7 @@ function ExportDialog({
               导出 PNG（iOS 不支持）
             </Button>
           ) : (
-            <Button variant="primary" disabled={busy} onClick={() => void onPNG()}>
+            <Button variant="primary" disabled={busy} onClick={gated(() => void onPNG())}>
               {busy ? '导出中…' : `导出 PNG @${scale}x`}
             </Button>
           )}
@@ -248,7 +253,7 @@ function SourceDialog({
           <Button variant="ghost" onClick={onClose}>
             关闭
           </Button>
-          <Button variant="primary" onClick={() => void copy()}>
+          <Button variant="primary" onClick={gated(() => void copy())}>
             {copied ? '已复制' : '复制源码'}
           </Button>
         </>

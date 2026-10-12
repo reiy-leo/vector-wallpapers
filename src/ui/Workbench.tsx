@@ -20,9 +20,13 @@ import { CuratedSetsPanel, PalettePanel, ParamPanel } from './Panels';
 import { PatternRail } from './PatternRail';
 import { TopBar, type NoticeTone } from './TopBar';
 import { Toast } from './primitives';
+import { LoginGateDialog } from './LoginGate';
+import { isSignedIn, openLoginGate, useAuth } from './auth';
 import {
+  applyPendingShare,
   applyTheme,
   getConfig,
+  hasPendingShare,
   pushRecent,
   scheduleUrlSync,
   useWorkbench,
@@ -75,6 +79,20 @@ export function Workbench() {
   useEffect(() => {
     scheduleUrlSync(getConfig, state.ui);
   }, [state.cfg, state.ui]);
+
+  /**
+   * 分享链接需要登录（Rei 2026-10-12）：store 首屏只暂存分享配置、画布显示默认壁纸。
+   * /api/me 有结论后：已登录 → 套用分享；未登录（含无 Worker 的纯静态预览）→ 弹出登录门禁。
+   */
+  const auth = useAuth();
+  useEffect(() => {
+    if (auth.status === 'loading' || !hasPendingShare()) return;
+    if (isSignedIn(auth)) {
+      if (applyPendingShare()) onNotice('已载入分享的壁纸', 'success');
+    } else {
+      openLoginGate('share');
+    }
+  }, [auth, onNotice]);
 
   // 切母题 → 记入「最近使用」（PRD P0-7）
   const patternId = useWorkbenchSelector((s) => s.cfg.patternId);
@@ -150,6 +168,9 @@ export function Workbench() {
        * 提示条：⭐ 永不条件渲染（Kumo dialog-rendering 的同源要求）——
        * 常驻 DOM，用内部 data-show 控制显隐，入场动画才不会在首次显示时丢失。
        */}
+      {/* 登录门禁：收藏 / 导出 / 分享链接共用一个弹窗（永不条件渲染） */}
+      <LoginGateDialog />
+
       <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
         <div className="pointer-events-auto">
           <Toast

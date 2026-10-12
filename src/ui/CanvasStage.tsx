@@ -79,7 +79,7 @@ export function CanvasStage({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 标题条：左边母题名 + 描述，右边「对这张图做什么」的产物动作。
-          换一版 / 分享 / 导出 与当前画面绑定，放在名称行右上角，紧贴画面且一眼可见。 */}
+          换一版 / 复制 CSS / 导出 与当前画面绑定，放在名称行右上角，紧贴画面且一眼可见。 */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3.5">
         <div className="grid min-w-0 gap-1">
           {/* ⭐ Kumo heading-case：sentence case */}

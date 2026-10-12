@@ -87,13 +87,13 @@ React 19 + Tailwind v4 + Vite 8 + TypeScript
 13. **输入控件统一走 `primitives.inputClass()`**：白底 + `ring-line` + 聚焦 `ring-2 brand`
 14. **控件高度只有三档**：`CONTROL_H`32 / `CHIP_H`28 / `CONTROL_H_LG`36
 15. **按钮实现入口唯一**：业务组件禁止裸写 `<button>`，走 `Button`/`IconButton`/`Chip`
-16. **与当前画面绑定的操作，紧贴当前画面**：分享/导出/换一版/主题切换都在画布栏
+16. **与当前画面绑定的操作，紧贴当前画面**：复制 CSS/导出/换一版/主题切换都在画布栏
 
 ---
 
 ## ⛔ 数据契约（一经上线不可改）
 
-分享链接依赖这些标识的稳定性：
+复制 CSS链接依赖这些标识的稳定性：
 
 - **pattern id** 不可改名（已锁定 27 个，见 `src/patterns/types.ts` 的 `PatternId`）
 - **元件 id** 不可改名（如 flow-lines 的 `bg/line_far/line_mid/line_near`）

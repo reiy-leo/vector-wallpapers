@@ -46,6 +46,27 @@ export function svgToDataUri(svgText: string): string {
   return `data:image/svg+xml;charset=utf-8,${encoded}`;
 }
 
+/**
+ * SVG → 可直接粘贴的 CSS 背景声明（「复制 CSS」）。
+ *
+ * - data URI 复用 `svgToDataUri`（encodeURIComponent + 引号转义），与预览同一编码；
+ *   额外把 `(` `)` 转义 —— 万一被人去掉引号写成 `url(data:…)`，括号会提前闭合 url()。
+ * - `cover + center + no-repeat`：导出 SVG 带固定宽高与 viewBox（整幅壁纸，非平铺单元），
+ *   按比例铺满容器、居中裁切，是作为整块背景最稳妥的取值。
+ * - 注释里的 `*\/` 会提前结束 CSS 注释，先剔除。
+ */
+export function svgToCssBackground(svgText: string, comment?: string): string {
+  const uri = svgToDataUri(svgText).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  const lines = [
+    `background-image: url("${uri}");`,
+    'background-size: cover;',
+    'background-position: center;',
+    'background-repeat: no-repeat;',
+  ];
+  if (comment) lines.unshift(`/* ${comment.replace(/\*\//g, '')} */`);
+  return lines.join('\n');
+}
+
 /** 从配置派生一个语义清晰的文件名：`dusk-ridges-1920x1080.svg`。 */
 export function exportFilename(
   patternId: string,

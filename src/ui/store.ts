@@ -25,7 +25,7 @@ import {
 import { clamp } from '../shared/guards';
 import { createDefaultConfig, structuredCloneConfig } from '../engine/render';
 import { registry } from '../patterns';
-import { decodeConfig, encodeConfig } from './share';
+import { decodeConfig, encodeConfig, type DecodedState } from './share';
 import type { PatternConfig, UIState } from '../engine/types';
 import type { PatternDef, ParamValue } from '../patterns/types';
 
@@ -54,23 +54,51 @@ function initialState(): WorkbenchState {
   };
 
   /**
-   * ⭐ URL 水合在**模块初始化时同步完成**，而不是挂载后再 effect。
+   * ⭐ URL 解析仍在**模块初始化时同步完成**，但**不直接套用**。
    *
-   * 若等到 useEffect，用户会先看到一帧默认母题再跳到链接指定的母题 ——
-   * 分享链接的「打开即所见」体验就没了。模块初始化早于首次渲染，
-   * 因此首帧就是正确画面。
+   * 访问分享链接需要 Google 登录（Rei 2026-10-12）：解析结果先暂存为「待套用的分享」，
+   * 首屏照常显示默认壁纸；/api/me 确认已登录后由 Workbench 调 `applyPendingShare()` 套用，
+   * 未登录则弹出登录门禁。暂存期间地址栏不被改写（见 `scheduleUrlSync`），
+   * 这样登录跳转的 returnTo 仍带着分享参数，回来后照样能套用。
    */
   if (typeof window !== 'undefined') {
     const decoded = decodeConfig(window.location.search);
-    if (decoded.cfg) base.cfg = decoded.cfg;
-    if (decoded.ui.theme) base.ui.theme = decoded.ui.theme;
-    if (decoded.ui.panel) base.ui.panel = decoded.ui.panel;
-    if (decoded.ui.grid !== undefined) base.ui.grid = decoded.ui.grid;
+    if (decoded.cfg) {
+      pendingShare = decoded;
+      pendingBaseCfg = base.cfg;
+    }
   }
   return base;
 }
 
+/**
+ * 待套用的分享链接状态。⚠️ 必须声明在 `initialState()` 调用之前（let 的暂时性死区）。
+ * `pendingBaseCfg` 记住暂存时的默认配置引用：用户一旦动了画布（引用变了），
+ * 就视为放弃这条分享，地址栏恢复同步。
+ */
+let pendingShare: DecodedState | null = null;
+let pendingBaseCfg: PatternConfig | null = null;
+
 let state: WorkbenchState = initialState();
+
+/** 地址栏里有一条尚未套用的分享链接。 */
+export function hasPendingShare(): boolean {
+  return pendingShare !== null;
+}
+
+/** 套用暂存的分享（登录确认后调用）。返回是否真的套用了。 */
+export function applyPendingShare(): boolean {
+  const decoded = pendingShare;
+  pendingShare = null;
+  pendingBaseCfg = null;
+  if (!decoded?.cfg) return false;
+  const ui = { ...state.ui };
+  if (decoded.ui.theme) ui.theme = decoded.ui.theme;
+  if (decoded.ui.panel) ui.panel = decoded.ui.panel;
+  if (decoded.ui.grid !== undefined) ui.grid = decoded.ui.grid;
+  set({ cfg: decoded.cfg, ui });
+  return true;
+}
 const listeners = new Set<() => void>();
 function emit(): void {
   for (const l of listeners) l();
@@ -225,6 +253,13 @@ let urlTimer = 0;
 export function scheduleUrlSync(getConfig: () => PatternConfig, ui: UIState): void {
   if (typeof window === 'undefined') return;
   window.clearTimeout(urlTimer);
+  if (pendingShare) {
+    // 分享尚未套用（等登录）且画布没动过 → 保留地址栏里的分享参数，不覆盖
+    if (getConfig() === pendingBaseCfg) return;
+    // 用户已在默认画布上改动 → 放弃这条分享，恢复正常同步
+    pendingShare = null;
+    pendingBaseCfg = null;
+  }
   urlTimer = window.setTimeout(() => {
     const qs = encodeConfig(getConfig(), ui);
     const url = window.location.pathname + (qs ? `?${qs}` : '');
