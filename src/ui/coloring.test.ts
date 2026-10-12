@@ -3,7 +3,7 @@ import { registry } from '../patterns';
 import { createDefaultConfig } from '../engine/render';
 import { hexToHsl } from '../engine/colors';
 import type { PatternConfig } from '../engine/types';
-import { nextSeed, randomizeColors } from './coloring';
+import { applyTone, bgTone, nextSeed, randomizeColors } from './coloring';
 
 function firstHex(cfg: PatternConfig, id: string): string | null {
   const p = cfg.elements.find((e) => e.id === id)?.paint;
@@ -47,4 +47,18 @@ describe('换一版：连点不会越来越灰', () => {
     const next = randomizeColors(cfg, def, 'analogous', 123);
     expect(next.elements[0].paint).toEqual(cfg.elements[0].paint);
   });
+});
+
+describe('浅底 / 深底：每张图都能切', () => {
+  for (const def of registry.list()) {
+    it(`${def.id}：切到相反底色后确实变了，再切回来也成立`, () => {
+      const cfg = createDefaultConfig(def);
+      const cur = bgTone(cfg, def);
+      const other = cur === 'light' ? 'dark' : 'light';
+      const flipped = applyTone(cfg, def, other);
+      expect(bgTone(flipped, def)).toBe(other);
+      expect(bgTone(applyTone(flipped, def, cur), def)).toBe(cur);
+      expect(applyTone(cfg, def, cur)).toBe(cfg);
+    });
+  }
 });

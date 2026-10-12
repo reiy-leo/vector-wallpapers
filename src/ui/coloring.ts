@@ -172,3 +172,115 @@ export function resetElements(
 }
 
 export type { ElementConfig };
+
+/* ─────────────────────────────────────────────────────────────────
+ * 浅底 / 深底（每张图都能切）
+ * ───────────────────────────────────────────────────────────────── */
+
+export type BgTone = 'light' | 'dark';
+
+function paintLightness(paint: PaintSpec): number | null {
+  if (paint.type === 'solid') return hexToHsl(paint.color).l;
+  if (paint.type === 'linear' || paint.type === 'radial') {
+    if (paint.stops.length === 0) return null;
+    return paint.stops.reduce((a, st) => a + hexToHsl(st.color).l, 0) / paint.stops.length;
+  }
+  return null;
+}
+
+function bgIds(def: PatternDef): string[] {
+  const ids = def.elements.filter((e) => e.role === 'bg').map((e) => e.id);
+  return ids.length > 0 ? ids : def.elements.slice(0, 1).map((e) => e.id);
+}
+
+/**
+ * 画面整体是浅还是深。底色权重 2、主/次色权重 1：
+ * 有些母题的 bg 只是细缝（pyramid-facets、raised-tiles），只看 bg 会把一张浅色图判成深色。
+ */
+function toneOf(paints: Map<string, PaintSpec>, def: PatternDef): BgTone {
+  const bg = new Set(bgIds(def));
+  let sum = 0;
+  let w = 0;
+  for (const e of def.elements) {
+    const weight = bg.has(e.id) ? 2 : e.role === 'primary' || e.role === 'secondary' ? 1 : 0;
+    if (!weight) continue;
+    const p = paints.get(e.id);
+    const l = p ? paintLightness(p) : null;
+    if (l === null) continue;
+    sum += l * weight;
+    w += weight;
+  }
+  return (w ? sum / w : 1) < 0.5 ? 'dark' : 'light';
+}
+
+/** 当前画面是浅底还是深底（按底色元件的平均明度判断）。 */
+export function bgTone(cfg: PatternConfig, def: PatternDef): BgTone {
+  return toneOf(new Map(cfg.elements.map((e) => [e.id, e.paint])), def);
+}
+
+/**
+ * 切换浅底 / 深底。
+ *
+ * 1. 优先用作者调过的同色调配色（默认配色或 preset）：明暗关系、对比度都是人工调好的，
+ *    多套候选时选底色色相离当前最近的一套，尽量保留用户选的色系。
+ * 2. 没有现成配色时，按明度翻转：底色压到很暗 / 很亮，前景元件 l → 1 − l
+ *    并夹在可读区间，色相与饱和度不动。
+ *
+ * 锁定元件不改；形态参数不改（只换颜色，不换构图）。
+ */
+export function applyTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
+  if (bgTone(cfg, def) === tone) return cfg;
+  const next = structuredCloneConfig(cfg);
+  const bgSet = new Set(bgIds(def));
+
+  const sources: Map<string, PaintSpec>[] = [];
+  const defaults = new Map<string, PaintSpec>(def.elements.map((e) => [e.id, e.paint]));
+  sources.push(defaults);
+  for (const pr of def.presets) {
+    const m = new Map(defaults);
+    for (const [id, o] of Object.entries(pr.elements)) m.set(id, o.paint);
+    sources.push(m);
+  }
+  const matching = sources.filter((m) => toneOf(m, def) === tone);
+
+  const firstHue = (p: PaintSpec | undefined): number | null => {
+    if (!p) return null;
+    const hex = p.type === 'solid' ? p.color : (p.type === 'linear' || p.type === 'radial') ? p.stops[0]?.color : undefined;
+    return hex ? hexToHsl(hex).h : null;
+  };
+  const curHue = firstHue(cfg.elements.find((e) => bgSet.has(e.id))?.paint);
+
+  if (matching.length > 0) {
+    let best = matching[0];
+    if (curHue !== null && matching.length > 1) {
+      const dist = (m: Map<string, PaintSpec>) => {
+        const h = firstHue(m.get([...bgSet][0]));
+        if (h === null) return 999;
+        const d = Math.abs(h - curHue) % 360;
+        return Math.min(d, 360 - d);
+      };
+      best = [...matching].sort((a, b) => dist(a) - dist(b))[0];
+    }
+    for (const e of next.elements) {
+      if (e.locked) continue;
+      const p = best.get(e.id);
+      if (p) e.paint = p;
+    }
+    return next;
+  }
+
+  for (const e of next.elements) {
+    if (e.locked) continue;
+    const isBg = bgSet.has(e.id);
+    e.paint = mapPaint(e.paint, (hex) => {
+      const { h, s, l } = hexToHsl(hex);
+      if (isBg) {
+        const nl = tone === 'dark' ? 0.06 + (1 - l) * 0.25 : 0.88 + (1 - l) * 0.1;
+        return hslToHex(h, Math.min(s, 0.35), Math.min(0.97, Math.max(0.04, nl)));
+      }
+      const nl = Math.min(0.85, Math.max(0.22, 1 - l));
+      return hslToHex(h, s, nl);
+    });
+  }
+  return next;
+}

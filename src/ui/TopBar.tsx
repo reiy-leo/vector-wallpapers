@@ -13,16 +13,17 @@
  * 分隔线才是「这里换了语义类别」。图标连续排列时眼睛会把它们读成一串
  * 同类按钮，用户找不到「哪个是全局动作」。
  *
- * ⭐ 主题切换也移到了画布（图片右上角）：主题改变的正是「这张图看起来
- * 是亮是暗」，把它留在顶栏等于让用户「改完设置再回去看效果」。
+ * ⭐ 界面主题（浅/深/跟随系统）在顶栏，它作用于整个应用；
+ * 图片右上角的是**壁纸本身**的浅底/深底切换，二者作用域不同。
  */
 import { useEffect, useState } from 'react';
 import { LIMITS } from '../shared/constants';
 import { readFavorites, setUI, usePatternDef, useWorkbenchSelector, writeFavorites } from './store';
-import { Button, IconButton, Tooltip } from './primitives';
+import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
 import { consumeLoginError, loadMe, logout, startLogin, useAuth } from './auth';
-import { IconGoogle, IconPanel, IconStar } from './icons';
+import { IconAuto, IconGoogle, IconMoon, IconPanel, IconStar, IconSun } from './icons';
+import type { UIState } from '../engine/types';
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
 export type NoticeFn = (message: string, tone?: NoticeTone) => void;
@@ -30,6 +31,7 @@ export type NoticeFn = (message: string, tone?: NoticeTone) => void;
 export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const def = usePatternDef();
   const panel = useWorkbenchSelector((s) => s.ui.panel);
+  const theme = useWorkbenchSelector((s) => s.ui.theme);
   const [favorites, setFavorites] = useState<string[]>([]);
 
   // 收藏只在挂载时读一次：它是持久化数据，不参与渲染高频变化
@@ -57,6 +59,17 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
 
       {/* ── 视图偏好：面板位置 / 收藏 ── */}
       <div className="flex items-center gap-1">
+        <Segmented
+          label="界面主题"
+          size="sm"
+          value={theme}
+          onChange={(t) => setUI({ theme: t as UIState['theme'] })}
+          options={[
+            { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅色界面' },
+            { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深色界面' },
+            { value: 'system', label: '', icon: <IconAuto size={14} />, title: '跟随系统' },
+          ]}
+        />
         <Tooltip content={panel === 'right' ? '把面板移到左侧' : '把面板移到右侧'}>
           <IconButton
             label="切换面板位置"

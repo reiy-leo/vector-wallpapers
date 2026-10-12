@@ -16,11 +16,11 @@ import { renderStandaloneSVG, createDefaultConfig } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
+import { applyTone, bgTone, type BgTone } from './coloring';
 import { Button, IconButton, Segmented, Tooltip, inputClass } from './primitives';
 import { ControlChips, DiscreteChips } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
-  IconAuto,
   IconClose,
   IconFocus,
   IconGrid,
@@ -31,7 +31,7 @@ import {
   IconSun,
 } from './icons';
 import type { ColorStrategy } from '../engine/colors';
-import type { PatternConfig, UIState } from '../engine/types';
+import type { PatternConfig } from '../engine/types';
 import type { NoticeFn } from './TopBar';
 
 export function CanvasStage({
@@ -75,14 +75,26 @@ export function CanvasStage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 标题条：母题名 + 描述 + 技术标识 */}
-      <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line px-5 py-3.5">
+      {/* 标题条：左边母题名 + 描述，右边「对这张图做什么」的产物动作。
+          换一版 / 分享 / 导出 与当前画面绑定，放在名称行右上角，紧贴画面且一眼可见。 */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3.5">
         <div className="grid min-w-0 gap-1">
           {/* ⭐ Kumo heading-case：sentence case */}
           <h1 className="text-lg font-semibold text-fg">{def.name}</h1>
-          <p className="text-sm text-fg-soft">{def.description}</p>
+          <p className="text-sm text-fg-soft">
+            {def.description}
+            <code className="ml-2 font-mono text-[0.9em] text-fg-mute">{def.id}</code>
+          </p>
         </div>
-        <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">{def.id}</code>
+        <div className="flex shrink-0 items-center gap-2">
+          <Tooltip content="换 seed + 按当前策略重排配色">
+            <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
+              <IconShuffle size={15} />
+              换一版
+            </Button>
+          </Tooltip>
+          <ProductActions onNotice={onNotice} />
+        </div>
       </div>
 
       {/* 画布区 */}
@@ -103,12 +115,12 @@ export function CanvasStage({
 
         {/* 栅格叠加：精确贴合图片盒子（而非整块舞台），
             否则用户看到的参考线会与壁纸边缘错位，失去参考价值 */}
-        {grid && <GridOverlay target={imgRef} />}
+        {grid && uri !== '' && <GridOverlay target={imgRef} />}
 
         {/* 主题切换：贴在**图片**右上角而非容器右上角 —— 主题改变的是
             「这张图看起来多亮」，把它放在舞台角上会让用户把作用域
             误读成「整个应用」。容器角在图片未铺满时离图很远。 */}
-        {!focus && <ThemeSwitchOverlay target={imgRef} />}
+        {!focus && uri !== '' && <ThemeSwitchOverlay target={imgRef} />}
 
         {/* 聚焦模式：整张 SVG 按窗口尺寸重新渲染并撑满视口，右上角关闭 */}
         {focus && <FocusOverlay onClose={() => setUI({ focus: false })} />}
@@ -118,7 +130,7 @@ export function CanvasStage({
           工具条：三行结构，靠分组而不是靠加大间距区分语义。
             行① 尺寸 + 形态参数  ← 「这张图长什么样」
             行② 离散形态选项
-            行③ 视图/产物动作    ← 「对这张图做什么」
+            行②右侧 视图动作（栅格/聚焦/恢复默认）；产物动作在标题行右上角
           滑块与产物动作必须**同一视觉带**：调形状和拿走产物是
           同一个连续行为链的两端，中间隔一行会让手感断开。
           ─────────────────────────────────────────────────────────── */}
@@ -177,16 +189,6 @@ export function CanvasStage({
               </IconButton>
             </Tooltip>
 
-            <div aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-line" />
-
-            <Tooltip content="换 seed + 按当前策略重排配色">
-              <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
-                <IconShuffle size={15} />
-                换一版
-              </Button>
-            </Tooltip>
-
-            <ProductActions onNotice={onNotice} />
           </div>
         </div>
 
@@ -274,28 +276,29 @@ function viewportSize() {
  * 否则会出现「栅格对得上、按钮对不上」的错位。
  */
 function ThemeSwitchOverlay({ target }: { target: React.RefObject<HTMLImageElement | null> }) {
-  const theme = useWorkbenchSelector((s) => s.ui.theme);
+  const def = usePatternDef();
+  const cfg = useWorkbenchSelector((s) => s.cfg);
   const box = useImageBox(target);
 
-  if (box.w === 0) return null;
+  if (box.w === 0 || !def) return null;
+  const tone = bgTone(cfg, def);
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 flex items-start justify-end p-3"
-      aria-hidden="false"
-    >
-      <div className="pointer-events-auto shadow-pop">
+    // 与栅格同一套定位：先做一个与图片盒子等大的居中框，再贴它的右上角
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="false">
+      <div className="relative" style={{ width: box.w, height: box.h }}>
+      <div className="pointer-events-auto absolute right-3 top-3 shadow-pop">
         <Segmented
-          label="界面主题"
+          label="壁纸底色"
           size="sm"
-          value={theme}
-          onChange={(t) => setUI({ theme: t as UIState['theme'] })}
+          value={tone}
+          onChange={(t) => setConfig(applyTone(cfg, def, t as BgTone))}
           options={[
-            { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅色' },
-            { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深色' },
-            { value: 'system', label: '', icon: <IconAuto size={14} />, title: '跟随系统' },
+            { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅底' },
+            { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深底' },
           ]}
         />
+      </div>
       </div>
     </div>
   );
