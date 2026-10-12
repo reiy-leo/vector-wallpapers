@@ -33,62 +33,52 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const PUFFS = 7;
 
 /**
- * 生成一朵云的轮廓路径。
+ * 生成一朵云的轮廓路径 —— **每朵的形状完全由 seed 决定**。
  *
- * 构造思路（自左下角起，逆时针走一圈）：
- *   底缘：从左端**水平直线**走到右端  ← 积云的平底，云之所以像云的关键
- *   右弧：自底向上收一个半弧到右侧肩部
- *   顶缘：3~5 个大小不等的拱形凸起（`Q`，控制点抬到顶点之上形成尖圆弧）
- *   左弧：收口回到起点
+ * 2026-10-12 第二次重做：旧版用 4 套固定的凸起比例（BUMP_SETS）+ `Q` 尖拱，
+ * 同屏只有 4 种轮廓、凸起是尖角，读起来像「齿轮/皇冠」而不是云。
  *
- * 顶部凸起**不刻意对称**：真实积云的凸起左右不等、间距不均，
- * 镜像对称会立刻暴露「这是程序画的」。
+ * ✅ 现在：
+ *  - 底缘仍是**水平直线**（积云的平底）。
+ *  - 顶缘由 3~6 个**圆弧泡**拼成（SVG `A` 弧，半圆到略扁之间随机），
+ *    泡的个数、各自宽度、谷底高度全部取自 rng。
+ *  - 谷底高度乘一个中间高两端低的包络 → 整朵云自然隆起成馒头形，两端泡贴着底缘收口。
  */
-function cloudPath(cx: number, baseY: number, halfW: number, height: number, bumps: readonly number[], jitter: readonly number[]): string {
+function cloudPath(cx: number, baseY: number, halfW: number, height: number, rng: () => number): string {
   const left = cx - halfW;
   const right = cx + halfW;
-  const topY = baseY - height;
-  const r = height * 0.62; // 肩部圆角半径
+  const k = 3 + Math.floor(rng() * 4); // 3~6 个泡
 
-  // 顶缘：从右肩向左，逐个凸起。bumps 是各凸起的相对宽度（0~1，和为 1）
-  let d = `M${n(left)} ${n(baseY)}`;
-  // 底缘平直 —— 直线段，不是弧线
-  d += `L${n(right)} ${n(baseY)}`;
-  // 右肩：竖直方向的圆角
-  d += `Q${n(right)} ${n(baseY - r)} ${n(right - r)} ${n(topY + r)}`;
-
-  let x = right - r;
-  const span = halfW * 2 - r * 2;
-  for (let i = 0; i < bumps.length; i++) {
-    const bw = span * bumps[i];
-    const j = jitter[i % jitter.length];
-    // 凸起高度：不等高 + 抖动 → 参差轮廓
-    const bh = height * (0.34 + j * 0.2);
-    const nx = x - bw;
-    const cxq = x - bw * 0.5;
-    const cyq = topY - bh;
-    d += `Q${n(cxq)} ${n(cyq)} ${n(nx)} ${n(topY + bh * 0.18)}`;
-    x = nx;
+  // 随机宽度，归一化后累加成各泡端点的 x（自右向左）
+  const ws: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < k; i++) {
+    const w = 0.6 + rng() * 0.9;
+    ws.push(w);
+    sum += w;
   }
+  const pts: Array<[number, number]> = [[right, baseY]];
+  let x = right;
+  for (let i = 0; i < k - 1; i++) {
+    x -= (ws[i] / sum) * halfW * 2;
+    const u = (x - left) / (halfW * 2); // 0..1
+    const env = Math.sin(u * Math.PI); // 中间高两端低
+    const vy = baseY - height * (0.25 + env * (0.35 + rng() * 0.3));
+    pts.push([x, vy]);
+  }
+  pts.push([left, baseY]);
 
-  // 左肩收口
-  d += `Q${n(left + r)} ${n(topY + r)} ${n(left)} ${n(baseY - r)}`;
-  d += 'Z';
-  return d;
+  let d = `M${n(left)} ${n(baseY)}L${n(right)} ${n(baseY)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1];
+    const [bx, by] = pts[i];
+    const chord = Math.hypot(bx - ax, by - ay);
+    // 半径 = 半弦 ~ 0.7 弦：从正半圆到略扁的泡，随机；sweep=0 让泡朝上鼓
+    const r = chord * (0.5 + rng() * 0.2);
+    d += `A${n(r)} ${n(r)} 0 0 0 ${n(bx)} ${n(by)}`;
+  }
+  return `${d}Z`;
 }
-
-/**
- * 预置的凸起宽度分布。
- *
- * ⚠️ 刻意用**不均匀且非对称**的比例（而非等分）：
- * 等分凸起会读成「齿轮」或「泡泡」，云的自然感来自参差。
- */
-const BUMP_SETS: ReadonlyArray<readonly number[]> = [
-  [0.34, 0.28, 0.22, 0.16],
-  [0.28, 0.34, 0.18, 0.2],
-  [0.3, 0.2, 0.3, 0.2],
-  [0.36, 0.22, 0.26, 0.16],
-];
 
 const def: PatternDef = {
   id: 'cloud-bands',
@@ -307,15 +297,10 @@ const def: PatternDef = {
         // 竖向幅度按 sin 包络：中段厚、两端薄 → 云带自然收尾
         const env = Math.sin(u * Math.PI) * 0.6 + 0.4;
         const h = Math.max(2, thickness * env * (0.7 + rng() * 0.6));
-        const halfW = h * (2.6 + rng() * 3.6) * scale;
-
-        // 凸起分布按云团索引轮换 → 同屏可见多种轮廓
-        const bumps = BUMP_SETS[(p + bi) % BUMP_SETS.length];
-        // 每朵云的凸起高度抖动（rng 已在云团循环里推进，天然确定性）
-        const jitter = [rng(), rng(), rng(), rng()];
+        const halfW = h * (1.6 + rng() * 2.2) * scale;
 
         parts.push(
-          path(cloudPath(cx, baseY + h * 0.34, halfW, h * 1.15, bumps, jitter), {
+          path(cloudPath(cx, baseY + h * 0.34, halfW, h * 1.15, rng), {
             fill: e.paintValue,
             'fill-opacity': e.opacity,
           }),
@@ -324,9 +309,8 @@ const def: PatternDef = {
         // 伴生云：贴在主云下方、更扁更宽，制造咬合层次
         if (rng() > 0.45) {
           const h2 = h * 0.5;
-          const j2 = [rng(), rng(), rng(), rng()];
           parts.push(
-            path(cloudPath(cx + (rng() - 0.5) * halfW, baseY + h * 0.62, halfW * 1.3, h2 * 1.2, bumps, j2), {
+            path(cloudPath(cx + (rng() - 0.5) * halfW, baseY + h * 0.62, halfW * 1.3, h2 * 1.2, rng), {
               fill: e.paintValue,
               'fill-opacity': e.opacity * 0.62,
             }),
