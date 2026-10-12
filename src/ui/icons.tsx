@@ -171,6 +171,15 @@ export function IconClose({ ...p }: IconProps) {
   );
 }
 
+/** 删除 */
+export function IconTrash({ ...p }: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5" />
+    </Svg>
+  );
+}
+
 /** 收藏（实心态与空心态用 fill 区分）。 */
 export function IconStar({ filled = false, ...p }: IconProps & { filled?: boolean }) {
   return (

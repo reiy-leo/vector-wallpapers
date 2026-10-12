@@ -17,7 +17,7 @@ import { LIMITS } from '../shared/constants';
 import { applySaved, removeSaved, savedToConfig, useWorkbenchSelector, type SavedWallpaper } from './store';
 import { copyBackgroundCSS } from './exporters';
 import { Button, IconButton } from './primitives';
-import { IconChevron, IconClose, IconFocus } from './icons';
+import { IconChevron, IconClose, IconFocus, IconTrash } from './icons';
 import type { NoticeFn } from './TopBar';
 
 export function FavoritesDialog({
@@ -31,10 +31,15 @@ export function FavoritesDialog({
 }) {
   const saved = useWorkbenchSelector((s) => s.saved);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  // 待确认删除的那张（Rei 2026-10-12：删除需弹窗确认）
+  const [pendingDelete, setPendingDelete] = useState<SavedWallpaper | null>(null);
 
   // 关闭时顺手退出聚焦
   useEffect(() => {
-    if (!open) setFocusIdx(null);
+    if (!open) {
+      setFocusIdx(null);
+      setPendingDelete(null);
+    }
   }, [open]);
 
   // Esc：聚焦中先退出聚焦，否则关闭整个面板
@@ -43,12 +48,13 @@ export function FavoritesDialog({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopPropagation();
-      if (focusIdx !== null) setFocusIdx(null);
+      if (pendingDelete) setPendingDelete(null);
+      else if (focusIdx !== null) setFocusIdx(null);
       else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, focusIdx, onClose]);
+  }, [open, focusIdx, pendingDelete, onClose]);
 
   // 套用到画布：导出 SVG / PNG 走画布，所以「套用」必须保留（Rei 2026-10-12）
   const apply = useCallback(
@@ -83,6 +89,7 @@ export function FavoritesDialog({
   const remove = useCallback(
     (item: SavedWallpaper) => {
       removeSaved(item.q);
+      setPendingDelete(null);
       onNotice('已删除收藏', 'info');
     },
     [onNotice],
@@ -124,7 +131,7 @@ export function FavoritesDialog({
                       onFocus={() => setFocusIdx(i)}
                       onCopy={() => copyCss(item)}
                       onApply={() => apply(item)}
-                      onRemove={() => remove(item)}
+                      onRemove={() => setPendingDelete(item)}
                     />
                   </li>
                 ))}
@@ -143,6 +150,31 @@ export function FavoritesDialog({
               onApply={() => apply(saved[focusIdx])}
               onClose={() => setFocusIdx(null)}
             />
+          )}
+
+          {pendingDelete && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" role="presentation">
+              <div className="absolute inset-0 bg-overlay" aria-hidden="true" onClick={() => setPendingDelete(null)} />
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-label="删除收藏"
+                className="relative w-full max-w-sm rounded-lg bg-surface p-5 shadow-pop"
+              >
+                <h3 className="text-md font-semibold text-fg">删除这张收藏？</h3>
+                <p className="mt-1.5 text-sm text-fg-soft">
+                  「{registry.get(pendingDelete.patternId)?.name ?? pendingDelete.patternId}」会从收藏中移除，无法撤销。
+                </p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="secondary" size="sm" autoFocus onClick={() => setPendingDelete(null)}>
+                    取消
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => remove(pendingDelete)}>
+                    删除
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -173,6 +205,7 @@ function SavedCard({
 
   return (
     <figure className="grid gap-2.5">
+      <div className="group/card relative">
       <button
         type="button"
         onClick={onFocus}
@@ -186,6 +219,15 @@ function SavedCard({
           <IconFocus size={16} />
         </span>
       </button>
+      {/* 删除：左上角，hover 才显出（键盘聚焦也显），点击后弹窗确认 */}
+      <IconButton
+        label="删除收藏"
+        onClick={onRemove}
+        className="absolute left-2 top-2 rounded-full bg-surface/80 text-fg opacity-0 shadow-pop backdrop-blur hover:bg-surface hover:text-danger focus-visible:opacity-100 group-hover/card:opacity-100"
+      >
+        <IconTrash size={16} />
+      </IconButton>
+      </div>
       <figcaption className="flex items-center justify-between gap-3">
         <div className="grid min-w-0">
           <span className="truncate text-base font-medium text-fg">{def?.name ?? '已下线的母题'}</span>
@@ -194,9 +236,6 @@ function SavedCard({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onRemove}>
-            删除
-          </Button>
           <Button variant="secondary" size="sm" onClick={onCopy} disabled={!cfg}>
             复制 CSS
           </Button>
