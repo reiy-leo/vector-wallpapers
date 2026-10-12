@@ -15,10 +15,11 @@
 import { useMemo } from 'react';
 import { Popover } from '@cloudflare/kumo/components/popover';
 import { Switch } from '@cloudflare/kumo/components/switch';
+import { Tabs } from '@cloudflare/kumo/components/tabs';
 import { IconChevron, IconSliders } from './icons';
 import { setParam, usePatternDef, useWorkbenchSelector } from './store';
-import { Button, SliderChip, inputClass } from './primitives';
-import type { ControlDef, ParamValue } from '../patterns/types';
+import { Button, SliderChip } from './primitives';
+import type { ControlDef } from '../patterns/types';
 import type { PatternConfig } from '../engine/types';
 
 /**
@@ -70,7 +71,7 @@ export function ControlChips() {
     <div
       role="group"
       aria-label="形态参数"
-      className="grid w-72 gap-y-3"
+      className="grid w-80 gap-y-3"
     >
       {controls.map((c) => (
         <ControlChip key={c.key} control={c} cfg={cfg} />
@@ -86,8 +87,9 @@ export function ControlChips() {
  */
 function visibleControls(controls: readonly ControlDef[]): readonly ControlDef[] {
   const sliders = controls.filter((c) => c.type === 'range' || c.type === 'angle');
+  const selects = controls.filter((c) => c.type === 'select');
   const switches = controls.filter((c) => c.type === 'toggle');
-  return [...sliders, ...switches];
+  return [...sliders, ...selects, ...switches];
 }
 
 function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig }) {
@@ -123,6 +125,28 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
     );
   }
 
+  if (control.type === 'select') {
+    // 离散选项也收进弹层：标签在上、kumo segmented 分段单选在下（Rei 2026-10-12）
+    return (
+      <div className="grid min-w-0 gap-1.5">
+        <span className="text-base text-fg-soft">{control.label}</span>
+        <Tabs
+          variant="segmented"
+          className="w-full rounded-md"
+          listClassName="rounded-md"
+          indicatorClassName="rounded-sm"
+          value={String(value)}
+          onValueChange={(v) => setParam(control.key, String(v))}
+          tabs={control.options.map((o) => ({
+            value: o.value,
+            label: o.label,
+            className: 'flex-1 justify-center',
+          }))}
+        />
+      </div>
+    );
+  }
+
   if (control.type !== 'range') return null;
 
   return (
@@ -136,63 +160,5 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
       showValue={false}
       onChange={(v) => setParam(control.key, v)}
     />
-  );
-}
-
-/**
- * 离散形态选项（select / toggle）—— 与滑块分开一行。
- *
- * 之所以不塞进滑块行：离散项的数量不固定，若与滑块混排，
- * 工具条会在换行时把「连续调节」与「模式切换」搅在一起，
- * 用户难以形成「这一段是调形状、这一段是选模式」的分段认知。
- */
-export function DiscreteChips() {
-  const def = usePatternDef();
-  const cfg = useWorkbenchSelector((s) => s.cfg);
-
-  const controls = useMemo(
-    () => def.controls.filter((c) => c.type === 'select'),
-    [def.controls],
-  );
-
-  if (controls.length === 0) return null;
-
-  return (
-    <div
-      role="group"
-      aria-label="形态选项"
-      className="flex min-w-0 flex-wrap items-center gap-2"
-    >
-      {controls.map((c) => (
-        <DiscreteChip key={c.key} control={c} cfg={cfg} />
-      ))}
-    </div>
-  );
-}
-
-function DiscreteChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig }) {
-  const value = cfg.params[control.key];
-  const set = (v: ParamValue) => setParam(control.key, v);
-
-  if (control.type !== 'select') return null;
-
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <label htmlFor={`chip-${control.key}`} className="text-base text-fg-soft">
-        {control.label}
-      </label>
-      <select
-        id={`chip-${control.key}`}
-        value={String(value)}
-        onChange={(e) => set(e.target.value)}
-        className={inputClass('shrink-0')}
-      >
-        {control.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }

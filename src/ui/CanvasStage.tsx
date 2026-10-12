@@ -18,7 +18,7 @@ import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from '
 import { shuffleCurrent } from './Panels';
 import { applyTone, bgTone, type BgTone } from './coloring';
 import { Button, IconButton, Segmented, Tooltip, inputClass } from './primitives';
-import { ControlsPopover, DiscreteChips } from './ControlChips';
+import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
   IconClose,
@@ -143,7 +143,6 @@ export function CanvasStage({
           <div aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-line sm:block" />
 
           <ControlsPopover />
-          <DiscreteChips />
 
           <div className="ml-auto flex items-center gap-3">
             {/* 体积/节点：纯诊断信息，与可点物用分隔线隔开 */}
