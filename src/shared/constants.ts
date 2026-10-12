@@ -6,6 +6,8 @@
 /** localStorage 键名。全部带版本号，便于未来 schema 升级时灰度迁移。 */
 export const STORAGE_KEY = {
   favorites: 'vw:favorites:v1',
+  /** 收藏 v2：具体的一张壁纸（配色 + 参数 + seed，存 share 编码），见 store.SavedWallpaper。 */
+  saved: 'vw:saved:v2',
   recent: 'vw:recent:v1',
   theme: 'vw:theme:v1',
   palettes: 'vw:palettes:v1',

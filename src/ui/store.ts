@@ -35,8 +35,17 @@ export interface WorkbenchState {
   /** 当前高亮的分类；'all' 表示显示全部。 */
   category: string;
   search: string;
-  /** 收藏的母题 id。 */
+  /** 收藏的母题 id（由 saved 派生，去重保序 —— 左栏星标用）。 */
   favorites: string[];
+  /** 收藏的具体壁纸（Rei 2026-10-12：收藏「这一张」，含配色 / 参数 / seed）。 */
+  saved: SavedWallpaper[];
+}
+
+/** 一张收藏的壁纸。q 是 share.encodeConfig 的产物，天然就是去重键。 */
+export interface SavedWallpaper {
+  q: string;
+  patternId: string;
+  savedAt: number;
 }
 
 /** 读取 URL / localStorage 得到首屏状态 —— 无 window 时退回默认值。 */
@@ -50,8 +59,11 @@ function initialState(): WorkbenchState {
     ui: { theme: readStoredTheme(), panel: 'right', focus: false, grid: false },
     category: 'all',
     search: '',
-    favorites: readFavorites(),
+    favorites: [],
+    saved: [],
   };
+  base.saved = readSaved();
+  base.favorites = favoriteIds(base.saved);
 
   /**
    * ⭐ URL 解析仍在**模块初始化时同步完成**，但**不直接套用**。
@@ -190,15 +202,49 @@ export function setCategory(category: string): void {
   set({ category });
 }
 
-/** 收藏切换 —— 收藏是 store 的一部分，右栏与顶栏因此能读到同一份状态。 */
-export function toggleFavorite(id: string): boolean {
-  const cur = state.favorites;
-  const next = cur.includes(id)
-    ? cur.filter((x) => x !== id)
-    : [id, ...cur].slice(0, LIMITS.MAX_FAVORITES);
-  writeFavorites(next);
-  set({ favorites: next });
-  return next.includes(id);
+/* ── 收藏（具体壁纸） ─────────────────────────────────────────── */
+
+function favoriteIds(saved: readonly SavedWallpaper[]): string[] {
+  return [...new Set(saved.map((x) => x.patternId))];
+}
+
+function setSaved(next: SavedWallpaper[]): void {
+  const capped = next.slice(0, LIMITS.MAX_FAVORITES);
+  writeSaved(capped);
+  set({ saved: capped, favorites: favoriteIds(capped) });
+}
+
+/** 当前配置的收藏键（不含 UI 偏好）。 */
+export function savedKey(cfg: PatternConfig): string {
+  return encodeConfig(cfg);
+}
+
+/** 收藏 / 取消收藏当前这张壁纸。返回切换后是否已收藏。 */
+export function toggleSaved(cfg: PatternConfig): boolean {
+  const q = savedKey(cfg);
+  if (state.saved.some((x) => x.q === q)) {
+    removeSaved(q);
+    return false;
+  }
+  setSaved([{ q, patternId: cfg.patternId, savedAt: Date.now() }, ...state.saved]);
+  return true;
+}
+
+export function removeSaved(q: string): void {
+  setSaved(state.saved.filter((x) => x.q !== q));
+}
+
+/** 收藏 → 配置；母题已下线 / 编码损坏时返回 null。 */
+export function savedToConfig(item: SavedWallpaper): PatternConfig | null {
+  return decodeConfig(item.q).cfg;
+}
+
+/** 把一张收藏套到画布上。 */
+export function applySaved(item: SavedWallpaper): boolean {
+  const cfg = savedToConfig(item);
+  if (!cfg) return false;
+  set({ cfg });
+  return true;
 }
 
 /* ── 主题持久化 ───────────────────────────────────────────────── */
@@ -295,6 +341,7 @@ const serverSnapshot: WorkbenchState = {
   category: 'all',
   search: '',
   favorites: [],
+  saved: [],
 };
 
 /** 订阅整个 store —— 适合读多个字段的面板。 */
@@ -332,7 +379,45 @@ export function subscribeToStore(cb: () => void): () => void {
   return subscribe(cb);
 }
 
-/** 收藏（PRD P0-7）：存 pattern id 列表。 */
+/**
+ * 读收藏 v2；首次读取时把 v1（只存母题 id）迁移成「该母题默认配置」的收藏。
+ */
+export function readSaved(): SavedWallpaper[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY.saved);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (x): x is SavedWallpaper =>
+          !!x && typeof x === 'object' && typeof (x as SavedWallpaper).q === 'string' &&
+          typeof (x as SavedWallpaper).patternId === 'string',
+      );
+    }
+    const legacy = readFavorites();
+    const migrated: SavedWallpaper[] = [];
+    for (const id of legacy) {
+      const def = registry.get(id);
+      if (!def) continue;
+      const cfg = createDefaultConfig(def, { width: DEFAULT_SIZE.w, height: DEFAULT_SIZE.h, seed: DEFAULT_SEED });
+      migrated.push({ q: encodeConfig(cfg), patternId: id, savedAt: Date.now() });
+    }
+    if (migrated.length > 0) writeSaved(migrated);
+    return migrated;
+  } catch {
+    return [];
+  }
+}
+
+export function writeSaved(items: SavedWallpaper[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY.saved, JSON.stringify(items.slice(0, LIMITS.MAX_FAVORITES)));
+  } catch {
+    /* 写入失败仅丢失收藏，不阻断主流程 */
+  }
+}
+
+/** 收藏 v1（PRD P0-7）：存 pattern id 列表 —— 仅供迁移读取。 */
 export function readFavorites(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY.favorites);
