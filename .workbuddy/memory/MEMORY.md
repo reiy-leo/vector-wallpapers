@@ -1,19 +1,24 @@
 # 项目长期记忆 · vector-wallpapers
 
+> ⚠️ **本文件是 AI 协作者的私有工作记忆，不是项目文档。**
+> 项目入口见 `AGENT.md`（铁律 + 验证命令），设计规范见 `.agent/design.md`，
+> 待办见 `.agent/todo.md`。本文件保留**过程性知识**：踩过的坑、假绿记录、
+> 并发写入冲突、方法论沉淀 —— 这些不适合写进项目文档，但换个会话就找不回来了。
+
 ## 项目定位
 SVG 格式的**桌面背景图生成器**（不是素材库）。核心差异化：**Pattern 中的元件可独立设置不同颜色**。
 参考站点：`https://www.svgbackgrounds.com/`（SVG 素材库 + 可定制导出）。
 
 ## 用户已确认的决策（不要擅自更改）
-1. **首版做 12 个 pattern**（非PRD 原本的 19 个），从 19 个中选取：
-   - A 极简线条(3)：`flow-lines` / `offset-grid` / `bauhaus-blocks`
-   - B 波点网格(3)：`polka-dots` / `hex-grid` / `diamond-lattice`
-   - C 渐变流体(3)：`dusk-ridges` / `liquid-mesh` / `aurora-wave`
-   - D 像素复古(3)：`memphis-grid` / `neon-pixels` / `new-wave-sunset`
+1. **母题库已从 12 扩到 27 个**（2026-10-12）。分类结构不变：
+   - A 极简线条：`flow-lines` `offset-grid` `bauhaus-blocks` `arc-composition` `contour-rings` `nouveau-scroll`
+   - B 波点网格：`polka-dots` `hex-grid` `diamond-lattice` `triangle-tiling` `checker-mesh` `girih-star` `halftone` `papercut` `art-deco-fan`
+   - C 渐变流体：`dusk-ridges` `liquid-mesh` `aurora-wave` `cloud-bands` `blob-field` `lowpoly-facet`
+   - D 像素复古：`memphis-grid` `neon-pixels` `new-wave-sunset` `pixel-terrain` `glitch-rgb` `isometric-voxel`
    - **pattern id 一经上线不可改名**（分享链接依赖稳定性）
 2. **PNG 导出取预览当前帧**（非架构默认的 t=0）
 3. 部署：**纯静态 SPA，无后端无数据库**，Cloudflare Workers
-4. Phase 1 范围 = T1+T2+T3（脚手架+ 引擎 + 12 个图案 + Lab 预览页），先出图再谈后续
+4. Phase 1 范围 = T1+T2+T3（脚手架+ 引擎 + 母题 + Lab 预览页），已收口
 
 ## 用户 10 项产品决策（2026-10-10 全部拍板，写入 PRD §5）
 | # | 决策 |
@@ -29,8 +34,15 @@ SVG 格式的**桌面背景图生成器**（不是素材库）。核心差异化
 | Q9 | **不做** PWA / 离线 |
 | Q10 | **不做**短链，用完整长URL |
 
-## 技术栈（架构 v2.0 锁定）
-React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算）+ Tailwind v4 + Vite 8 + TypeScript
+## 技术栈（架构 v2.0 锁定，2026-10-12 已调整）
+React 19 + Tailwind v4 + Vite 8 + TypeScript
+**MUI 已移除** —— 核实 `src/` 对 `@mui/material` 与 `@emotion/react` 零引用，
+构建产物里也搜不到 mui 字样。PRD 指定 MUI 但从未实际使用，
+属架构文档与实现脱节的遗留。改用 Cloudflare Kumo 接管通用控件行为与无障碍，
+外观仍由 `--vw-*` token 覆写（保留「暗房」原则，不切Kumo 橙色品牌色）。
+⚠️ Kumo 的安装方式：npmmirror 的 semver 返回空版本字符串，`npm install` 会挂在
+`make-dir@4.0.0` 上。已改用 `npm pack` + `tar -xzf` 直接解包。
+
 状态管理：自研 external store（零依赖），不用 Redux/Zustand
 部署：Vite → **Workers Static Assets，零 Worker 脚本**（不配置 `main` 字段）
 理由：静态资源请求免费且无限、不计 CPU；预渲染可顺带解决 SEO
@@ -105,11 +117,15 @@ React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算
    用户看到 4 个色块都能点，功能看似完好，但每次改色只染一半。
    必须量化「纯色元件占比」才能发现。教训：**审查读代码，不靠印象。**
 
-## 测试规模（2026-10-12）
-19 母题 / 86 元件 / 平均 4.5 个·张 / 纯色占比 84%。
-UI 测试 101 项（share 29 / tokens 66 / hardcoding 6）+ structure 10 + liquid-mesh 11。
+## 测试规模（2026-10-12 实测）
+**27 母题** / 241 测试 passed（verify + patterns + ui 三批合计）。
+其中 UI 层 120、patterns 层 121、专项门禁：flow-lines 19 / cloud-bands 10 / budget 8。
 ⚠️ **全量单批跑会被沙箱 OOM kill（exit 137）**，需分批 + `--max-old-space-size=3072`。
 **任何新写的门禁都必须用变异测试自证**（注入缺陷 → 必须失败 → 还原）。
+
+⚠️ **记忆里的数字会过时**。本条目曾长期写着「19 母题 / 86 元件 / 264 passed」，
+而并发写入已把母题推到 27 个、测试数也变了。**引用任何统计数字前先实测**——
+过时数字比没有数字更危险，它会让人以为已经核对过了。
 
 ## 协作模式
 本项目走 software-company 专家团 SOP：主理人（齐活林）编排 → 产品经理（许清楚）出 PRD → 架构师（高见远）出架构+任务分解 → 工程师（寇豆码）写代码 → QA（严过关）测试。
@@ -154,22 +170,33 @@ UI 测试 101 项（share 29 / tokens 66 / hardcoding 6）+ structure 10 + liqui
    配套：三档互质tile 破星点网格（原来单档 120px 晶格一眼看穿）、feGaussianBlur 只糊幕身。
 
    **不可改数据契约**：元件 id `sky/band_a/band_b/stars`、控件 key `bands/amp/thickness/stars/sway`、preset id `boreal/nebula/ember`、`paletteSlots` 全部锁定（分享链接依赖）。
-2. **补齐到 19 个 pattern**（不追参考站那48 个，因其页面 JS 渲染抓不到清单）。**全部原创重新设计**，不做临摹。需新增 7 个（id 必须沿用 PRD）：
-   - A极简线条：`arc-composition` 弧光构成 / `contour-rings` 等高线圈
-   - B 波点网格：`triangle-tiling` 三角铺排 / `checker-mesh` 棋盘格
-   - C 渐变流体：`cloud-bands` 云层带 / `blob-field` 有机斑点场
-   - D 像素复古：`pixel-terrain` 像素地形
-
 ## ⚠️ 2026-10-11 环境故障：Bash/Grep 通道阻塞
-`sandbox-exec: data object length 66863 exceeds maximum (65535)` —— 主理人、工程师、QA 三方均持续遭遇，**连 `echo ok` 与 pkill 都失败**，多次重试不恢复。
+` sandbox-exec: data object length 66863 exceeds maximum (65535)` —— 主理人、工程师、QA 三方均持续遭遇，**连 `echo ok` 与 pkill 都失败**，多次重试不恢复。
 **影响**：五条校验无法实跑、Chromium截图无法进行、Grep 全文检索失效。
-**变通**：Read / Write / Edit 仍可用 → 用 Read 逐文件静态核对（改动是否落盘、语法是否闭合、导入导出是否匹配）。本轮即用此法确认 `measure` 已在 budget.ts 导出且签名匹配、`skipBudget` 分支语法完整。
-**纪律**：受阻时必须**明说哪条校验没跑成**，不得用「静态核对通过」包装成验收通过。工程师本轮主动给了 IS_PASS: NO，这种诚实应继续保持。
+**变通**：Read / Write / Edit 仍可用 → 用 Read 逐文件静态核对（改动是否落盘、语法是否闭合、导入导出是否匹配）。
+**纪律**：受阻时必须**明说哪条校验没跑成**，不得用「静态核对通过」包装成验收通过。
+
+> 另注：**全量 vitest 单批跑会 OOM kill（exit 137）**。这个坑至今仍在——
+> 必须分批 + `NODE_OPTIONS="--max-old-space-size=3072"`。
 
 ## Phase 1 状态：✅ 已收口（2026-10-10）
-T1+T2+T3+Lab 完成。**最终校验：typecheck 0 error / test 264 passed / build ✓ / verify 6 passed / coverage 94.78%**。
-**元件级配色 200seed 全 100%**（12 pattern × 54 元件）。体积最大 5451B（红线 27%）。
-详见 `2026-10-10-phase1-final.md`（含全部 bug 记录、方法论沉淀、T4 待办）。
+T1+T2+T3+Lab 完成（当时的 12 个母题）。后续已扩到 27 个。
+详见 `2026-10-10-phase1-final.md`（含当时全部 bug 记录、方法论沉淀、T4 待办）。
+
+## 母题扩充的两批历史（留档）
+- **第一批（2026-10-12）**：12 → 19。新增 `arc-composition` / `contour-rings` /
+  `triangle-tiling` / `checker-mesh` / `cloud-bands` / `blob-field` / `pixel-terrain`。
+  依据 `docs/PATTERN-SELECTION.md`（参考站 48 张判读 + 结构审查）。
+  **不追参考站那48 个**，因其页面 JS 渲染抓不到清单；全部原创，不做临摹。
+- **第二批（2026-10-12）**：19 → **27**。这批是**并发写入**产生的
+  （另一进程在我的工作期间新建），我负责收口：
+  `girih-star` / `halftone` / `papercut` / `glitch-rgb`（第一批 4 个）
+  + `art-deco-fan` / `nouveau-scroll` / `isometric-voxel` / `lowpoly-facet`（后 4 个）。
+  收口内容：补 PatternId 联合类型、修 seed 撞图、修 control key 字面量、
+  art-deco-fan 体积从 20965B 收到 19231B。
+
+⚠️ **并发写入造成的真实危害**：那批文件被一个 message 为「chore: 引入 Kumo 组件库」
+的提交一并提交，导致**提交信息与内容严重不符**。教训见下方「提交纪律」。
 
 ## ⚠️ 本项目最大的陷阱：假绿测试
 同一类坑踩了 4 次，每次都是「测试通过但结果无效」：
