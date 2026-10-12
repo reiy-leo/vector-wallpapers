@@ -13,6 +13,7 @@ import offsetGrid from './A-lines/offset-grid';
 import bauhausBlocks from './A-lines/bauhaus-blocks';
 import arcComposition from './A-lines/arc-composition';
 import contourRings from './A-lines/contour-rings';
+import nouveauScroll from './A-lines/nouveau-scroll';
 
 // B 波点 / 网格重复
 import polkaDots from './B-repeat/polka-dots';
@@ -23,6 +24,7 @@ import diamondLattice from './B-repeat/diamond-lattice';
 import girihStar from './B-repeat/girih-star';
 import halftone from './B-repeat/halftone';
 import papercut from './B-repeat/papercut';
+import artDecoFan from './B-repeat/art-deco-fan';
 
 // C 渐变流体 / 有机形态
 import duskRidges from './C-organic/dusk-ridges';
@@ -30,6 +32,7 @@ import liquidMesh from './C-organic/liquid-mesh';
 import auroraWave from './C-organic/aurora-wave';
 import cloudBands from './C-organic/cloud-bands';
 import blobField from './C-organic/blob-field';
+import lowpolyFacet from './C-organic/lowpoly-facet';
 
 // D 像素 / 复古游戏
 import memphisGrid from './D-pixel/memphis-grid';
@@ -37,6 +40,7 @@ import neonPixels from './D-pixel/neon-pixels';
 import newWaveSunset from './D-pixel/new-wave-sunset';
 import pixelTerrain from './D-pixel/pixel-terrain';
 import glitchRgb from './D-pixel/glitch-rgb';
+import isometricVoxel from './D-pixel/isometric-voxel';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -64,6 +68,10 @@ const ALL: PatternDef[] = [
   halftone,
   papercut,
   glitchRgb,
+  artDecoFan,
+  nouveauScroll,
+  isometricVoxel,
+  lowpolyFacet,
 ];
 
 export const registry = createRegistry();

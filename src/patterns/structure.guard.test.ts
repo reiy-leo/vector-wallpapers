@@ -12,9 +12,10 @@
  * 「你这个母题撑不起元件级配色」，而不是上线后靠用户反馈才发现。
  */
 import { describe, expect, it } from 'vitest';
-import { registry } from '../patterns';
+import { registry } from './index';
 import { LIMITS } from '../shared/constants';
-import { renderStandaloneSVG } from '../engine/render';
+import { renderSVG } from '../engine/render';
+import { countTopLevelNodes } from '../engine/svg';
 
 /**
  * 允许「纯色占比低于 50%」的母题白名单。
@@ -57,20 +58,24 @@ interface Metrics {
 
 function metricsOf(id: string): Metrics {
   const def = registry.get(id)!;
-  const svg = renderStandaloneSVG(def, {
-    patternId: def.id,
-    width: 1920,
-    height: 1080,
-    seed: 7,
-    elements: def.elements.map((e) => ({
-      id: e.id,
-      paint: e.paint,
-      opacity: e.opacity,
-      visible: e.visible,
-      locked: e.locked ?? false,
-    })),
-    params: Object.fromEntries(def.controls.map((c) => [c.key, c.default])),
-  }, { skipBudget: true });
+  const out = renderSVG(
+    def,
+    {
+      patternId: def.id,
+      width: 1920,
+      height: 1080,
+      seed: 7,
+      elements: def.elements.map((e) => ({
+        id: e.id,
+        paint: e.paint,
+        opacity: e.opacity,
+        visible: e.visible,
+        locked: e.locked ?? false,
+      })),
+      params: Object.fromEntries(def.controls.map((c) => [c.key, c.default])),
+    },
+    { skipBudget: true },
+  );
 
   const solids = def.elements.filter((e) => e.paint.type === 'solid').length;
   const gradients = def.elements.filter(
@@ -85,8 +90,22 @@ function metricsOf(id: string): Metrics {
     gradients,
     solidRatio: solids / def.elements.length,
     configurable: def.elements.filter((e) => e.configurable).length,
-    bytes: new TextEncoder().encode(svg).length,
-    nodes: (svg.match(/<(rect|circle|path|line|polygon|ellipse|g)\b/g) ?? []).length,
+    bytes: out.bytes,
+    /*
+     * ⭐ 节点数必须用引擎自己的 `countTopLevelNodes(body)`，
+     * 不能用正则数全部标签。
+     *
+     * 踩过的坑：这里原先写的是 `svg.match(/<(rect|path|…)/g).length`，
+     * 结果把 `<defs>` 里 `<pattern>` **内部**的图形也算了进去。
+     * 而 pattern 内部可以有任意多图形 —— 那正是平铺的意义所在。
+     * 于是所有走 `<pattern>` 的母题都被误判为「超节点上限」：
+     * 实测 `art-deco-fan` 被数成 76 个（真值：body 顶层只有 1 个），
+     * 差点让一个设计正确的母题被「优化」成不可平铺。
+     *
+     * 引擎的 `budget.ts` 一直用的是 `countTopLevelNodes`，
+     * 是这个守卫自己写错了 —— 与其各写一套，不如直接复用引擎真源。
+     */
+    nodes: countTopLevelNodes(out.body),
   };
 }
 

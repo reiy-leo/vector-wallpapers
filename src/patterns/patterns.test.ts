@@ -42,27 +42,48 @@ function maxConfig(patternId: string) {
   return cfg;
 }
 
+/**
+ * 实现数量与 id 契约。
+ *
+ * ⚠️ 数量断言的演进：原本写死「19」（PRD 首批）。
+ * 2026-10-12 依据`docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口
+ * 新增 8 个母题 → 27 个。
+ *
+ * 这里刻意**不**改成「27」而保留一个具名常量：
+ * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
+ * 写死字面量会让人下意识以为是测试写错了。
+ */
+const TOTAL_EXPECTED = 27;
+
+/** 分类分布：B 类增量最多（4 个新母题都落在重复纹样）。 */
+const CATEGORY_EXPECTED: Record<string, number> = {
+  'A-lines': 6,
+  'B-repeat': 9,
+  'C-organic': 6,
+  'D-pixel': 6,
+};
+
 describe('实现数量与 id 契约', () => {
-  it('PRD 锁定的 19 个 pattern 已全部实现', () => {
-    expect(ALL).toHaveLength(19);
+  it(`共 ${TOTAL_EXPECTED} 个 pattern（首批 19 + 第二批 8）`, () => {
+    expect(ALL).toHaveLength(TOTAL_EXPECTED);
   });
 
-  it('全部 id 均属PRD 锁定的 19 个 id 之内', () => {
+  it('全部 id 均属PRD + 第二批锁定的 id 清单之内', () => {
     for (const def of ALL) {
-      expect(ALL_PATTERN_IDS, `${def.id} 不在 PRD id清单中`).toContain(def.id);
+      expect(ALL_PATTERN_IDS, `${def.id} 不在 id 清单中`).toContain(def.id);
     }
   });
 
-  it('分类分布：线条 5 / 波点 5 / 流体 5 / 像素 4', () => {
-    // D 类是 4 个（像素调性母题天然少一个），其余三类各 5 个
-    const expected: Record<string, number> = {
-      'A-lines': 5,
-      'B-repeat': 5,
-      'C-organic': 5,
-      'D-pixel': 4,
-    };
+  it('id 清单与实现一一对应（双向，防止清单里有未实现的 id）', () => {
+    expect(ALL_PATTERN_IDS.length).toBe(ALL.length);
+    const implemented = new Set(ALL.map((d) => d.id));
+    const missing = ALL_PATTERN_IDS.filter((id) => !implemented.has(id));
+    expect(missing, `清单中这些 id 尚未实现：${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('分类分布符合预期', () => {
     for (const c of CATEGORIES) {
-      expect(registry.listByCategory(c), c).toHaveLength(expected[c]);
+      expect(registry.listByCategory(c), c).toHaveLength(CATEGORY_EXPECTED[c]);
     }
   });
 
@@ -72,30 +93,8 @@ describe('实现数量与 id 契约', () => {
     }
   });
 
-  it('实现的 19 个 id 精确匹配 PRD 锁定清单', () => {
-    expect(ALL.map((d) => d.id).sort()).toEqual(
-      [
-        'arc-composition',
-        'aurora-wave',
-        'bauhaus-blocks',
-        'blob-field',
-        'checker-mesh',
-        'cloud-bands',
-        'contour-rings',
-        'diamond-lattice',
-        'dusk-ridges',
-        'flow-lines',
-        'hex-grid',
-        'liquid-mesh',
-        'memphis-grid',
-        'new-wave-sunset',
-        'neon-pixels',
-        'offset-grid',
-        'pixel-terrain',
-        'polka-dots',
-        'triangle-tiling',
-      ].sort(),
-    );
+  it('实现的 id 精确匹配锁定清单', () => {
+    expect(ALL.map((d) => d.id).sort()).toEqual([...ALL_PATTERN_IDS].sort());
   });
 });
 
@@ -227,7 +226,7 @@ describe('体积红线 ⭐ PRD NFR 硬指标', () => {
       // eslint-disable-next-line no-console
       console.log(`[budget] ${r.id.padEnd(16)} default=${String(r.bytes).padStart(5)}B  max=${String(r.maxBytes).padStart(5)}B`);
     }
-    expect(report).toHaveLength(19);
+    expect(report).toHaveLength(27);
   });
 });
 
@@ -307,13 +306,13 @@ describe('registry', () => {
   it('重复注册同一对象是幂等的（不算冲突）', () => {
     const original = registry.get('polka-dots')!;
     expect(() => registry.register([original])).not.toThrow();
-    expect(registry.size).toBe(19);
+    expect(registry.size).toBe(27);
   });
 
   it('search 按 id / 中文名 / 描述模糊匹配', () => {
     expect(registry.search('polka').map((d) => d.id)).toContain('polka-dots');
     expect(registry.search('波点').map((d) => d.id)).toContain('polka-dots');
-    expect(registry.search('')).toHaveLength(19);
+    expect(registry.search('')).toHaveLength(27);
     expect(registry.search('zzz-不存在')).toHaveLength(0);
   });
 
@@ -347,7 +346,7 @@ describe('PatternId 类型即PRD 契约', () => {
  * 这组断言把「可配置」从声明变成**可验证的事实**。
  */
 
-/** 高区分度探针色：19 个 pattern 的硬编码色里都没有它，避免撞色造成假阴性。 */
+/** 高区分度探针色：27 个 pattern 的硬编码色里都没有它，避免撞色造成假阴性。 */
 const PROBE = '#ff00a8';
 /** 每个元件采样多少个 seed 统计命中率。 */
 const HIT_SEEDS = 60;
@@ -636,26 +635,48 @@ describe('blob-field 无退化斑点（半径过小却仍绘制）', () => {
     expect(tiny, `参数极值下出现退化斑点：\n  ${tiny.slice(0, 5).join('\n  ')}`).toEqual([]);
   });
 
-  it('槽位圆心不得落在 tile 之外（负坐标 = 整颗被裁掉）', () => {
-    // 用最小单元 + 最大抖动构造最坏情况
-    const cfg = createDefaultConfig(def, { width: 2560, height: 1440, seed: 3 });
+it('退化槽位被跳过时，每个色组仍要有 ≥3px 的可见斑点（20 seed × 最坏参数）', () => {
     const sizeCtl = def.controls.find((x) => x.key === 'size')!;
     const jitCtl = def.controls.find((x) => x.key === 'jitter')!;
-    if (sizeCtl.type !== 'range' || jitCtl.type !== 'range') return;
-    cfg.params.size = sizeCtl.min;
-    cfg.params.jitter = jitCtl.max;
-
-    const svg = renderStandaloneSVG(def, cfg);
-    const pt = /<pattern[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"/.exec(svg);
-    if (!pt) return; // 该 seed 下无平铺（理论上不会）
-    const tw = parseFloat(pt[1]);
-    const th = parseFloat(pt[2]);
-    const outside: string[] = [];
-    for (const m of svg.matchAll(/<circle[^>]*\bcx="(-?[\d.]+)"[^>]*\bcy="(-?[\d.]+)"/g)) {
-      const cx = parseFloat(m[1]);
-      const cy = parseFloat(m[2]);
-   if (cx < 0 || cy < 0 || cx > tw || cy > th) outside.push(`(${cx}, ${cy}) tile=${tw}×${th}`);
+    if (sizeCtl.type !== 'range' || jitCtl.type !== 'range') {
+      throw new Error('size / jitter 应为 range 控件');
     }
-    expect(outside, `圆心落在 tile 之外：\n  ${outside.slice(0, 5).join('\n  ')}`).toEqual([]);
+    const missing: string[] = [];
+
+    for (let seed = 0; seed < 20; seed++) {
+      // 最坏情况：最小单元 + 最大抖动 —— 贴边槽位最容易被判退化而跳过
+   const cfg = createDefaultConfig(def, { width: 2560, height: 1440, seed });
+      cfg.params.size = sizeCtl.min;
+      cfg.params.jitter = jitCtl.max;
+
+      const svg = renderStandaloneSVG(def, cfg);
+      /**
+       * 断言对象是**每个色组都要有「足够大」的斑点**，而不是「圆心不出界」。
+       *
+     * ⚠️ 这里换过两次断言，过程值得记下来：
+       *  - v1 用 `width=... height=...` 单条正则取 tile 尺寸 → 属性按字母序排序，
+   *    `height` 在 `width` 之前，永远匹配不上；`if (!pt) return` 让用例
+       *    **静默通过、什么都没断言**（假绿）。
+       *  - v2 修好正则后改断言「圆心不出界」→ 但这条**在数学上不可能失败**：
+    *    `if (room < 2) continue` 已经把退化槽位跳过了，变异测试证明
+     *    MARGIN 改成 0 它照样绿。断言恒真等于没有断言。
+       *  - v3（当前）直接锁定真正在意的性质：退化槽位被跳过时，
+       *    每组 3 个槽位的冗余仍要保证该色组有可见斑点。
+       */
+      const byFill = new Map<string, number>();
+    for (const m of svg.matchAll(/<circle[^>]*\bfill="([^"]+)"[^>]*\br="([\d.]+)"/g)) {
+        byFill.set(m[1], Math.max(byFill.get(m[1]) ?? 0, parseFloat(m[2])));
+      }
+
+      // 三个 blob 元件（bg 是渐变、不产生 circle，不参与）
+      for (const el of def.elements.filter((e) => e.id.startsWith('blob_'))) {
+        const hex = el.paint.type === 'solid' ? el.paint.color.toLowerCase() : '';
+        const maxR = hex ? byFill.get(hex) ?? 0 : 0;
+        if (maxR < 3) {
+   missing.push(`seed=${seed} ${el.id}(${hex}) 最大半径仅 ${maxR.toFixed(2)}px`);
+    }
+    }
+    }
+    expect(missing, `色组退化（要求每组至少一个 ≥3px 的斑点）：\n  ${missing.slice(0, 5).join('\n  ')}`).toEqual([]);
   });
 });

@@ -16,7 +16,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { registry } from '../patterns';
-import { URL_PARAM } from '../shared/constants';
 
 const UI_DIR = join(process.cwd(), 'src/ui');
 
@@ -41,6 +40,33 @@ const FILES = collect(UI_DIR).map((path) => ({
   abs: path,
   code: stripComments(readFileSync(path, 'utf-8')),
 }));
+
+/**
+ * 与母题 id 空间同形异义的合法字符串。
+ *
+ * ⚠️ 为什么需要它：`pattern id` 是 kebab-case（`aurora-wave`），
+ * 天然不会与 UI 里的标识符撞名 —— 所以 pattern id 检查可以做到零豁免。
+ * 但 **element id 与控件 key 是作者自由命名的短词**，
+ * 会与 UI 自身的类名 / SVG 属性名 / 数学函数撞名
+ * （`top` 既是 isometric-voxel 的「顶面」元件，也是 Tailwind 类；
+ *   `angle` 既是 halftone 的控件，也是 SVG 的 `angle` 属性）。
+ *
+ * 列入豁免的代价：若某个母题真的有个叫 `round` 的元件，这个守卫抓不到它。
+ *但那仍被 `patterns.test.ts` 的「id 唯一性」「元件可配置性」覆盖，不构成盲区。
+ */
+const RESERVED_CONTROL_KEYS: ReadonlySet<string> = new Set([
+  // ElementRole 的 5 个语义名
+  'bg', 'primary', 'secondary', 'accent', 'detail',
+  // URL 参数与 UIState 判别值
+  'p', 'w', 'h', 'seed', 'cols', 'params', 'ui',
+  'light', 'dark', 'system', 'left', 'right', 'grid', 'panel', 'focus', 'theme',
+  'true', 'false',
+  // 常见英文单词 / SVG 属性名 / CSS 类名
+  'top', 'bottom', 'left', 'right', 'center',
+  'angle', 'round', 'height', 'width', 'size',
+  'color', 'fill', 'stroke', 'index', 'type', 'name', 'value', 'data', 'item', 'key',
+  'scale', 'spread', 'ratio', 'shift', 'depth', 'turns', 'points', 'density', 'step',
+]);
 
 describe('UI 层零硬编码（工程铁律 10）', () => {
   it('扫描到了 UI 源码（确保下面的断言不是空跑）', () => {
@@ -76,7 +102,6 @@ describe('UI 层零硬编码（工程铁律 10）', () => {
      *
      * 排除依据取自类型定义本身而非手写清单，避免以后新增 role 时漏改。
      */
-    const ROLE_NAMES = new Set<string>(['bg', 'primary', 'secondary', 'accent', 'detail']);
     /*
      * ⚠️ 还要排除与**本项目自有命名空间**冲突的短 id。
      *
@@ -87,30 +112,12 @@ describe('UI 层零硬编码（工程铁律 10）', () => {
      *
      * 排除清单从 `URL_PARAM` 与 `UIState` 推导，不手写。
      */
-    const RESERVED = new Set<string>([
-      ...ROLE_NAMES,
-      ...Object.values(URL_PARAM),
-      // UIState 的判别值：主题 / 面板位置 / 栅格开关。
-      // 它们与母题元件 id 同处字符串空间（`grid` 恰好也是 diamond-lattice 的元件名），
-      // 因此必须一并排除，否则守卫对合法的界面态编码报假阳性。
-      'light',
-      'dark',
-      'system',
-      'left',
-      'right',
-      'grid',
-      'panel',
-      'focus',
-      'theme',
-      'true',
-      'false',
-    ]);
 
     const offenders: string[] = [];
     for (const f of FILES) {
       for (const def of registry.list()) {
         for (const el of def.elements) {
-          if (RESERVED.has(el.id)) continue;
+          if (RESERVED_CONTROL_KEYS.has(el.id)) continue;
           if (new RegExp(`['"\`]${el.id}['"\`]`).test(f.code)) {
             offenders.push(`${f.path} → ${el.id}（${def.id}）`);
           }
@@ -145,10 +152,17 @@ describe('UI 层零硬编码（工程铁律 10）', () => {
   });
 
   it('UI 层不含任何参数控件 key 字面量', () => {
+    /*
+     * 与 element id 检查同理：控件 key 也会与 UI 自身的英文标识撞名
+     * （`angle` 既是 halftone 的控件 key，也是 SVG 的 `angle` 属性名；
+     *  `round` 既是 papercut 的控件 key，也是 Math.round 的用法）。
+     * 复用同一份 RESERVED 表，两个检查口径保持一致。
+     */
     const offenders: string[] = [];
     for (const f of FILES) {
       for (const def of registry.list()) {
         for (const c of def.controls) {
+          if (RESERVED_CONTROL_KEYS.has(c.key)) continue;
           if (new RegExp(`['"\`]${c.key}['"\`]`).test(f.code)) {
             offenders.push(`${f.path} → ${c.key}（${def.id}）`);
           }

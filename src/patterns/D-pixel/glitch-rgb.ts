@@ -33,7 +33,7 @@ const def: PatternDef = {
   controls: [
     { key: 'blocks', label: '色块密度', type: 'range', min: 6, max: 40, step: 1, default: 18, heavy: true },
     { key: 'shift', label: '通道错位', type: 'range', min: 0, max: 40, step: 1, default: 14, unit: 'px' },
-    { key: 'scan_gap', label: '扫描线间距', type: 'range', min: 2, max: 12, step: 1, default: 4 },
+    { key: 'scanGap', label: '扫描线间距', type: 'range', min: 2, max: 12, step: 1, default: 4 },
     { key: 'bands', label: '错位色带', type: 'range', min: 0, max: 12, step: 1, default: 5 },
     { key: 'animate', label: '滚动动画', type: 'toggle', default: false, group: '动画' },
   ],
@@ -86,7 +86,7 @@ const def: PatternDef = {
     const { width: W, height: H, params, elements, rng, animate } = cfg;
     const blocks = Math.round(Math.max(6, Math.min(40, Number(params.blocks))));
     const shift = Math.max(0, Number(params.shift));
-    const scanGap = Math.max(2, Math.min(12, Number(params.scan_gap)));
+    const scanGap = Math.max(2, Math.min(12, Number(params.scanGap)));
     const bandCount = Math.round(Math.max(0, Math.min(12, Number(params.bands))));
     const doAnimate = params.animate === true;
 
@@ -99,13 +99,18 @@ const def: PatternDef = {
     /**
      * 随机量必须在进平铺前抽完（与 papercut 同理）。
      *
-     * 通道错位量：三个通道各自独立的偏移量，向两侧拉开形成「重影」。
-     * 中间通道偏移最小、两端最大 —— 与真实信号噪声的分布一致，
-     * 比三通道等距错开更像「故障」而不是「重影滤镜」。
+     * 通道错位量：三通道各自独立偏移，形成阶梯式重影。
+     *
+     * ⚠️ G 通道的偏移必须**显著**。原写成 `shift × (rng−0.5) × 0.5`
+     * （最大 ±2.5px），结果 G 层被错位更大的 R/B 完全覆盖 ——
+     * 改 G 的颜色时产物一个字节都不变，命中率 0%，
+     * 即「声明可配置实则死元件」。这是元数据与实现不一致的典型，
+     * 由 `patterns.test.ts` 的死元件检测抓到。
+     * 现在 G 取 0.2~0.45 倍错位量，三层呈 R-左 / G-中 / B-右 的清晰阶梯。
      */
-    const shiftR = -shift * (0.7 + rng() * 0.6);
-    const shiftG = shift * (rng() - 0.5) * 0.5;
-    const shiftB = shift * (0.7 + rng() * 0.6);
+    const shiftR = -shift * (0.8 + rng() * 0.4);
+    const shiftG = shift * (0.2 + rng() * 0.25);
+    const shiftB = shift * (0.8 + rng() * 0.4);
 
     /**
      * 像素条带图形单元。
@@ -142,20 +147,26 @@ const def: PatternDef = {
      * 在深底上叠印三个半透明通道，观感与滤色接近。
      */
 
-    const tileRef = api.tile({
-      key: `gx-${api.n(unit)}-${blocks}`,
-      w: unit,
-      h: unit,
-      content: g({}, bars.join('')),
-    });
-
     /*
-     * 通道层：同一个 tile 引用三次，各自水平平移后叠印。
+     * 通道层：把同一份「条带布局」用三个通道各自的**颜色**各画一遍，
+     * 再各自水平平移后叠印。
      *
-     * ⚠️ 平移做在 tile 的 **content** 里（内层 <g transform>）而不是
-     * 平铺单元的 patternTransform 上—— 后者会连带旋转/缩放整个平铺网格，
-     * 导致色带边界也一起位移，撕裂感反而消失。
+     * ⚠️⚠️ 这里踩过两个叠加在一起的坑，都表现为「G 通道改色毫无效果」：
+     *
+     * 坑一：条带画成白色（`fill: '#ffffff'`），通道 rect 只写 `fill: url(#tile)`
+     *      —— 于是三个通道的颜色**根本没进产物**，改 ch_g 的颜色无任何变化。
+     *      「通道」变成了「同色重复三次」，只有位移没有分色。
+     *
+     * 坑二：若把条带做成白色 pattern 再让三个 rect 引用它，
+     *      三个 channel pattern 的 content 逐字节相同 → defs 签名撞车 →
+     *      只剩一层。**平移必须写在 patternTransform**（进签名），
+     *      且每层用各自颜色（content 不同），两条同时满足才不会合并。
+     *
+     * 正确做法：条带布局用**占位符**生成一次，再按通道替换 fill 字符串，
+     * 保证三层的 content 天然不同。
      */
+    const layout = bars.join('').split('#ffffff').join('%C%');
+
     const layers: string[] = [];
     const channels: Array<[typeof chR, number]> = [
       [chR, shiftR],
@@ -165,13 +176,17 @@ const def: PatternDef = {
     for (const [e, dx] of channels) {
       if (!e.visible) continue;
       const fillRef = api.tile({
-        key: `gx-ch-${e.id}-${api.n(dx)}`,
-        w: W,
-        h: H,
-        content: g({ transform: `translate(${api.n(dx)} 0)` }, rect(0, 0, W, H, { fill: tileRef })),
+        // key 含 element id：颜色不同 → content 不同 → 签名不同，三层不会合并
+        key: `gx-ch-${e.id}`,
+        w: unit,
+        h: unit,
+        content: g({}, layout.split('%C%').join(e.paintValue)),
+        // ⭐ 平移写在这里 —— patternTransform 参与签名去重
+        transform: `translate(${api.n(dx)} 0)`,
       });
       layers.push(rect(0, 0, W, H, { fill: fillRef, 'fill-opacity': e.opacity }));
     }
+
 
     // 横向错位色带：模拟「整行数据被搬到别处」的撕裂
     const bandMarks: string[] = [];

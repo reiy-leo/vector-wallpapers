@@ -75,7 +75,7 @@ const def: PatternDef = {
   paletteSlots: { bg: ['bg'], primary: ['star'], secondary: ['star_in'], detail: ['line'] },
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
-    const { width: W, height: H, params, elements } = cfg;
+    const { width: W, height: H, params, elements, rng } = cfg;
     const cell = Math.max(40, Number(params.cell));
     const ratio = Math.max(0.1, Math.min(0.6, Number(params.ratio)));
     const showStroke = params.stroke === true;
@@ -115,6 +115,8 @@ const def: PatternDef = {
 
     // 主星顶点间旋转半个角距，让尖角朝向水平方向 —— 伊斯兰镶嵌的经典取法
     const rot = 180 / points / 2;
+    /** 副星保留比例 —— 0 = 全留白，1 = 四角全满。 */
+    const cornerKeep = 0.55;
 
     const marks: string[] = [];
 
@@ -139,9 +141,14 @@ const def: PatternDef = {
 
     // 单元四角的「副星」：半径小、旋转错开，填满主星之间的负空间。
     // 这是让镶嵌显密均匀的关键 —— 缺了它会显得像孤立的星而不是一片镶嵌。
+    //
+    // ⭐ seed 的作用：决定哪些角落真的画副星。全部画满是最规整的形态，
+    // 但真实伊斯兰镶嵌常在局部留白。随机取子集既满足 `seedable` 契约，
+    // 又不会破坏秩序（子集仍是确定性的：同 seed 必得同结果）。
     if (star.visible) {
       const cornerR = R * 0.3;
       for (const [ox, oy] of [[0, 0], [cell, 0], [0, cell], [cell, cell]] as Array<[number, number]>) {
+        if (rng() > cornerKeep) continue;
         marks.push(
           path(starPath(ox, oy, cornerR, 0.45, rot + 45), {
             fill: star.paintValue,
