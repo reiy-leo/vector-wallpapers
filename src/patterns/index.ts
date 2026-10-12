@@ -50,7 +50,6 @@ import nestedShapes from './A-lines/nested-shapes';
 import spiralPolygons from './A-lines/spiral-polygons';
 import nodeWeb from './A-lines/node-web';
 import chevron from './B-repeat/chevron';
-import fishScales from './B-repeat/fish-scales';
 import sunburst from './A-lines/sunburst';
 import squareRings from './B-repeat/square-rings';
 import raisedTiles from './B-repeat/raised-tiles';
@@ -150,7 +149,6 @@ const ALL: PatternDef[] = [
   spiralPolygons,
   nodeWeb,
   chevron,
-  fishScales,
   sunburst,
   squareRings,
   raisedTiles,

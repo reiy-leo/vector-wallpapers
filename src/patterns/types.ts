@@ -255,7 +255,6 @@ export type PatternId =
   | 'spiral-polygons'
   | 'node-web'
   | 'chevron'
-  | 'fish-scales'
   | 'sunburst'
   | 'square-rings'
   | 'raised-tiles'

@@ -114,7 +114,7 @@ const def: PatternDef = {
     const ln = elements.get('line')!;
     const core = elements.get('core')!;
 
-    // 单元尺寸按长边推导：竖屏不至于过密（与 fish-scales 不同，保证横竖屏观感一致）。
+    // 单元尺寸按长边推导：竖屏不至于过密（保证横竖屏观感一致）。
     const R = Math.max(W, H) / count / 2;
     const rowH = R * rowGap;
     const tileW = 2 * R;
