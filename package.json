@@ -24,7 +24,6 @@
   "dependencies": {
     "@cloudflare/kumo": "^2.14.0",
     "@phosphor-icons/react": "^2.1.10",
-    "@resvg/resvg-wasm": "^2.6.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

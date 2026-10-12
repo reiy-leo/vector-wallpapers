@@ -12,7 +12,7 @@
  * 但右栏的「参数」Tab 不能因此空掉：那里保留 `随机种子`
  * （它服务于「复现/分享」，属配置而非形态）与全部参数的长说明。
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Popover } from '@cloudflare/kumo/components/popover';
 import { Switch } from '@cloudflare/kumo/components/switch';
 import { Tabs } from '@cloudflare/kumo/components/tabs';
@@ -37,16 +37,23 @@ import type { PatternConfig } from '../engine/types';
 export function ControlsPopover() {
   const def = usePatternDef();
   const count = useMemo(() => visibleControls(def.controls).length, [def.controls]);
+  // 受控开合；文字也包进 span，配合 `*:pointer-events-none` 与按钮的 select-none，
+  // 整个按钮（图标 / 文字 / 计数 / 箭头）任意位置都能点开（Rei 2026-10-12 第二次反馈）。
+  const [open, setOpen] = useState(false);
   if (count === 0) return null;
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <Popover.Trigger
         render={
-          // 子元素一律 pointer-events-none：点到图标/计数/箭头时事件目标仍是按钮本身，
-          // 否则点右侧箭头区域弹层不响应（Rei 2026-10-12）
-          <Button variant="secondary" size="sm" aria-label="形态参数" className="*:pointer-events-none">
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="形态参数"
+            aria-expanded={open}
+            className="*:pointer-events-none"
+          >
             <IconSliders size={15} />
-            参数
+            <span>参数</span>
             <span className="font-mono text-[0.9em] text-fg-mute">{count}</span>
             <IconChevron dir="up" size={13} />
           </Button>

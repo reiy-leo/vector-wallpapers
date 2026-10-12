@@ -109,6 +109,8 @@ const BUTTON_BASE =
   // 快速交互上的颜色渐变会让界面显「黏」，颜色必须瞬时切换。
   // 只保留一个极短的 transform 过渡（按下反馈），不影响颜色。
   'transition-transform duration-75 active:translate-y-px ' +
+  // 按钮文字不可选中：Safari/macOS 上按住文字轻微拖动会被当成选字而吞掉 click（Rei 2026-10-12「参数」按钮）
+  'cursor-pointer select-none ' +
   'disabled:pointer-events-none disabled:opacity-45';
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {

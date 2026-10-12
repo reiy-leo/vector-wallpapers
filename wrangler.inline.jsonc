@@ -3,9 +3,6 @@
   // 与 wrangler.jsonc 同一个 Worker，区别只在静态资源：这里把 dist/ 内联进脚本（见 worker-inline/entry.ts）。
   // 用于 API Token 部署（Static Assets 上传接口不可用的环境）：npm run deploy:inline
   "name": "vector-wallpapers",
-  // ⚠️ 本 Worker 导出命名入口 OgImage（src/worker/og.ts），被 shortlink-personal 通过 Service Binding 调用：
-  //   "services": [{ "binding": "WALLPAPERS", "service": "vector-wallpapers", "entrypoint": "OgImage" }]
-  // Worker 名 vector-wallpapers、导出名 OgImage、方法 render(seed,width,height) 都是跨 Worker 契约——别改名。
   "main": "worker-inline/entry.ts",
   "compatibility_date": "2026-10-10",
   "workers_dev": false,

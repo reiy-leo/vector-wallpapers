@@ -8,9 +8,6 @@
  * assets.generated.ts 由 scripts/build-inline-assets.mjs 生成（gitignored）。
  */
 import { createHandler } from "../src/worker/index";
-
-/** Service Binding 入口：shortlink-personal 调用 OgImage.render()（见 wrangler.inline.jsonc 注释，不要改名）。 */
-export { OgImage } from "../src/worker/og";
 import { INLINE_ASSETS, GLOBAL_HEADERS } from "./assets.generated";
 
 function decode(b64: string): Uint8Array {
