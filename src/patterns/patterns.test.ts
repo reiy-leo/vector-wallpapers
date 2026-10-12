@@ -17,7 +17,7 @@ import type { PatternConfig } from '../engine/types';
 const ALL = registry.list();
 
 /** 五个分类（2026-10-12 重组：新增 E-scene 风景）。 */
-const CATEGORIES = ['A-lines', 'B-repeat', 'C-organic', 'E-scene', 'D-pixel'] as const;
+const CATEGORIES = ['A-lines', 'B-repeat', 'C-organic', 'E-scene', 'D-pixel', 'F-ornament', 'G-botanical', 'H-cosmos', 'I-optical', 'J-generative', 'K-texture', 'L-architecture', 'M-movement', 'N-animal'] as const;
 
 /** 把某 pattern 的全部控件推到最大值 —— 体积红线的真实考验场景。 */
 function maxConfig(patternId: string) {
@@ -53,7 +53,7 @@ function maxConfig(patternId: string) {
  * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
  * 写死字面量会让人下意识以为是测试写错了。
  */
-const TOTAL_EXPECTED = 59;
+const TOTAL_EXPECTED = 95;
 
 /** 分类分布（2026-10-12 重组后：线条 / 几何 / 流体 / 风景 / 像素）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
@@ -62,6 +62,15 @@ const CATEGORY_EXPECTED: Record<string, number> = {
   'C-organic': 7,
   'E-scene': 16,
   'D-pixel': 6,
+  'F-ornament': 4,
+  'G-botanical': 4,
+  'H-cosmos': 4,
+  'I-optical': 4,
+  'J-generative': 4,
+  'K-texture': 4,
+  'L-architecture': 4,
+  'M-movement': 4,
+  'N-animal': 4,
 };
 
 describe('实现数量与 id 契约', () => {

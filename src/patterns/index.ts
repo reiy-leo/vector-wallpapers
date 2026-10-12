@@ -78,6 +78,43 @@ import sakuraFall from './E-scene/sakura-fall';
 import ukiyoeFuji from './E-scene/ukiyoe-fuji';
 import hotAirBalloons from './E-scene/hot-air-balloons';
 import bambooMist from './E-scene/bamboo-mist';
+// 第七批：9 个新分类
+import seigaiha from './F-ornament/seigaiha';
+import meanderKey from './F-ornament/meander-key';
+import asanoha from './F-ornament/asanoha';
+import shippo from './F-ornament/shippo';
+import leafChain from './G-botanical/leaf-chain';
+import petalScatter from './G-botanical/petal-scatter';
+import palmFronds from './G-botanical/palm-fronds';
+import ginkgoFans from './G-botanical/ginkgo-fans';
+import constellations from './H-cosmos/constellations';
+import planetOrbits from './H-cosmos/planet-orbits';
+import nebulaDust from './H-cosmos/nebula-dust';
+import eclipse from './H-cosmos/eclipse';
+import interferenceRings from './I-optical/interference-rings';
+import moireLines from './I-optical/moire-lines';
+import opWaveGrid from './I-optical/op-wave-grid';
+import impossibleCubes from './I-optical/impossible-cubes';
+import voronoiCells from './J-generative/voronoi-cells';
+import fractalTree from './J-generative/fractal-tree';
+import hilbertCurve from './J-generative/hilbert-curve';
+import cellularAutomaton from './J-generative/cellular-automaton';
+import woodGrain from './K-texture/wood-grain';
+import marbleVeins from './K-texture/marble-veins';
+import basketWeave from './K-texture/basket-weave';
+import linenWeave from './K-texture/linen-weave';
+import archWindows from './L-architecture/arch-windows';
+import staircase from './L-architecture/staircase';
+import encausticTiles from './L-architecture/encaustic-tiles';
+import blindsShadow from './L-architecture/blinds-shadow';
+import memphisConfetti from './M-movement/memphis-confetti';
+import swissGrid from './M-movement/swiss-grid';
+import constructivist from './M-movement/constructivist';
+import punchCard from './M-movement/punch-card';
+import pawPrints from './N-animal/paw-prints';
+import birdFlock from './N-animal/bird-flock';
+import fishSchool from './N-animal/fish-school';
+import butterflies from './N-animal/butterflies';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -143,6 +180,43 @@ const ALL: PatternDef[] = [
   ukiyoeFuji,
   hotAirBalloons,
   bambooMist,
+  // 第七批（2026-10-12）：纹样/植物/宇宙/错觉/生成/材质/建筑/流派/动物
+  seigaiha,
+  meanderKey,
+  asanoha,
+  shippo,
+  leafChain,
+  petalScatter,
+  palmFronds,
+  ginkgoFans,
+  constellations,
+  planetOrbits,
+  nebulaDust,
+  eclipse,
+  interferenceRings,
+  moireLines,
+  opWaveGrid,
+  impossibleCubes,
+  voronoiCells,
+  fractalTree,
+  hilbertCurve,
+  cellularAutomaton,
+  woodGrain,
+  marbleVeins,
+  basketWeave,
+  linenWeave,
+  archWindows,
+  staircase,
+  encausticTiles,
+  blindsShadow,
+  memphisConfetti,
+  swissGrid,
+  constructivist,
+  punchCard,
+  pawPrints,
+  birdFlock,
+  fishSchool,
+  butterflies,
 ];
 
 export const registry = createRegistry();

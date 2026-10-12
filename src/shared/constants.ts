@@ -96,7 +96,7 @@ export const PRESERVE_ASPECT_RATIO = 'xMidYMid slice';
 
 /** 分类展示名与顺序 —— UI 的分类 Tab 由此生成。 */
 export const CATEGORY_META: ReadonlyArray<{
-  id: 'A-lines' | 'B-repeat' | 'C-organic' | 'E-scene' | 'D-pixel';
+  id: import('../patterns/types').PatternCategory;
   label: string;
   /** 分类 Tabs 用的短名：「全部」+ 5 类共 6 个分段，两字短名才能在栏宽内一行放下，不触发 kumo Tabs 的横向滚动。 */
   short: string;
@@ -107,6 +107,15 @@ export const CATEGORY_META: ReadonlyArray<{
   { id: 'C-organic', label: '渐变流体', short: '流体', hint: '柔和过渡与有机形态' },
   { id: 'E-scene', label: '风景意境', short: '风景', hint: '山峦、云霞、极光、森林' },
   { id: 'D-pixel', label: '像素复古', short: '像素', hint: '游戏厅、霓虹、复古印刷' },
+  { id: 'F-ornament', label: '传统纹样', short: '纹样', hint: '青海波、回纹、麻叶、七宝、星纹' },
+  { id: 'G-botanical', label: '植物花卉', short: '植物', hint: '叶片、花瓣、藤蔓、银杏' },
+  { id: 'H-cosmos', label: '宇宙天文', short: '宇宙', hint: '星座、轨道、星云、日食' },
+  { id: 'I-optical', label: '光学错觉', short: '错觉', hint: '干涉、莫尔、欧普、不可能图形' },
+  { id: 'J-generative', label: '数学生成', short: '生成', hint: '沃罗诺伊、分形、空间填充曲线' },
+  { id: 'K-texture', label: '材质纹理', short: '材质', hint: '木纹、大理石、编织、布纹' },
+  { id: 'L-architecture', label: '建筑空间', short: '建筑', hint: '拱窗、楼梯、拼花瓷砖、光影' },
+  { id: 'M-movement', label: '设计流派', short: '流派', hint: '孟菲斯、包豪斯、瑞士网格、构成主义' },
+  { id: 'N-animal', label: '动物形象', short: '动物', hint: '爪印、鸟群、鱼群、蝴蝶' },
 ];
 
 /** URL 写入防抖（PRD P0-6：拖动滑块不应刷历史记录）。 */

@@ -14,6 +14,15 @@ describe('生成预览产物', () => {
       'B-repeat': '波点网格',
       'C-organic': '渐变流体',
       'D-pixel': '像素复古',
+      'F-ornament': '传统纹样',
+      'G-botanical': '植物花卉',
+      'H-cosmos': '宇宙天文',
+      'I-optical': '光学错觉',
+      'J-generative': '数学生成',
+      'K-texture': '材质纹理',
+      'L-architecture': '建筑空间',
+      'M-movement': '设计流派',
+      'N-animal': '动物形象',
     };
     const report: any[] = [];
 

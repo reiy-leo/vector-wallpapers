@@ -10,7 +10,22 @@
  * 分类 id（值一经上线不可变更）。2026-10-12 重组：B-repeat 改名展示为「几何」，新增 E-scene「风景」。
  * ⚠️ 分类与源码文件夹无强绑定 —— 部分 pattern 的文件仍留在旧文件夹，以 `category` 字段为准。
  */
-export type PatternCategory = 'A-lines' | 'B-repeat' | 'C-organic' | 'E-scene' | 'D-pixel';
+export type PatternCategory =
+  | 'A-lines'
+  | 'B-repeat'
+  | 'C-organic'
+  | 'E-scene'
+  | 'D-pixel'
+  // 2026-10-12 第七批：9 个新分类
+  | 'F-ornament'
+  | 'G-botanical'
+  | 'H-cosmos'
+  | 'I-optical'
+  | 'J-generative'
+  | 'K-texture'
+  | 'L-architecture'
+  | 'M-movement'
+  | 'N-animal';
 
 /** PRD 定义的元件角色。 */
 export type ElementRole = 'bg' | 'primary' | 'secondary' | 'accent' | 'detail';
@@ -267,4 +282,41 @@ export type PatternId =
   | 'sakura-fall'
   | 'ukiyoe-fuji'
   | 'hot-air-balloons'
-  | 'bamboo-mist';
+  | 'bamboo-mist'
+  // 第七批：9 个新分类（2026-10-12）
+  | 'seigaiha'
+  | 'meander-key'
+  | 'asanoha'
+  | 'shippo'
+  | 'leaf-chain'
+  | 'petal-scatter'
+  | 'palm-fronds'
+  | 'ginkgo-fans'
+  | 'constellations'
+  | 'planet-orbits'
+  | 'nebula-dust'
+  | 'eclipse'
+  | 'interference-rings'
+  | 'moire-lines'
+  | 'op-wave-grid'
+  | 'impossible-cubes'
+  | 'voronoi-cells'
+  | 'fractal-tree'
+  | 'hilbert-curve'
+  | 'cellular-automaton'
+  | 'wood-grain'
+  | 'marble-veins'
+  | 'basket-weave'
+  | 'linen-weave'
+  | 'arch-windows'
+  | 'staircase'
+  | 'encaustic-tiles'
+  | 'blinds-shadow'
+  | 'memphis-confetti'
+  | 'swiss-grid'
+  | 'constructivist'
+  | 'punch-card'
+  | 'paw-prints'
+  | 'bird-flock'
+  | 'fish-school'
+  | 'butterflies';

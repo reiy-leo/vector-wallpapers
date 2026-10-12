@@ -10,7 +10,6 @@ import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { useWorkbenchSelector, selectPattern, setCategory, setSearch } from './store';
-import { Tabs } from '@cloudflare/kumo/components/tabs';
 import { CountBadge, SearchInput } from './primitives';
 import { IconStar } from './icons';
 import type { PatternDef } from '../patterns/types';
@@ -89,22 +88,11 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
           placeholder="搜索母题"
         />
         {/*
-         * 分类筛选用 kumo `Tabs`（segmented）：与右栏面板 Tabs 同一套组件与动画指示器。
-         * 标签用短名（线条/几何/流体/风景/像素），6 段在 256px 内一行放下 ——
-         * 放不下时 kumo 会出横向滚动 + 渐隐箭头，但「像素」被藏起来的问题依旧，所以宁可用短名。
+         * 分类筛选：14 个分类 + 全部，segmented Tabs 一行放不下（会横向滚动藏掉后几类），
+         * 改为 5 列换行的分类胶囊（2026-10-12 第七批新增 9 类后）。
+         * 选中态用品牌浅底 + 品牌色字，未选中为次级文字，hover 浅灰底。
          */}
-        <Tabs
-          variant="segmented"
-          className="w-full rounded-md"
-          listClassName="rounded-md"
-          indicatorClassName="rounded-sm"
-          value={category}
-          onValueChange={setCategory}
-          tabs={[
-            { value: ALL, label: '全部', className: 'flex-1 justify-center' },
-            ...CATEGORY_META.map((c) => ({ value: c.id, label: c.short, className: 'flex-1 justify-center' })),
-          ]}
-        />
+        <CategoryChips category={category} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -126,6 +114,33 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+/** 分类胶囊：5 列换行（CHIP_H 高度档），见上方说明。 */
+function CategoryChips({ category }: { category: string }) {
+  return (
+    <div role="radiogroup" aria-label="母题分类" className="grid grid-cols-5 gap-1">
+      {[{ id: ALL, short: '全部', hint: '全部母题' }, ...CATEGORY_META].map((c) => {
+        const on = c.id === category;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={c.hint}
+            onClick={() => setCategory(c.id)}
+            className={[
+              'h-7 rounded-sm text-base transition-colors focus-visible:outline-2 focus-visible:outline-brand',
+              on ? 'bg-brand-tint font-medium text-brand' : 'text-fg-soft hover:bg-surface-2 hover:text-fg',
+            ].join(' ')}
+          >
+            {c.short}
+          </button>
+        );
+      })}
     </div>
   );
 }
