@@ -2,7 +2,7 @@
 
 > 版本：v2.0（对齐 PRD v1.0 修订版）
 > 目标平台：Cloudflare Workers · 纯静态 SPA · 无后端 · 无数据库
-> 配套文档：`docs/PRD.md`
+> 配套文档：`.agent/docs/PRD.md`
 
 **本次修订说明**：v1.0 草案基于口头 brief 独立设计，产出后读取 `PRD.md` 发现 **7 处实质性冲突**（技术栈、Pattern 数量与 id、渐变 PaintSpec、元件数据结构、URL 格式、体积预算、色板系统）。v2.0 已全部对齐 PRD，PRD 为产品事实来源，冲突处以 PRD 为准。详见 §0.2。
 

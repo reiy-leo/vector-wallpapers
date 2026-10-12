@@ -96,8 +96,8 @@ rm -rf node_modules && npm install && npm run typecheck && npm run build
 ### ☐ 仓库可见性
 
 `github.com/reiy-leo/vector-wallpapers` 目前是 **PUBLIC**。
-含 `docs/PRD.md`（商业模式章节）与 `.workbuddy/memory/`（内部开发笔记）。
-建议改 Private，或把 `.workbuddy/` 移出仓库。
+含 `.agent/docs/PRD.md`（商业模式章节）与 `.agent/memory/`（内部开发笔记，原 `.workbuddy/memory/`）。
+建议改 Private，或把 `.agent/memory/` 移出仓库。
 
 ---
 

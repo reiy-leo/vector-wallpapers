@@ -16,13 +16,32 @@
 
 | 层级 | 文件 | 管什么 |
 |---|---|---|
-| 1 | `docs/PRD.md` | **产品事实**（做什么、给谁、边界在哪）|
-| 2 | `docs/ARCHITECTURE.md` | **技术实现**（怎么分层、模块边界）|
-| 3 | `docs/PATTERN-SELECTION.md` | 母题取舍依据 |
-| 4 | `docs/STYLE-100-ANALYSIS.md` | 142 风格 × 母题的可添加性判定 |
+| 1 | `.agent/docs/PRD.md` | **产品事实**（做什么、给谁、边界在哪）|
+| 2 | `.agent/docs/ARCHITECTURE.md` | **技术实现**（怎么分层、模块边界）|
+| 3 | `.agent/docs/PATTERN-SELECTION.md` | 母题取舍依据 |
+| 4 | `.agent/docs/STYLE-100-ANALYSIS.md` | 142 风格 × 母题的可添加性判定 |
 | 5 | `.agent/design.md` | 本项目**额外**自定的门禁（Kumo 规范未覆盖的部分）|
 
 > PRD 与架构冲突时：PRD 定产品，架构定实现。架构师 v1.0 曾与 PRD 冲突 7 处，v2.0 已全部对齐。
+
+## 文档地图（全部在 `.agent/`）
+
+| 路径 | 内容 |
+|---|---|
+| `.agent/skills/kumo-design/SKILL.md` | **唯一设计规范**：Cloudflare Kumo（`npx skills add cloudflare/kumo@kumo-design` 安装，`.claude/skills/` 下为软链）。Apple 风格的 `DESIGN.md` 已删除 |
+| `.agent/design.md` | Kumo 在本项目的落地清单 + 自定门禁 |
+| `.agent/todo.md` | 待办 |
+| `.agent/docs/` | PRD / ARCHITECTURE / PATTERN-SELECTION / STYLE-100-ANALYSIS + 6 张 mermaid 图 |
+| `.agent/memory/` | 长期记忆 `MEMORY.md` 与各阶段工作日志（原 `.workbuddy/memory/`）|
+
+## 常用命令
+
+```bash
+npm install --legacy-peer-deps   # 当前 lockfile 在 npm 10 下 ci 会报 Invalid Version
+npm run dev        # http://localhost:5173
+npm run test       # vitest（串行）
+npm run deploy     # build + wrangler deploy → Cloudflare Workers Static Assets
+```
 
 ## 技术栈（锁定，勿擅自更换）
 

@@ -46,7 +46,7 @@ function maxConfig(patternId: string) {
  * 实现数量与 id 契约。
  *
  * ⚠️ 数量断言的演进：原本写死「19」（PRD 首批）。
- * 2026-10-12 依据`docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口
+ * 2026-10-12 依据`.agent/docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口
  * 新增 8 个母题 → 27 个。
  *
  * 这里刻意**不**改成「27」而保留一个具名常量：

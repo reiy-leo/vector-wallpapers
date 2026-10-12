@@ -102,10 +102,10 @@ React 19 + Tailwind v4 + Vite 8 + TypeScript
 - R6 低：TypeScript npm latest 已是 7.0.2（原生重写版），安装时需显式确认 `tsc --version`，异常回退 ~5.9.0
 
 ## 规划文档位置
-- `docs/PRD.md` —— 许清楚产出，PRD v1.0 修订版（产品事实来源）
-- `docs/ARCHITECTURE.md` —— 高见远产出 v2.0，1568 行（技术事实来源）
-- `docs/PATTERN-SELECTION.md` —— 母题取舍依据（2026-10-12）：参考站 48 张判读 + 19 母题结构审查
-- `docs/01~07-*.mermaid` —— 架构附带的 7 张流程图（分层/预览/PNG导出/首屏/任务依赖/类图/分享数据流）
+- `.agent/docs/PRD.md` —— 许清楚产出，PRD v1.0 修订版（产品事实来源）
+- `.agent/docs/ARCHITECTURE.md` —— 高见远产出 v2.0，1568 行（技术事实来源）
+- `.agent/docs/PATTERN-SELECTION.md` —— 母题取舍依据（2026-10-12）：参考站 48 张判读 + 19 母题结构审查
+- `.agent/docs/01~07-*.mermaid` —— 架构附带的 7 张流程图（分层/预览/PNG导出/首屏/任务依赖/类图/分享数据流）
 
 ## ⚠️ 三条「只有实测才能发现」的坑（2026-10-12 全部踩过）
 1. **URL 编解码分隔符冲突**：`ElementPatch` 用 `,` 分隔字段，而渐变编码内部也用 `,`
@@ -186,7 +186,7 @@ T1+T2+T3+Lab 完成（当时的 12 个母题）。后续已扩到 27 个。
 ## 母题扩充的两批历史（留档）
 - **第一批（2026-10-12）**：12 → 19。新增 `arc-composition` / `contour-rings` /
   `triangle-tiling` / `checker-mesh` / `cloud-bands` / `blob-field` / `pixel-terrain`。
-  依据 `docs/PATTERN-SELECTION.md`（参考站 48 张判读 + 结构审查）。
+  依据 `.agent/docs/PATTERN-SELECTION.md`（参考站 48 张判读 + 结构审查）。
   **不追参考站那48 个**，因其页面 JS 渲染抓不到清单；全部原创，不做临摹。
 - **第二批（2026-10-12）**：19 → **27**。这批是**并发写入**产生的
   （另一进程在我的工作期间新建），我负责收口：

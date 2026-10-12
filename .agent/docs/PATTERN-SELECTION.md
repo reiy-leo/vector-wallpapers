@@ -2,7 +2,7 @@
 
 > 日期：2026-10-12
 > 性质：**决策依据文档**，不修改任何产品事实。
-> 关联：`docs/PRD.md`（产品事实来源）、`docs/ARCHITECTURE.md`（技术实现）。
+> 关联：`.agent/docs/PRD.md`（产品事实来源）、`.agent/docs/ARCHITECTURE.md`（技术实现）。
 > 本文中的所有数据均从 `registry` 实测得出，不依赖记忆或印象。
 
 ---

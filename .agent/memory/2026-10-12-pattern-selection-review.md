@@ -40,7 +40,7 @@ B 审查现有 19 母题结构感、C 固化成决策依据文档。三项全做
 > 纯色元件改色 = 整块变色（换肤）；渐变元件改色 = 只染一端（染色）。价值不在一个量级。
 
 ## 产出
-- `docs/PATTERN-SELECTION.md` —— 决策依据文档（含分类判读、实测总表、取数方式）
+- `.agent/docs/PATTERN-SELECTION.md` —— 决策依据文档（含分类判读、实测总表、取数方式）
 - `src/patterns/structure.guard.test.ts` —— 结构健康度门禁（10 项），新增母题自动拦截
 - `src/patterns/C-organic/liquid-mesh.test.ts` —— 本次修正的回归测试（11 项）
 - 修改 `src/patterns/C-organic/liquid-mesh.ts`（bg 纯色化 + 新增 grain 元件 + 3 个 preset 同步）

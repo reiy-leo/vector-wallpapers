@@ -63,7 +63,7 @@ const ALL: PatternDef[] = [
   neonPixels,
   newWaveSunset,
   pixelTerrain,
-  // 第二批（2026-10-12，依据 docs/STYLE-100-ANALYSIS.md §4.2 的结构缺口）
+  // 第二批（2026-10-12，依据 .agent/docs/STYLE-100-ANALYSIS.md §4.2 的结构缺口）
   girihStar,
   halftone,
   papercut,
