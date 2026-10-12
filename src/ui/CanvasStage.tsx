@@ -127,81 +127,78 @@ export function CanvasStage({
       </div>
 
       {/* ───────────────────────────────────────────────────────────
-          工具条：三行结构，靠分组而不是靠加大间距区分语义。
-            行① 尺寸 + 形态参数  ← 「这张图长什么样」
-            行② 离散形态选项
-            行②右侧 视图动作（栅格/聚焦/恢复默认）；产物动作在标题行右上角
-          滑块与产物动作必须**同一视觉带**：调形状和拿走产物是
-          同一个连续行为链的两端，中间隔一行会让手感断开。
+          工具条：两行，每行一个职责。
+            行① 画布（尺寸）+ 模式（离散选项）｜ 右侧：诊断（体积/节点）+ 视图动作
+            行② 连续参数：等宽网格，标签 / 滑条 / 数值三列上下对齐
           ─────────────────────────────────────────────────────────── */}
-      <div className="grid shrink-0 gap-2.5 border-t border-line px-5 py-3">
-        {/* 行① 尺寸 + 形态参数 */}
-        <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+      <div className="grid shrink-0 gap-3 border-t border-line px-5 py-3">
+        {/* 行① */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
           <SizeSelect cfg={cfg} onChange={setSize} />
 
-          {/* 竖分隔线：尺寸是「画布」，参数是「内容」，两者作用对象不同 */}
+          {/* 竖分隔线：尺寸是「画布」，右边是「内容」的模式选项 */}
           <div aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-line sm:block" />
 
-          <ControlChips />
-        </div>
-
-        {/* 行② 离散形态选项 + 产物动作 */}
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
           <DiscreteChips />
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            {/* 体积/节点：纯诊断信息，与可点物用分隔线隔开 */}
+            <p
+              className={`flex items-center gap-1 whitespace-nowrap font-mono text-[0.9em] ${
+                overBudget ? 'text-danger' : 'text-fg-mute'
+              }`}
+            >
+              <IconInfo size={13} />
+              {(metrics.bytes / 1024).toFixed(1)} KB / {(LIMITS.MAX_SVG_BYTES / 1024).toFixed(0)} KB
+              <span>· {metrics.nodes} 节点</span>
+            </p>
+            <div aria-hidden="true" className="h-6 w-px shrink-0 bg-line" />
+            <div className="flex items-center gap-1">
             <Tooltip content={grid ? '隐藏栅格' : '显示栅格'}>
-              <IconButton
-                label={grid ? '隐藏栅格' : '显示栅格'}
-                aria-pressed={grid}
-                className={grid ? 'bg-brand-tint text-brand' : ''}
-                onClick={() => setUI({ grid: !grid })}
-              >
-                <IconGrid size={16} />
-              </IconButton>
-            </Tooltip>
+                <IconButton
+                  label={grid ? '隐藏栅格' : '显示栅格'}
+                  aria-pressed={grid}
+                  className={grid ? 'bg-brand-tint text-brand' : ''}
+                  onClick={() => setUI({ grid: !grid })}
+                >
+                  <IconGrid size={16} />
+                </IconButton>
+              </Tooltip>
 
-            <Tooltip content={focus ? '退出聚焦' : '聚焦预览'}>
-              <IconButton
-                label={focus ? '退出聚焦' : '聚焦预览'}
-                aria-pressed={focus}
-                className={focus ? 'bg-brand-tint text-brand' : ''}
-                onClick={() => setUI({ focus: !focus })}
-              >
-                <IconFocus size={16} />
-              </IconButton>
-            </Tooltip>
+              <Tooltip content={focus ? '退出聚焦' : '聚焦预览'}>
+                <IconButton
+                  label={focus ? '退出聚焦' : '聚焦预览'}
+                  aria-pressed={focus}
+                  className={focus ? 'bg-brand-tint text-brand' : ''}
+                  onClick={() => setUI({ focus: !focus })}
+                >
+                  <IconFocus size={16} />
+                </IconButton>
+              </Tooltip>
 
-            <Tooltip content="恢复当前母题的默认配置">
-              <IconButton
-                label="恢复默认"
-                onClick={() => {
-                  const base = createDefaultConfig(def, {
-                    width: cfg.width,
-                    height: cfg.height,
-                    seed: cfg.seed,
-                  });
-                  setConfig(base);
-                  onNotice('已恢复默认配置', 'info');
-                }}
-              >
-                <IconReset size={16} />
-              </IconButton>
-            </Tooltip>
+              <Tooltip content="恢复当前母题的默认配置">
+                <IconButton
+                  label="恢复默认"
+                  onClick={() => {
+                    const base = createDefaultConfig(def, {
+                      width: cfg.width,
+                      height: cfg.height,
+                      seed: cfg.seed,
+                    });
+                    setConfig(base);
+                    onNotice('已恢复默认配置', 'info');
+                  }}
+                >
+                  <IconReset size={16} />
+                </IconButton>
+              </Tooltip>
 
+            </div>
           </div>
         </div>
 
-        {/* 体积/节点：纯诊断信息，与可点物严格分开 */}
-        <p
-          className={`flex items-center gap-1 font-mono text-[0.9em] ${
-            overBudget ? 'text-danger' : 'text-fg-mute'
-          }`}
-        >
-          <IconInfo size={13} />
-          {(metrics.bytes / 1024).toFixed(1)} KB / {(LIMITS.MAX_SVG_BYTES / 1024).toFixed(0)} KB
-          <span>· {metrics.nodes} 节点</span>
-        </p>
+        {/* 行② 连续参数 */}
+        <ControlChips />
       </div>
     </div>
   );

@@ -38,7 +38,7 @@ export function ControlChips() {
     <div
       role="group"
       aria-label="形态参数"
-      className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5"
+      className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-8 gap-y-2"
     >
       {controls.map((c) => (
         <ControlChip key={c.key} control={c} cfg={cfg} />

@@ -499,21 +499,22 @@ export function SliderChip({
   const text = format ? format(value) : String(value);
   // ⭐ tabular-nums：数字等宽，否则滑块拖动时右侧数值列会左右抖动
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor={id} className="shrink-0 text-base text-fg-soft">
+    // 三列网格：标签定宽 / 滑条撑满 / 数值定宽右对齐 —— 多个滑块上下对齐成整齐的列
+    <div className="grid min-w-0 grid-cols-[5em_minmax(0,1fr)_3.5em] items-center gap-2">
+      <label htmlFor={id} className="truncate text-base text-fg-soft" title={label}>
         {label}
       </label>
       <input
         id={id}
         type="range"
-        className="vw-slider w-24 shrink-0"
+        className="vw-slider w-full min-w-0"
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <code className="w-11 shrink-0 text-right font-mono text-[0.9em] tabular-nums text-fg-mute">
+      <code className="text-right font-mono text-[0.9em] tabular-nums text-fg-mute">
         {text}
       </code>
     </div>
