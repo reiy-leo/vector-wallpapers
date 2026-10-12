@@ -60,6 +60,9 @@ import scatterBlobs from './C-organic/scatter-blobs';
 import pebbleField from './C-organic/pebble-field';
 import terrazzo from './C-organic/terrazzo';
 import blobContours from './C-organic/blob-contours';
+import topoLines from './A-lines/topo-lines';
+import waveStripes from './A-lines/wave-stripes';
+import tvStatic from './D-pixel/tv-static';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -109,6 +112,10 @@ const ALL: PatternDef[] = [
   pebbleField,
   terrazzo,
   blobContours,
+  // 第五批（2026-10-12）
+  topoLines,
+  waveStripes,
+  tvStatic,
 ];
 
 export const registry = createRegistry();

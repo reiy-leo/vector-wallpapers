@@ -1,206 +1,248 @@
 /**
  * 流线曲 —— A 极简几何线条。
  *
- * 构图要点：线束横扫全幅，三层共用相位基准但振幅、疏密、**形态**不同，
- * 靠「疏密 + 相位差 + 形态差」制造流动感。所有几何由 W/H 比例推导，尺寸无关。
- *
- * ⭐ 体积策略：**必须走 <pattern> 平铺**。三条线束在竖直方向本身就是重复的，
- * 把「密度行」折进 tile 高度后，单条波浪路径 + 一个 tile 即可表达任意密度，
- * SVG 体积与 density 完全解耦（实测密度 4 与 60 体积几乎相同）。
- * 早期版本逐行画 `<path>`，密度 60 时会膨胀到 44KB / 66 个顶层节点，直接击穿红线。
+ * 一束**永不相交**的平行流线横扫全幅：所有线来自同一个平滑位移场，
+ * 相邻线只在相位上缓慢错开，于是线距自然「呼吸」（汇聚 / 舒展），
+ * 再由一个 seed 决定位置的「涌泉」把线束撑开一道柳叶形的留白，作为画面焦点。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 2026-10-12 视觉重做。用户反馈三连：
- *① 「线条类型太单一」② 「背景色和线条都没对比度了」③ 「不优雅」
+ * 2026-10-12 v2 重做（用户：「还是不好看」）。v1 的病根：
  *
- * 三条根因与对应解法：
+ * ❶ **pattern 平铺把线切断**：tile 高 = 2×行距，而振幅常常大于 tile 高，
+ *    波峰波谷被 tile 边界裁掉 → 画面上到处是断头的短线、孤立的小横杠。
+ * ❷ **三层各自独立的波互相穿插**：远/中/近三组线束频率、相位都不同，
+ *    交叉成一团乱麻，没有「流」的方向感。
+ * ❸ **曲线有折角**：二次贝塞尔的控制点取段起点高度，每个节点处切线不连续，
+ *    放大后是一串细小的锯齿拐点（chevron 形态更是直接用 |sin| 造尖角）。
+ * ❹ 预设全是暗色，且 line_far 与底色太近，远层几乎看不见。
  *
- * ❶ 线宽**不随分辨率缩放**（铁律 6 的隐性违反）
- *    旧版 `stroke-width = weight * scale`（1.2 × 0.7 ≈ 0.84px）是绝对像素，
- *    但画布宽 2560 —— 0.84px 的线在 4K 屏上等于发丝，肉眼几乎不可见。
- *    ✅ 解法：`unit = min(W,H) / 1080` 作为缩放基准，线宽按 `weight * unit`
- *    推导。这样「线宽 1.2」在任何尺寸下都是**同样的视觉粗细**，
- *    缩略图（240×150）也不会粗成一块。
+ * v2 的做法：
+ *  - **单一位移场**：y_i(x) = 基线_i + F(x, t_i)，F 对 t 的变化率远小于行距
+ *    （再加逐列钳制兜底）→ 数学上保证线与线不交叉、间距不塌缩。
+ *  - **Catmull-Rom → 三次贝塞尔**，用 `S` 命令串接：x 等距采样时 Catmull-Rom 的
+ *    相邻控制点恰好关于节点对称，与 `S` 的反射语义一致 → 全线 C1 连续，零折角。
+ *  - **远 / 中 / 近不再是三组独立的波**，而是同一束线里按节奏交织的三种笔触
+ *    （细·中·粗 + 三色），层次靠线宽与颜色表达。
+ *  - 坐标先取整（小画布保留 1 位小数）再写相对增量，无累计误差；体积 ∝ 线数 × 段数，
+ *    由 SEG_BUDGET 分配段数、BYTE_CAP 兜底，任何尺寸/参数极值都 < 20KB。
  *
- * ❷ 低透明度吃掉对比度（**两个衰减相乘**）
- *    旧版 line_far 的 opacity 是 0.45，实测合成后与底色仅 **2.69:1**
- *    （WCAG 要 4.5:1）。更隐蔽的是：不透明度与线宽是**叠加**的衰减 ——
- *    0.45 的 alpha × 0.84px 的线宽 ≈ 视觉上不存在。
- *    ✅ 解法：opacity 下限抬到 0.5，且把「层次」主要交给**线宽与振幅**表达，
- *    不透明度只做次要修饰。
- *
- * ❸ 形态单一：三层都是 `sin`，只是振幅/相位不同 —— 三条一样的正弦波。
- *    ✅ 解法：新增 `morph` 控件（正弦/叠加/折角/涡旋），
- *    三层默认**各取一种形态**，并给每层不同的「形态微调」（相位、谐波数、锐度）。
- *    这样同屏会出现三种不同的线：柔波、密纹、硬折 —— 层次立刻出来。
+ * 每层仍包在一个整幅 `<pattern>` 里（tile = 画布 + 动画余量，不发生重复）：
+ * 这样每层是一个独立可寻址的绘制层，flow-lines.guard 的分层检测也依赖它。
  *
  * ⚠️ 数据契约（分享链接依赖，**不可改名/删除**）：
  *   元件 id `bg` / `line_far` / `line_mid` / `line_near`
- *   控件 key `density` / `weight` / `amplitude` / `curvature` / `drift`
- *   新增参数一律走新 key，旧链接解析后缺省为 default —— 行为兼容。
+ *   控件 key `density` / `weight` / `amplitude` / `curvature` / `drift` / `morph` / `accent`
+ *   （morph 的选项值也保持不变，旧链接语义平滑迁移到新场）
  */
-import { g, n, path, rect } from '../../engine/svg';
+import { g, path, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
 
-/**
- * 线宽缩放基准：让「线宽 1.2」在任何画布尺寸下都是同一视觉粗细。
- *
- * 取 `min(W,H)/1080` 而非 `W/1920`：壁纸的高宽比跨度极大
- * （1170×2532 的竖屏 vs 3440×1440 的带鱼屏），用短边才能让竖屏不被放大到过粗。
- * clamp 到 [0.5, 4]：下限防缩略图（240×150 → 0.14）线粗成块，
- * 上限防 7680 超宽屏线细成发丝。
- */
+/** 线宽缩放基准：「线宽 1.2」在任何画布尺寸下都是同一视觉粗细（短边 / 1080，clamp）。 */
 function widthUnit(w: number, h: number): number {
   return Math.min(4, Math.max(0.5, Math.min(w, h) / 1080));
 }
 
-/** 形态：四条线束各取一种，同屏构成层次（旧版三层同形态 = 「线条类型单一」的根因）。 */
-type Morph = 'sine' | 'harmonics' | 'chevron' | 'vortex';
+type Morph = 'sine' | 'harmonics' | 'chevron' | 'vortex' | 'mixed';
+const MORPHS: readonly Morph[] = ['mixed', 'sine', 'harmonics', 'chevron', 'vortex'];
 
-/** 形态查表 —— seed 决定哪三层用哪种，保证同seed 可复现且三屏不同。 */
-const MORPHS: readonly Morph[] = ['sine', 'harmonics', 'chevron', 'vortex'];
+/** 全部线条的贝塞尔段数总预算 —— 体积的主旋钮（每段约 12~16 字节）。 */
+const SEG_BUDGET = 1000;
+/** 三层 `d` 字符总量硬上限，超出则不再追加线条（实际很少触发）。 */
+const BYTE_CAP = 16500;
 
-function buildWave(
-  w: number,
-  baseline: number,
-  amp: number,
-  phase: number,
-  cycles: number,
-  segs: number,
+/** 三种笔触：线宽倍率。远 = 细丝，中 = 主线，近 = 少量粗线做重音。 */
+const STROKE_SCALE = [0.6, 1, 1.75] as const;
+
+/**
+ * 笔触节奏：周期 6 —— 近 · 远 · 中 · 远 · 中 · 远。
+ * 细线占一半做「底纹」，主线三分之一，粗重音六分之一，读起来像乐谱的强弱拍。
+ */
+const RHYTHM = [2, 0, 1, 0, 1, 0] as const;
+
+/** 圆角折线波：s→0 退化为正弦，s→1 趋近三角波（但始终光滑，无尖角）。 */
+function shapedWave(a: number, s: number): number {
+  if (s < 0.01) return Math.sin(a);
+  return Math.asin(s * Math.sin(a)) / Math.asin(s);
+}
+
+interface Field {
+  /** 返回第 t∈[0,1] 条线在 x 处相对基线的位移（px）。 */
+  (x: number, t: number): number;
+}
+
+function buildField(
   morph: Morph,
-  /** chevron 的锐度：越大折角越尖；harmonics 的二次谐波占比 */
+  W: number,
+  amp: number,
+  lambda: number,
   accent: number,
-): string {
-  if (amp === 0) return `M0 ${n(baseline)} L${n(w)} ${n(baseline)}`;
+  rng: () => number,
+): { f: Field; reach: number; harmonic: boolean } {
+  const k = (Math.PI * 2) / lambda;
+  const p1 = rng() * Math.PI * 2;
+  const p2 = rng() * Math.PI * 2;
+  // 相位随 t 漂移的速率：让上下线错位 → 线距呼吸。符号随 seed。
+  const shear = (1.1 + rng() * 0.8) * (rng() < 0.5 ? -1 : 1);
+  // 涌泉：横向位置、所在线束高度、宽度
+  const sx = W * (0.22 + rng() * 0.56);
+  const st = 0.38 + rng() * 0.24;
+  const sw = Math.max(lambda * 0.32, W * 0.16);
+  const sx2 = sx + (rng() < 0.5 ? -1 : 1) * W * (0.3 + rng() * 0.15);
+  const st2 = st + (rng() < 0.5 ? -0.22 : 0.22);
 
-  // 归一化相位角：0~1 对应一整个周期，供各形态共用
-  const th = (t: number): number => t * Math.PI * 2 * cycles + phase;
-
-  const yOf = (t: number): number => {
-    const a = th(t);
-    let y: number;
-    switch (morph) {
-      // 柔波：纯正弦，最柔和
-      case 'sine':
-        y = Math.sin(a);
-        break;
-      // 叠加：基频 + 二次谐波 → 同一条线上同时有缓起伏与细密波纹
-      case 'harmonics':
-        y = (1 - accent * 0.5) * Math.sin(a) + accent * 0.5 * Math.sin(2 * a);
-        break;
-      // 折角：正弦取绝对值再折 → 直段 + 圆角交替，几何感强
-      case 'chevron':
-        y = (1 - accent) * Math.sin(a) + accent * Math.abs(Math.sin(a));
-        break;
-      // 涡旋：sin 叠加其相位偏移项 → 疏密不均，像被旋涡搅动
-      case 'vortex':
-      default:
-        y = Math.sin(a) * (1 - accent * 0.5) + accent * 0.5 * Math.sin(a * 0.5 + accent * 3);
-        break;
-    }
-    return baseline + y * amp;
+  const base = (x: number, t: number): number => Math.sin(k * x + p1 + shear * t * Math.PI);
+  const harm = (x: number, t: number): number => Math.sin(2 * k * x + p2 - shear * t * Math.PI * 1.6);
+  const swell = (x: number, t: number, cx: number, ct: number, tau: number): number => {
+    const dx = (x - cx) / sw;
+    return Math.exp(-dx * dx) * Math.tanh((t - ct) / tau);
   };
 
-  const step = w / segs;
-  let d = `M0 ${n(yOf(0))}`;
-  for (let i = 0; i < segs; i++) {
-    const x0 = step * i;
-    const x1 = step * (i + 1);
-    const cx = (x0 + x1) / 2;
-    // 控制点取起点高度 → 曲线在段内平滑过渡到终点，视觉上连续
-    d += ` Q${n(cx)} ${n(yOf(i / segs))} ${n(x1)} ${n(yOf((i + 1) / segs))}`;
+  switch (morph) {
+    case 'sine':
+      return { f: (x, t) => amp * base(x, t), reach: amp, harmonic: false };
+    case 'harmonics': {
+      const h = 0.18 + accent * 0.32;
+      return {
+        f: (x, t) => amp * ((1 - h) * base(x, t) + h * harm(x, t)),
+        reach: amp,
+        harmonic: true,
+      };
+    }
+    case 'chevron': {
+      const s = 0.5 + accent * 0.47;
+      return {
+        f: (x, t) => amp * shapedWave(k * x + p1 + shear * t * Math.PI, s),
+        reach: amp,
+        harmonic: true,
+      };
+    }
+    case 'vortex': {
+      const B = amp * (1 + accent * 1.4);
+      return {
+        f: (x, t) =>
+          amp * 0.5 * base(x, t) + B * swell(x, t, sx, st, 0.09) + B * 0.55 * swell(x, t, sx2, st2, 0.07),
+        reach: amp * 0.5 + B * 1.55,
+        harmonic: false,
+      };
+    }
+    case 'mixed':
+    default: {
+      const h = accent * 0.22;
+      const B = amp * (0.35 + accent * 0.75);
+      return {
+        f: (x, t) => amp * ((1 - h) * base(x, t) + h * harm(x, t)) + B * swell(x, t, sx, st, 0.08),
+        reach: amp + B,
+        harmonic: accent > 0.05,
+      };
+    }
   }
-  return d;
 }
 
 const def: PatternDef = {
   id: 'flow-lines',
   name: '流线曲',
   category: 'A-lines',
-  description: '四层线束以不同形态横扫画面 —— 柔波、密纹、折角、涡旋叠出流动韵律。',
+  description: '一束永不相交的平行流线横扫画面，线距随波呼吸，在焦点处舒展出一道留白。',
   seedable: true,
   animatable: true,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#0b1220' }, opacity: 1, visible: true, configurable: true },
-    { id: 'line_far', label: '线束 · 远', role: 'secondary', paint: { type: 'solid', color: '#2dd4bf' }, opacity: 0.5, visible: true, configurable: true },
-    { id: 'line_mid', label: '线束 · 中', role: 'primary', paint: { type: 'solid', color: '#818cf8' }, opacity: 0.8, visible: true, configurable: true },
-    { id: 'line_near', label: '线束 · 近', role: 'accent', paint: { type: 'solid', color: '#fbbf24' }, opacity: 1, visible: true, configurable: true },
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#0e1424' }, opacity: 1, visible: true, configurable: true },
+    { id: 'line_far', label: '细线', role: 'secondary', paint: { type: 'solid', color: '#5b78b0' }, opacity: 1, visible: true, configurable: true },
+    { id: 'line_mid', label: '主线', role: 'primary', paint: { type: 'solid', color: '#9db8f2' }, opacity: 1, visible: true, configurable: true },
+    { id: 'line_near', label: '重音线', role: 'accent', paint: { type: 'solid', color: '#f7b267' }, opacity: 1, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'density', label: '密度', type: 'range', min: 4, max: 60, step: 1, default: 22, heavy: true },
-    // 上限 4→8：配合 widthUnit 缩放后，8 档在 4K 上才有「粗线」的存在感
-    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 8, step: 0.1, default: 1.6, unit: 'px' },
-    { key: 'amplitude', label: '振幅', type: 'range', min: 0, max: 0.35, step: 0.01, default: 0.12 },
-    { key: 'curvature', label: '曲率', type: 'range', min: 0.5, max: 4, step: 0.1, default: 1.6 },
-    // ── 新增（旧的 key 一个都没动，老链接行为不变）──
-    /** 形态分配：三线同形态 / 三线各异 / 双频密纹 / 涡旋为主 */
+    { key: 'density', label: '密度', type: 'range', min: 4, max: 60, step: 1, default: 26, heavy: true },
+    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 8, step: 0.1, default: 1.4, unit: 'px' },
+    { key: 'amplitude', label: '振幅', type: 'range', min: 0, max: 0.35, step: 0.01, default: 0.1 },
+    { key: 'curvature', label: '曲率', type: 'range', min: 0.5, max: 4, step: 0.1, default: 1.2 },
     { key: 'morph', label: '形态', type: 'select', default: 'mixed', options: [
-      { value: 'mixed', label: '三线各异' },
+      { value: 'mixed', label: '流波涌泉' },
       { value: 'sine', label: '统一柔波' },
       { value: 'harmonics', label: '双频密纹' },
       { value: 'chevron', label: '折角几何' },
       { value: 'vortex', label: '涡旋起伏' },
     ] },
-    /** 形态强调度：chevron 的锐度 / harmonics 的谐波占比 */
-    { key: 'accent', label: '形态强度', type: 'range', min: 0, max: 1, step: 0.05, default: 0.55 },
+    /** 形态强度：谐波占比 / 折角锐度 / 涌泉张开程度 */
+    { key: 'accent', label: '形态强度', type: 'range', min: 0, max: 1, step: 0.05, default: 0.6 },
     { key: 'drift', label: '流动动画', type: 'toggle', default: false, group: '动画' },
   ],
 
   presets: [
     {
+      id: 'paper',
+      label: '宣纸',
+      // 亮色：暖白底 + 墨灰细线 + 朱砂重音
+      elements: {
+        bg: { paint: { type: 'solid', color: '#f5f0e6' } },
+        line_far: { paint: { type: 'solid', color: '#9a8f80' } },
+        line_mid: { paint: { type: 'solid', color: '#4a4f5c' } },
+        line_near: { paint: { type: 'solid', color: '#c8553d' } },
+      },
+      params: { morph: 'mixed', density: 30, weight: 1.2, amplitude: 0.09 },
+    },
+    {
+      id: 'seafoam',
+      label: '海雾',
+      // 亮色：雾青底 + 青绿 / 深海蓝
+      elements: {
+        bg: { paint: { type: 'solid', color: '#e8f3f1' } },
+        line_far: { paint: { type: 'solid', color: '#5fa59a' } },
+        line_mid: { paint: { type: 'solid', color: '#1f7a72' } },
+        line_near: { paint: { type: 'solid', color: '#16405a' } },
+      },
+      params: { morph: 'sine', density: 34, weight: 1.1, amplitude: 0.12, curvature: 0.9 },
+    },
+    {
       id: 'midnight',
       label: '午夜蓝',
       elements: {
-        bg: { paint: { type: 'solid', color: '#0a0f1e' } },
-        line_far: { paint: { type: 'solid', color: '#1d4ed8' } },
-        line_mid: { paint: { type: 'solid', color: '#60a5fa' } },
-        line_near: { paint: { type: 'solid', color: '#dbeafe' } },
+        bg: { paint: { type: 'solid', color: '#070b1a' } },
+        line_far: { paint: { type: 'solid', color: '#3d62c4' } },
+        line_mid: { paint: { type: 'solid', color: '#7fb0ff' } },
+        line_near: { paint: { type: 'solid', color: '#e6f0ff' } },
       },
-      params: { morph: 'harmonics', density: 30, weight: 1.4 },
+      params: { morph: 'harmonics', density: 32, weight: 1.2, accent: 0.45 },
     },
     {
       id: 'sakura',
       label: '樱',
       elements: {
-        bg: { paint: { type: 'solid', color: '#2b1b2e' } },
-        line_far: { paint: { type: 'solid', color: '#9d4edd' } },
-        line_mid: { paint: { type: 'solid', color: '#e08fb4' } },
-        line_near: { paint: { type: 'solid', color: '#ffe0ec' } },
+        bg: { paint: { type: 'solid', color: '#241626' } },
+        line_far: { paint: { type: 'solid', color: '#9a5a9e' } },
+        line_mid: { paint: { type: 'solid', color: '#ec8fb5' } },
+        line_near: { paint: { type: 'solid', color: '#ffe3ee' } },
       },
-      params: { morph: 'mixed', amplitude: 0.18, density: 26, accent: 0.7 },
+      params: { morph: 'vortex', density: 28, amplitude: 0.08, accent: 0.55 },
     },
     {
       id: 'mint',
       label: '薄荷',
       elements: {
-        bg: { paint: { type: 'solid', color: '#04211f' } },
-        line_far: { paint: { type: 'solid', color: '#0f766e' } },
-        line_mid: { paint: { type: 'solid', color: '#2dd4bf' } },
-        line_near: { paint: { type: 'solid', color: '#a7f3d0' } },
+        bg: { paint: { type: 'solid', color: '#05201e' } },
+        line_far: { paint: { type: 'solid', color: '#1f8f84' } },
+        line_mid: { paint: { type: 'solid', color: '#4fe0c8' } },
+        line_near: { paint: { type: 'solid', color: '#d8fff2' } },
       },
-      params: { morph: 'vortex', density: 20, accent: 0.8 },
+      params: { morph: 'mixed', density: 22, curvature: 1.6, accent: 0.8 },
     },
     {
       id: 'graphite',
       label: '石墨',
       /**
-       * 单色系：层次全靠**明度阶梯**，色相完全不用 —— 这是最优雅的一档。
-       *
-       * ⚠️ 踩过的坑：曾试图用 `opacity: 0.62` 来「补偿」line_far 的对比度，
-       * 结果**反而降到 1.98:1**。方向从根上就错了 ——
-       * alpha 是把前景往背景上**拉**，线越淡越接近底色，对比度必然下降。
-       * 正确做法是**提高原色明度**（把灰阶拉宽），让 alpha 保持 1。
-       * 这一条已写进 `flow-lines.guard.test.ts` ⑪ 作为回归门禁。
+       * 单色系：层次全靠**明度阶梯**（bg < 细 < 主 < 重音，单调递增）。
+       * ⚠️ 不要用降 opacity 去「补偿」对比度 —— alpha 只会把线拉向底色。
+       * 正确做法是提高原色明度，alpha 保持 1（flow-lines.guard ⑪b / ⑬）。
        */
       elements: {
-        bg: { paint: { type: 'solid', color: '#0b0b0d' } },
-        line_far: { paint: { type: 'solid', color: '#7d8794' } },
-        line_mid: { paint: { type: 'solid', color: '#b8c0cc' } },
+        bg: { paint: { type: 'solid', color: '#0c0c0e' } },
+        line_far: { paint: { type: 'solid', color: '#6f7782' } },
+        line_mid: { paint: { type: 'solid', color: '#b4bcc7' } },
         line_near: { paint: { type: 'solid', color: '#f7f9fc' } },
       },
-      params: { morph: 'chevron', accent: 0.65, density: 24, weight: 1.8 },
+      params: { morph: 'chevron', accent: 0.6, density: 24, weight: 1.5, curvature: 1.4 },
     },
   ],
 
@@ -208,115 +250,149 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng, animate } = cfg;
-    const density = Math.max(2, Number(params.density));
-    const weight = Number(params.weight);
-    const amplitude = Number(params.amplitude);
-    const curvature = Number(params.curvature);
-    const accent = Math.min(1, Math.max(0, Number(params.accent)));
+    const density = Math.min(60, Math.max(2, Number(params.density) || 26));
+    const weight = Math.max(0.1, Number(params.weight) || 1.4);
+    const amplitude = Math.min(0.5, Math.max(0, Number(params.amplitude) || 0));
+    const curvature = Math.min(6, Math.max(0.2, Number(params.curvature) || 1.2));
+    const accent = Math.min(1, Math.max(0, Number(params.accent ?? 0.6)));
     const drift = params.drift === true;
-    const morph = String(params.morph);
+    const morphRaw = String(params.morph);
+    const morph: Morph = (MORPHS as readonly string[]).includes(morphRaw) ? (morphRaw as Morph) : 'mixed';
 
     const unit = widthUnit(W, H);
-
     const bg = elements.get('bg')!;
-    const far = elements.get('line_far')!;
-    const mid = elements.get('line_mid')!;
-    const near = elements.get('line_near')!;
+    const layerEls = [elements.get('line_far')!, elements.get('line_mid')!, elements.get('line_near')!];
 
-    const parts: string[] = [
-      rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }),
-    ];
+    const bgRect = rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity });
+    const parts: string[] = [];
 
-    /**
-     * 三层线束。
-     *
-     * 层次由**四个维度**共同表达（v1 只有两个 —— 振幅与相位）：
-     *  ① 疏密 step（2/3/5） ② 线宽 scale（0.55/1/1.7）
-     *  ③ 振幅 gain（1/0.72/0.44） ④ **形态 morph**
-     *
-     * ⭐ ④ 是本轮新增的关键维度：`mixed` 档下三层各取一种形态，
-     * 于是同屏出现柔波 / 密纹 / 折角三种不同的线 —— 这直接解决
-     * 用户说的「线条类型太单一」。
-     */
-    const layers: Array<{
-      e: typeof far;
-      step: number;
-      phase: number;
-      gain: number;
-      scale: number;
-      morph: Morph;
-    }> = [];
+    // ── 几何尺度：波长以宽为主、长边为辅（竖屏也有完整的起伏），振幅按短边 ──
+    const lambda = (W * 0.6 + Math.max(W, H) * 0.4) / curvature;
+    const amp = Math.min(W, H) * amplitude;
+    const { f, reach, harmonic } = buildField(morph, W, amp, lambda, accent, rng);
 
-    const mixed = morph === 'mixed' || !(MORPHS as readonly string[]).includes(morph);
-    const fixed = (MORPHS as readonly string[]).includes(morph) ? (morph as Morph) : null;
+    const gap = H / density;
+    // 动画余量：左右各多画一截，平移时边缘不露底
+    const moving = animate && drift;
+    const margin = moving ? Math.round(W * 0.04) : 0;
+    const x0 = -margin - W * 0.01;
+    const x1 = W + margin + W * 0.01;
 
-    // 三层默认形态：柔波（远）+ 双频（中）+ 折角（近）
-    // 由 seed 整体偏移，让每个 seed 得到不同的形态组合
-    const base = mixed ? MORPHS : [fixed!, fixed!, fixed!];
-    const spin = Math.floor(rng() * MORPHS.length);
+    // 线束必须盖满画面：上下各溢出「最大位移 + 一个行距」
+    const pad = reach + gap;
+    const lineCount = Math.max(2, Math.ceil((H + pad * 2) / gap) + 1);
+    const yStart = -pad + ((rng() - 0.5) * gap) / 2;
+    const rhythmOff = Math.floor(rng() * RHYTHM.length);
 
-    const plan: Array<{ step: number; phase: number; gain: number; scale: number }> = [
-      { step: 2, phase: 0, gain: 1, scale: 0.55 },
-      { step: 3, phase: Math.PI / 3, gain: 0.72, scale: 1 },
-      { step: 5, phase: (Math.PI * 2) / 3, gain: 0.44, scale: 1.7 },
-    ];
-    const picks = [far, mid, near];
-    plan.forEach((p, i) => {
-      layers.push({ e: picks[i], ...p, morph: base[(i + spin) % base.length] });
-    });
+    // ── 段数分配：既要够光滑（每周期 ≥ 7 段），又不能击穿体积 ──
+    const cyclesAcross = (x1 - x0) / lambda;
+    const want = Math.ceil(cyclesAcross * (harmonic ? 13 : 8)) + 2;
+    const segs = Math.max(6, Math.min(48, want, Math.floor(SEG_BUDGET / lineCount)));
+    const step = (x1 - x0) / segs;
 
-    const amp = H * amplitude;
-    const segs = 32;
+    // 坐标精度：小画布保留 1 位小数，其余取整（视觉无差、体积省一半）
+    const q = Math.min(W, H) < 700 ? 10 : 1;
+    const r = (v: number): number => Math.round(v * q) / q;
+    const fmt = (v: number): string => {
+      const s = String(Math.round(v * q) / q);
+      return s === '-0' ? '0' : s;
+    };
+    // 紧凑拼接：负号自带分隔，正数前补空格
+    const join = (vals: number[]): string => {
+      let out = '';
+      for (const v of vals) {
+        const s = fmt(v);
+        out += out === '' || s[0] === '-' ? s : ` ${s}`;
+      }
+      return out;
+    };
 
-    for (const layer of layers) {
-      const { e, step, phase, gain, scale, morph: m } = layer;
-      if (!e.visible) continue;
-      // 该层的行距：density 越小行距越大
-      const gap = (H * step) / density;
-      if (gap <= 0) continue;
+    // ── 采样整个场，逐列钳制保证不交叉 ──
+    const minGap = gap * 0.32;
+    const xs: number[] = [];
+    for (let k = -1; k <= segs + 1; k++) xs.push(x0 + step * k);
+    let prev: number[] | null = null;
+    const ds = ['', '', ''];
+    let total = 0;
 
-      // tile 高度 = 一个「行距 × 2」的周期，两条路径相位差 π。
-      // 正弦的 π 相位等价于上下镜像，因此竖直平铺后行距恰好 = gap，且首尾无缝。
-      const tileH = gap * 2;
-      const stroke = e.paintValue;
-      /**
-       * ⭐ 线宽乘 `unit` —— 这是本轮最重要的修复。
-       * 旧版绝对 px 在 2560 宽的画布上只有 0.84px，等于发丝。
-       */
-      const base_ = {
-        fill: 'none',
-        stroke,
-        'stroke-width': n(weight * scale * unit),
-        'stroke-opacity': e.opacity,
-        'stroke-linecap': 'round' as const,
-      };
+    for (let i = 0; i < lineCount; i++) {
+      const t = lineCount === 1 ? 0.5 : i / (lineCount - 1);
+      const baseY = yStart + i * gap;
+      const ys = xs.map((x) => baseY + f(x, t));
+      if (prev) for (let k = 0; k < ys.length; k++) ys[k] = Math.max(ys[k], prev[k] + minGap);
+      prev = ys;
 
-      // seed 抖动：每层取一个相位偏移，让不同 seed 得到不同的波浪节奏
-      const jitter = rng() * Math.PI * 2;
-      // 每层再取一个形态强调度微调（±0.18），避免三层形态完全雷同
-      const ac = Math.min(1, Math.max(0, accent + (rng() - 0.5) * 0.36));
-      const content =
-        path(buildWave(W, gap, amp * gain, phase + jitter, curvature, segs, m, ac), base_) +
-        path(buildWave(W, gap * 2, amp * gain, phase + jitter + Math.PI, curvature, segs, m, ac), base_);
+      // 整条线都在画面外 → 不画（但仍参与钳制链）
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const y of ys) {
+        if (y < lo) lo = y;
+        if (y > hi) hi = y;
+      }
+      if (hi < -gap || lo > H + gap) continue;
 
-      const tileRef = api.tile({
-        key: `fl-${m}-${api.n(gap)}-${api.n(amp * gain)}-${api.n(curvature)}-${api.n(ac)}-${api.n(weight * scale * unit)}`,
-        w: W,
-        h: tileH,
-        content,
-      });
-      parts.push(rect(0, 0, W, H, { fill: tileRef }));
+      const layer = RHYTHM[(i + rhythmOff) % RHYTHM.length];
+      if (!layerEls[layer].visible) continue;
+
+      // Catmull-Rom（均匀）→ 三次贝塞尔：c2 = P(k+1) - (P(k+2) - P(k)) / 6。
+      // x 等距，故 c1 正好是上一段 c2 关于节点的反射 → 用 `S` 省掉一半控制点。
+      // 先取整再求差分 → 相对坐标无累计误差。
+      // tile 原点被挪到 (-margin, -2gap)，故写入的坐标整体 +(margin, 2gap)。
+      const ox = margin;
+      const oy = gap * 2;
+      const px = xs.map((x) => r(x + ox));
+      const py = ys.map((y) => r(y + oy));
+      // 首段用 C（需给出 c1），其后全是 S
+      const c1x = r(xs[1] + (xs[2] - xs[0]) / 6 + ox);
+      const c1y = r(ys[1] + (ys[2] - ys[0]) / 6 + oy);
+      let d = `M${fmt(px[1])} ${fmt(py[1])}`;
+      for (let k = 1; k <= segs; k++) {
+        const cx2 = r(xs[k + 1] - (xs[k + 2] - xs[k]) / 6 + ox);
+        const cy2 = r(ys[k + 1] - (ys[k + 2] - ys[k]) / 6 + oy);
+        const ex = px[k + 1];
+        const ey = py[k + 1];
+        if (k === 1) d += `c${join([c1x - px[k], c1y - py[k], cx2 - px[k], cy2 - py[k], ex - px[k], ey - py[k]])}`;
+        else d += `s${join([cx2 - px[k], cy2 - py[k], ex - px[k], ey - py[k]])}`;
+      }
+      if (total + d.length > BYTE_CAP) break;
+      total += d.length;
+      ds[layer] += d;
     }
 
-    const body = parts.join('');
-    if (!animate || !drift) return { body };
+    const tileW = W + margin * 2;
+    layerEls.forEach((e, li) => {
+      if (!e.visible || ds[li] === '') return;
+      const content = path(ds[li], {
+        fill: 'none',
+        stroke: e.paintValue,
+        'stroke-width': api.n(weight * STROKE_SCALE[li] * unit),
+        'stroke-opacity': e.opacity,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      });
+      const ref = api.tile({
+        key: `fl2-${li}-${api.n(W)}-${api.n(H)}-${margin}`,
+        w: tileW,
+        h: H + gap * 4,
+        // tile 原点挪到 (-margin, -2gap)，尺寸 = 画布 + 余量 → 整幅不发生重复
+        transform: `translate(${api.n(-margin)} ${api.n(-gap * 2)})`,
+        content,
+      });
+      parts.push(rect(-margin, 0, tileW, H, { fill: ref }));
+    });
 
-    // 动画：整体沿 X 平移四分之一周期后往复，形成无缝循环的「流淌」
+    const lines = parts.join('');
+    if (!moving) return { body: bgRect + lines };
+
+    // 动画：整体左右缓缓漂移一个余量宽度，往复无缝
     const name = api.keyframes(
       'vw-flow',
-      `from{transform:translateX(0)}to{transform:translateX(${api.n(W / (curvature * 4))}px)}`,
+      `from{transform:translateX(${api.n(-margin * 0.9)}px)}to{transform:translateX(${api.n(margin * 0.9)}px)}`,
     );
-    return { body: g({ style: `animation:${name} 16s ease-in-out infinite alternate` }, body) };
+    // 底色不参与平移，只让线漂
+    return {
+      body: bgRect + g({ class: name, style: `animation:${name} 18s ease-in-out infinite alternate` }, lines),
+    };
   },
 };
 

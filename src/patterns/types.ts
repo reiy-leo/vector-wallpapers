@@ -238,4 +238,7 @@ export type PatternId =
   | 'scatter-blobs'
   | 'pebble-field'
   | 'terrazzo'
-  | 'blob-contours';
+  | 'blob-contours'
+  | 'topo-lines'
+  | 'wave-stripes'
+  | 'tv-static';

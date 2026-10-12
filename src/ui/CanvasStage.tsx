@@ -62,7 +62,10 @@ export function CanvasStage({
   useEffect(() => {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {
-      const out = renderStandaloneSVG(def, cfg, { skipBudget: true });
+      // ⭐ 预览必须 animate:true —— renderStandaloneSVG 默认 animate:false（导出静态，Q1），
+      // 不显式打开的话 pattern 的「闪烁 / 漂移」开关在画布上永远无效（stripAnimation 整段剥离）。
+      // 动画只是预览层的叠加：下载 / PNG / 缩略图仍走默认 animate:false。
+      const out = renderStandaloneSVG(def, cfg, { skipBudget: true, animate: true });
       setSvg(out);
       setMetrics({ bytes: measureBytes(out), nodes: countNodes(out) });
     });
@@ -229,7 +232,8 @@ function FocusOverlay({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   const uri = useMemo(() => {
-    const svg = renderStandaloneSVG(def, { ...cfg, width: view.w, height: view.h }, { skipBudget: true });
+    // 聚焦预览与主画布一致：动画开关需在这里生效（见上方主画布注释）
+    const svg = renderStandaloneSVG(def, { ...cfg, width: view.w, height: view.h }, { skipBudget: true, animate: true });
     return svgToDataUri(svg);
   }, [def, cfg, view]);
 

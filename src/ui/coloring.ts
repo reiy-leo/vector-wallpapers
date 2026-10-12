@@ -5,9 +5,9 @@
  * 原因：同一 seed + 同一当前配色必须产出同一结果，否则「分享链接」
  * 会指向一个用户自己都复现不出来的画面。
  */
-import { hexToHsl, hslToHex, type ColorStrategy } from '../engine/colors';
+import { contrastRatio, hexToHsl, hexToRgb, hslToHex, type ColorStrategy } from '../engine/colors';
 import { mulberry32 } from '../engine/rng';
-import { PALETTES } from '../patterns/palettes';
+import { PALETTES, VIVID_PALETTES, type Palette } from '../patterns/palettes';
 import { structuredCloneConfig } from '../engine/render';
 import type { ElementConfig, PatternConfig } from '../engine/types';
 import type { PaintSpec, PatternDef } from '../patterns/types';
@@ -73,7 +73,7 @@ function recolorHex(
   const neutral = s < 0.08;
   const ns = neutral
     ? Math.min(0.12, s + 0.04)
-    : Math.min(0.5, Math.max(satFloor, s * satScale));
+    : Math.min(0.78, Math.max(satFloor, s * satScale));
   return hslToHex((((h + hueShift) % 360) + 360) % 360, ns, l);
 }
 
@@ -88,10 +88,13 @@ function mapPaint(paint: PaintSpec, fn: (hex: string) => string): PaintSpec {
 /**
  * 换一版：换 seed + 重新配色。
  *
- * - `analogous`（默认）：取作者的一套配色，整体旋转色相、微调饱和度，**明度不动**
- *   → 对比度与层次和作者原稿一致。
- * - `palette`：随机套一个内置色板（按 paletteSlots），不引入新颜色。
- * - `full`：每个元件各自随机色相，但明度仍沿用作者配色，避免糊成一片。
+ * 大部分点击走 vivid（高饱和、和谐、对比度有保证，见 `vividFromScheme`）；
+ * 少数点击回到作者配色骨架（同样提了饱和度），让作者的成品配色仍有机会出现。
+ *
+ * - `analogous`（默认）：82% vivid（生成式色相和声 / 精选高饱和色板），否则取作者的一套配色
+ *   整体旋转色相、提饱和度，**明度不动**。
+ * - `palette`：70% 套一个精选高饱和色板（按当前浅/深底重排明度），否则套 PRD 内置色板。
+ * - `full`：85% vivid 全色域（色相按黄金角铺开），否则每个元件各自随机色相、明度沿用作者配色。
  *
  * 跳过 `locked` 元件（「锁定」的全部意义）；渐变元件的每个色标一起变，保持渐变内部关系。
  */
@@ -103,16 +106,37 @@ export function randomizeColors(
 ): PatternConfig {
   const rng = mulberry32(seed);
   const tone = bgTone(cfg, def);
+  // 先掷一次骰子决定这一版走「高饱和生成」还是「作者配色骨架」：
+  // 用户反馈「换一版的颜色都太保守」→ 大部分点击给出鲜艳配色，作者配色只偶尔出现。
+  const roll = rng();
 
-  if (strategy === 'palette' && PALETTES.length > 0) {
-    const pal = PALETTES[Math.floor(rng() * PALETTES.length) % PALETTES.length];
-    const locked = new Set(cfg.elements.filter((e) => e.locked).map((e) => e.id));
-    const slots: Record<string, string> = {};
-    for (const [role, hex] of Object.entries(pal.slots)) slots[role] = hex;
-    const applied = applyPaletteSlots(cfg, def, slots);
-    applied.elements = applied.elements.map((e, i) => (locked.has(e.id) ? cfg.elements[i] : e));
-    applied.seed = seed;
-    return keepTone(applied, def, tone);
+  if (strategy === 'palette') {
+    if (roll < VIVID_SHARE.palette && VIVID_PALETTES.length > 0) {
+      const pal = VIVID_PALETTES[Math.floor(rng() * VIVID_PALETTES.length) % VIVID_PALETTES.length];
+      return vividFromScheme(cfg, def, seed, rng, curatedScheme(pal, rng));
+    }
+    if (PALETTES.length > 0) {
+      const pal = PALETTES[Math.floor(rng() * PALETTES.length) % PALETTES.length];
+      const locked = new Set(cfg.elements.filter((e) => e.locked).map((e) => e.id));
+      const slots: Record<string, string> = {};
+      for (const [role, hex] of Object.entries(pal.slots)) slots[role] = hex;
+      const applied = applyPaletteSlots(cfg, def, slots);
+      applied.elements = applied.elements.map((e, i) => (locked.has(e.id) ? cfg.elements[i] : e));
+      applied.seed = seed;
+      return keepTone(applied, def, tone);
+    }
+  }
+
+  if (strategy === 'full' && roll < VIVID_SHARE.full) {
+    return vividFromScheme(cfg, def, seed, rng, freeScheme(rng));
+  }
+  if (strategy === 'analogous' && roll < VIVID_SHARE.analogous) {
+    // 生成和声 : 精选色板 ≈ 5 : 3
+    const scheme =
+      rng() < 0.62 || VIVID_PALETTES.length === 0
+        ? harmonyScheme(rng)
+        : curatedScheme(VIVID_PALETTES[Math.floor(rng() * VIVID_PALETTES.length) % VIVID_PALETTES.length], rng);
+    return vividFromScheme(cfg, def, seed, rng, scheme);
   }
 
   const next = structuredCloneConfig(cfg);
@@ -120,7 +144,7 @@ export function randomizeColors(
   const source = pickSource(def, rng, tone);
   // 色相整体转 40°~320°：太小看不出「换了一版」，正好 360° 又等于没换
   const hueShift = 40 + rng() * 280;
-  const satScale = 0.85 + rng() * 0.35;
+  const satScale = 1.1 + rng() * 0.45;
 
   for (const e of next.elements) {
     const spec = def.elements.find((d) => d.id === e.id);
@@ -129,12 +153,298 @@ export function randomizeColors(
     const isBg = spec?.role === 'bg';
     if (strategy === 'full') {
       const shift = rng() * 360;
-      e.paint = mapPaint(src, (hex) => recolorHex(hex, shift, 1 + rng() * 0.4, isBg ? 0 : 0.25));
+      e.paint = mapPaint(src, (hex) => recolorHex(hex, shift, 1.2 + rng() * 0.5, isBg ? 0 : 0.4));
     } else {
-      e.paint = mapPaint(src, (hex) => recolorHex(hex, hueShift, satScale, isBg ? 0 : 0.18));
+      e.paint = mapPaint(src, (hex) => recolorHex(hex, hueShift, satScale, isBg ? 0 : 0.32));
     }
   }
   return keepTone(next, def, tone);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * 高饱和「vivid」配色：色相和声 + 明度骨架 + 对比度兜底
+ * ───────────────────────────────────────────────────────────────── */
+
+/** 各策略里走 vivid 的概率；其余点击回到作者配色骨架（同样提了饱和度）。 */
+const VIVID_SHARE = { analogous: 0.82, full: 0.85, palette: 0.7 } as const;
+
+/** 前景元件与底色的最低 WCAG 对比度（按画出来的颜色算，不计不透明度）。 */
+export const VIVID_MIN_CONTRAST: Record<BgTone, number> = { light: 1.8, dark: 2.5 };
+
+interface HueSat {
+  h: number;
+  s: number;
+}
+
+/** 一套 vivid 配色方案：底色色倾 + 按角色顺序排列的前景色相。明度不在这里定。 */
+export interface VividScheme {
+  bg: HueSat;
+  fg: HueSat[];
+  /** 渐变色标之间的色相漂移（度），让渐变内部也有色彩流动而不是单色深浅。 */
+  drift: number;
+}
+
+const wrapHue = (h: number): number => ((h % 360) + 360) % 360;
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+
+/** 色相和声：互补 / 分裂互补 / 三角 / 邻近 / 四方。数组第 0 个给 primary。 */
+const HARMONIES: readonly (readonly number[])[] = [
+  [0, 180, 30, 210], // complementary
+  [0, 150, 210, 60], // split-complementary
+  [0, 120, 240, 60], // triadic
+  [0, 35, 70, -35], // analogous（高饱和邻近，依旧够跳）
+  [0, 90, 180, 270], // square
+];
+
+/** 生成式和声：随机基色相 + 一种和声，前景饱和度 0.7~0.95。 */
+export function harmonyScheme(rng: () => number): VividScheme {
+  const base = rng() * 360;
+  const kind = HARMONIES[Math.floor(rng() * HARMONIES.length) % HARMONIES.length];
+  const fg = kind.map((d) => ({ h: wrapHue(base + d + (rng() - 0.5) * 14), s: 0.72 + rng() * 0.23 }));
+  // 底色色倾：互补（最跳）> 同色系（单色调）> 第三色
+  const r = rng();
+  const bgH = r < 0.5 ? base + 180 : r < 0.8 ? base : base + kind[2];
+  return { bg: { h: wrapHue(bgH + (rng() - 0.5) * 20), s: 0 }, fg, drift: (rng() < 0.5 ? -1 : 1) * (18 + rng() * 30) };
+}
+
+/** 「全色域」：前景色相按黄金角铺开，互不相近，饱和度拉满。 */
+export function freeScheme(rng: () => number): VividScheme {
+  let h = rng() * 360;
+  const fg: HueSat[] = [];
+  for (let i = 0; i < 5; i++) {
+    fg.push({ h: wrapHue(h), s: 0.75 + rng() * 0.22 });
+    h += 137.508 + (rng() - 0.5) * 30;
+  }
+  return { bg: { h: rng() * 360, s: 0 }, fg, drift: (rng() < 0.5 ? -1 : 1) * (25 + rng() * 40) };
+}
+
+/** 精选高饱和色板 → 方案：只取色相与饱和度（饱和度至少 0.7），明度由当前底色类别决定。 */
+export function curatedScheme(pal: Palette, rng: () => number): VividScheme {
+  const order: (keyof Palette['slots'])[] = ['primary', 'secondary', 'accent', 'detail'];
+  const fg = order.map((k) => {
+    const { h, s } = hexToHsl(pal.slots[k]);
+    return { h: wrapHue(h + (rng() - 0.5) * 10), s: clamp(Math.max(s, 0.7), 0, 0.97) };
+  });
+  return { bg: { h: hexToHsl(pal.slots.bg).h, s: 0 }, fg, drift: (rng() < 0.5 ? -1 : 1) * (15 + rng() * 25) };
+}
+
+/** 纯色相（s=1, l=0.5）的相对亮度：黄 ≈ 0.93、蓝 ≈ 0.07。用于把色相分给明暗不同的元件。 */
+function hueLum(h: number): number {
+  const { r, g, b } = hexToRgb(hslToHex(h, 1, 0.5));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const ROLE_RANK: Record<string, number> = { primary: 0, secondary: 1, accent: 2, detail: 3, bg: 9 };
+
+function stopsOf(paint: PaintSpec): string[] {
+  if (paint.type === 'solid') return [paint.color];
+  if (paint.type === 'linear' || paint.type === 'radial') return paint.stops.map((st) => st.color);
+  return [];
+}
+
+/** 用一组新颜色（与色标一一对应）重写 paint；色标 offset / stop-opacity 原样保留。 */
+function withColors(paint: PaintSpec, colors: string[]): PaintSpec {
+  if (paint.type === 'solid') return { type: 'solid', color: colors[0] };
+  if (paint.type === 'linear' || paint.type === 'radial') {
+    return { ...paint, stops: paint.stops.map((st, i) => ({ ...st, color: colors[i] ?? st.color })) };
+  }
+  return paint;
+}
+
+function rgbDist(a: string, b: string): number {
+  const x = hexToRgb(a);
+  const y = hexToRgb(b);
+  return Math.hypot(x.r - y.r, x.g - y.g, x.b - y.b);
+}
+
+/**
+ * 叠加层（颗粒、高光、阴影、扫描线、星点、白云这类）：近白/近黑且半透明，或低不透明度的 detail。
+ * 它们靠「白/黑 + 透明度」起作用，染成鲜艳色会破坏质感 → 原样保留，也不参与对比度约束。
+ */
+function isOverlay(paint: PaintSpec, opacity: number, role: string): boolean {
+  const cols = stopsOf(paint);
+  if (cols.length === 0) return true;
+  const l = cols.reduce((a, c) => a + hexToHsl(c).l, 0) / cols.length;
+  if ((l >= 0.9 || l <= 0.08) && opacity < 0.95) return true;
+  return role === 'detail' && opacity <= 0.4;
+}
+
+/**
+ * 按方案生成一版 vivid 配色。
+ *
+ * - 明度骨架取自作者的同色调配色（保留「谁亮谁暗」的层次，如浮雕的受光面/背光面），
+ *   但在纯色底母题里拉伸到鲜艳色最好看的明度区间，再逐个推离底色直到对比度达标。
+ * - 底色：浅底 → 淡彩（l 0.92~0.96），深底 → 深而饱和（l 0.07~0.14）。
+ * - 底色是大跨度渐变（天空、落日）的「场景型」母题：每个色标保留作者明度、只换色相饱和度，
+ *   否则日落会被压成一片平色。
+ * - 渐变元件：每个色标都重新上色（色相沿 drift 漂移），色标间的明度差与 stop-opacity 保持。
+ * - 锁定 / 不可配置元件不动；不透明度不动；全部确定性（同 seed 同结果）。
+ */
+function vividFromScheme(
+  cfg: PatternConfig,
+  def: PatternDef,
+  seed: number,
+  rng: () => number,
+  scheme: VividScheme,
+): PatternConfig {
+  const tone = bgTone(cfg, def);
+  const source = pickSource(def, rng, tone);
+  const bgSet = new Set(bgIds(def));
+  const specOf = (id: string) => def.elements.find((d) => d.id === id);
+  const editable = (e: ElementConfig) => !e.locked && specOf(e.id)?.configurable !== false;
+
+  const bgL = tone === 'dark' ? 0.07 + rng() * 0.07 : 0.92 + rng() * 0.04;
+  // 深底避开黄/橙色相：压暗后是橄榄褐、泥色，一点也不「深而饱和」→ 转到互补的蓝紫一侧
+  if (tone === 'dark' && wrapHue(scheme.bg.h) > 25 && wrapHue(scheme.bg.h) < 85) {
+    scheme = { ...scheme, bg: { ...scheme.bg, h: wrapHue(scheme.bg.h + 180) } };
+  }
+  const bgS = tone === 'dark' ? 0.5 + rng() * 0.4 : 0.45 + rng() * 0.45;
+  const fgSatJitter = cfg.elements.map(() => rng());
+
+  // 场景型：底色渐变明度跨度大
+  const bgSrc = cfg.elements.filter((e) => bgSet.has(e.id)).map((e) => source.get(e.id) ?? e.paint);
+  const bgSpan = Math.max(
+    0,
+    ...bgSrc.map((p) => {
+      const ls = stopsOf(p).map((c) => hexToHsl(c).l);
+      return ls.length ? Math.max(...ls) - Math.min(...ls) : 0;
+    }),
+  );
+  const scenic = bgSpan > 0.2;
+
+  const build = (adj: number): PatternConfig => {
+    const next = structuredCloneConfig(cfg);
+    next.seed = seed;
+
+    // 1) 底色
+    for (const e of next.elements) {
+      if (!bgSet.has(e.id) || !editable(e)) continue;
+      const src = source.get(e.id) ?? e.paint;
+      const ls = stopsOf(src).map((c) => hexToHsl(c).l);
+      const mean = ls.reduce((a, b) => a + b, 0) / Math.max(1, ls.length);
+      e.paint = withColors(
+        src,
+        ls.map((l, i) => {
+          const h = scheme.bg.h + i * scheme.drift;
+          if (scenic) return hslToHex(h, clamp(0.6 + bgS * 0.35, 0, 0.95), l);
+          // adj > 0（整体明暗判到另一边时）把底色也往极端推一点
+          const bl = tone === 'dark' ? Math.max(0.04, bgL - adj * 0.35) : Math.min(0.975, bgL + adj * 0.15);
+          return hslToHex(h, bgS, clamp(bl + (l - mean), 0.03, 0.98));
+        }),
+      );
+    }
+    const bgColors = next.elements.filter((e) => bgSet.has(e.id)).flatMap((e) => stopsOf(e.paint));
+
+    // 2) 叠加层回到作者原样（白/黑 + 透明度），不染色
+    for (const e of next.elements) {
+      if (bgSet.has(e.id) || !editable(e)) continue;
+      const src = source.get(e.id) ?? e.paint;
+      if (isOverlay(src, e.opacity, specOf(e.id)?.role ?? 'detail')) e.paint = src;
+    }
+
+    // 3) 前景常规元件：按角色排序分配色相
+    const fgs = next.elements
+      .map((e, idx) => ({ e, idx, spec: specOf(e.id), src: source.get(e.id) ?? e.paint }))
+      .filter(({ e }) => !bgSet.has(e.id))
+      .filter(({ e, spec, src }) => editable(e) && !isOverlay(src, e.opacity, spec?.role ?? 'detail'))
+      .sort((a, b) => (ROLE_RANK[a.spec?.role ?? 'detail'] ?? 5) - (ROLE_RANK[b.spec?.role ?? 'detail'] ?? 5) || a.idx - b.idx);
+
+    const meanL = (p: PaintSpec) => {
+      const ls = stopsOf(p).map((c) => hexToHsl(c).l);
+      return ls.reduce((a, b) => a + b, 0) / Math.max(1, ls.length);
+    };
+    const srcLs = fgs.map((f) => meanL(f.src));
+    const minL = Math.min(...srcLs);
+    const maxL = Math.max(...srcLs);
+    const [lo, hi] = tone === 'light' ? [Math.min(0.5, 0.25 + adj), 0.66] : [0.42, Math.max(0.5, 0.76 - adj)];
+    const T = VIVID_MIN_CONTRAST[tone];
+    const used: string[] = [...bgColors];
+
+    // 目标明度：场景型保留作者明度；纯色底按作者明暗顺序拉伸到 [lo, hi]
+    const targets = fgs.map((_, i) => {
+      const m = srcLs[i];
+      if (scenic) return m;
+      if (maxL - minL < 0.04) return fgs.length > 1 ? lo + ((hi - lo) * (i % 3)) / 2 : (lo + hi) / 2;
+      return lo + ((m - minL) / (maxL - minL)) * (hi - lo);
+    });
+    // 色相按「天生亮度」分给元件：最暗的元件拿蓝/紫/红，最亮的拿黄/青。
+    // 否则黄、橙被压到低明度就成了土褐色 —— 正是「保守、脏」的来源。
+    const n = scheme.fg.length;
+    const huePlan = fgs.map((_, i) => ({ ...scheme.fg[i % n], h: scheme.fg[i % n].h + Math.floor(i / n) * 24 }));
+    const byHueLum = [...huePlan].sort((a, b) => hueLum(a.h) - hueLum(b.h));
+    const byTarget = fgs.map((_, i) => i).sort((a, b) => targets[a] - targets[b] || a - b);
+    const assigned: HueSat[] = new Array(fgs.length);
+    byTarget.forEach((fi, rank) => (assigned[fi] = byHueLum[rank]));
+
+    fgs.forEach((f, i) => {
+      const hs = assigned[i];
+      let h = hs.h;
+      const s = clamp(hs.s + (fgSatJitter[f.idx] - 0.5) * 0.08, 0.62, 0.98);
+      const srcStops = stopsOf(f.src).map((c) => hexToHsl(c).l);
+      const m = srcLs[i];
+      const target = targets[i];
+
+      const colorsAt = (hh: number, base: number) =>
+        srcStops.map((l, k) => hslToHex(hh + k * scheme.drift * 0.5, s, clamp(base + (l - m), 0.04, 0.97)));
+      const okContrast = (cols: string[]) =>
+        scenic || cols.every((c) => bgColors.every((b) => contrastRatio(c, b) >= T));
+
+      let best = colorsAt(h, target);
+      for (let attempt = 0; attempt < 6; attempt++) {
+        let base = target;
+        let cols = colorsAt(h, base);
+        // 推离底色直到对比度达标（浅底往暗推，深底往亮推）
+        for (let k = 0; k < 40 && !okContrast(cols); k++) {
+          base = clamp(base + (tone === 'light' ? -0.02 : 0.02), 0.04, 0.97);
+          cols = colorsAt(h, base);
+        }
+        best = cols;
+        // 与已用颜色（含底色、其它元件）过近 → 转一点色相再来
+        if (used.every((u) => rgbDist(u, cols[0]) >= 46)) break;
+        h += 29;
+      }
+      used.push(best[0]);
+      f.e.paint = withColors(f.src, best);
+    });
+    return next;
+  };
+
+  // 前景元件多的母题（如孟菲斯 5 个前景）可能把整体明暗判到另一边
+  // → 逐步收窄前景明度区间（深底压低上限、浅底抬高下限），仍不行再交给 keepTone 兜底
+  let out = build(0);
+  for (let adj = 0.05; bgTone(out, def) !== tone && adj <= 0.3; adj += 0.05) out = build(adj);
+  return keepTone(out, def, tone);
+}
+
+/**
+ * 直接取一版 vivid 配色（不经「换一版」的概率分流）。供测试与调试用。
+ * `kind`：harmony = 生成式和声，curated = 精选色板，free = 全色域。
+ */
+export function vividColors(
+  cfg: PatternConfig,
+  def: PatternDef,
+  seed: number,
+  kind: 'harmony' | 'curated' | 'free' = 'harmony',
+): PatternConfig {
+  const rng = mulberry32(seed ^ 0x5f3759df);
+  const scheme =
+    kind === 'free'
+      ? freeScheme(rng)
+      : kind === 'curated' && VIVID_PALETTES.length > 0
+        ? curatedScheme(VIVID_PALETTES[Math.floor(rng() * VIVID_PALETTES.length) % VIVID_PALETTES.length], rng)
+        : harmonyScheme(rng);
+  return vividFromScheme(cfg, def, seed, rng, scheme);
+}
+
+/** 该母题的底色是否为大跨度渐变（天空 / 落日这类「场景型」）：vivid 时保留作者明度、不做对比度约束。 */
+export function isScenic(def: PatternDef): boolean {
+  return authorSources(def).some((m) =>
+    bgIds(def).some((id) => {
+      const p = m.get(id);
+      const ls = p ? stopsOf(p).map((c) => hexToHsl(c).l) : [];
+      return ls.length > 0 && Math.max(...ls) - Math.min(...ls) > 0.2;
+    }),
+  );
 }
 
 /** 换色后若浅/深底被改变（色板、无同色调配色等情况），按明度翻转回原来的底色类别。 */
