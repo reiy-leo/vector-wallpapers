@@ -6,32 +6,27 @@
  * 每层的尖顶有轻微横向错位，底边带一条斜切的暗色楔形 → 两面受光的扁平感。
  * 树按远 → 近分成若干排（横屏 3 排，竖屏自动加排以填满纵向），
  * 远排小、浅，近排大、深；最近一排树底越出画布，保证底部无缝。
- * 最上层撒一层大小不一的白色雪点。
+ * 最上层是分 4 个深度层的雪（远小暗密、近大亮疏，圆点为主夹少量六角星）。
  *
  * ⭐ 体积/节点策略：
  *   - 每排一个 `<g fill=排色>`（顶层节点数 = 排数 + 背景 + 雪），
  *     排内每棵树 2 条 path：整树轮廓（全部层合并）+ 全部暗楔（叠半透明阴影色）。
  *     必须逐树输出而非整排合并：后画的树要盖住先画那棵的暗楔，合并会穿帮。
- *   - 雪点 = 零长度线段 + 圆头描边（`M x yh0`），按 3 档半径各一条 path，约 11B/点。
+ *   - 雪：共享 `_snow.ts`，零长度线段 + 圆头描边，每「层 × 子组 × 形状」一条 path，约 9B/点。
  *   - 树与雪各有字节预算（TREE_CAP / SNOW_CAP），超了就放稀树距 / 截断雪点，
  *     「控件全部拉满 × 任意比例 × 动画副本」都稳在 20KB 内。
  *
- * 动画（仅预览）：`snowfall` 开关 + cfg.animate 时，雪层整体向下平移一屏循环，
- * 用 `<use>` 在上方补一份副本做无缝衔接；三档雪点速度不同（近大远小的视差）。
+ * 动画（仅预览）：`snowfall` 开关 + cfg.animate 时，每个深度层速度 / 摆幅不同（视差），
+ * 层内子组周期与起始偏移错开；`<use>` 上方补副本做一屏无缝循环（见 _snow.ts）。
  */
 import { g, path, rect } from '../../engine/svg';
+import { renderSnow } from './_snow';
 import type { PatternDef, RenderApi, RenderResult, ResolvedConfig } from '../types';
 
 /** 树冠全部 path 数据的字节上限（含标签开销估算）。 */
 const TREE_CAP = 11000;
-/** 雪点 path 数据字节上限；动画时 `<use>` 复用，不额外占字节。 */
+/** 雪层 path 数据字节上限；动画时 `<use>` 复用，不额外占字节。 */
 const SNOW_CAP = 5200;
-/** 雪点三档：半径倍率、数量权重、下落周期（秒）。 */
-const SNOW_TIERS: Array<{ r: number; w: number; dur: number }> = [
-  { r: 0.55, w: 0.5, dur: 34 },
-  { r: 1, w: 0.33, dur: 24 },
-  { r: 1.6, w: 0.17, dur: 16 },
-];
 
 interface Tree {
   /** 中心 x、顶端 y、高、底宽 */
@@ -272,47 +267,24 @@ const def: PatternDef = {
     }
     parts.push(...rowMarkup.filter((s) => s !== ''));
 
-    // ── 雪点：3 档半径，零长度线段 + 圆头描边 ──────────────────
-    // 随机量独立抽取（固定上限条数），雪量只决定取前多少个 → 雪量变化不改树林布局
-    const areaRatio = (W * H) / (S * S);
-    const want = Math.round(190 * snowAmt * areaRatio);
-    const rBase = S * 0.0042 * snowSize;
-    const snowD = ['', '', ''];
-    let used = 0;
-    for (let i = 0; i < want; i++) {
-      const u = rng();
-      const tier = u < SNOW_TIERS[0].w ? 0 : u < SNOW_TIERS[0].w + SNOW_TIERS[1].w ? 1 : 2;
-      const seg = `M${r0(rng() * W)} ${r0(rng() * H)}h0`;
-      if (used + seg.length > SNOW_CAP) break;
-      snowD[tier] += seg;
-      used += seg.length;
-    }
+    // ── 雪：4 个深度层（远小暗慢密 → 近大亮快疏），见 _snow.ts ──────
+    // 随机量在树林之后抽取，雪量只决定取前多少片 → 雪量变化不改树林布局
     if (snow.visible) {
-      const sid = `ct-snow-${seed}-${r0(W)}x${r0(H)}`;
-      SNOW_TIERS.forEach((st, k) => {
-        if (snowD[k] === '') return;
-        const sw = Math.max(1.2, rBase * st.r * 2);
-        const attrs = {
-          fill: 'none',
-          stroke: snow.paintValue,
-          'stroke-opacity': snow.opacity,
-          'stroke-width': api.n(sw),
-          'stroke-linecap': 'round',
-        };
-        if (!falling) {
-          parts.push(path(snowD[k], attrs));
-          return;
-        }
-        // 动画：整层向下平移一屏，上方 `<use>` 副本无缝补位
-        const name = api.keyframes(`vw-ctfall-${r0(H)}`, `from{transform:translateY(0)}to{transform:translateY(${r0(H)}px)}`);
-        const id = `${sid}-${k}`;
-        parts.push(
-          g(
-            { style: `animation:${name} ${st.dur}s linear infinite` },
-            path(snowD[k], { ...attrs, id }) + `<use href="#${id}" y="${r0(-H)}"/>`,
-          ),
-        );
+      const areaRatio = (W * H) / (S * S);
+      const sn = renderSnow({
+        W,
+        H,
+        rng,
+        api,
+        count: Math.round(230 * snowAmt * areaRatio),
+        size: 0.0084 * snowSize,
+        color: snow.paintValue,
+        opacity: snow.opacity,
+        cap: SNOW_CAP,
+        falling,
+        idPrefix: `ct${seed}s`,
       });
+      if (sn.markup !== '') parts.push(sn.markup);
     }
 
     return { body: parts.join('') };

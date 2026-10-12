@@ -3,28 +3,32 @@
  *
  * 构图要点：单色系（默认青绿）4 层云杉剪影由远及近叠压铺满画面：
  * 远层浅而朦胧、近层深而高大；树冠轮廓是一层层下垂的锯齿枝条（非光滑三角），
- * 树身细高、彼此重叠；最上面撒一层大小不一的白色圆雪花。
+ * 树身细高、彼此重叠；最上面是分层的雪：远小暗密、近大亮疏，圆点为主夹少量六角星。
  *
  * ⭐ 体积/节点策略：
  *   - 坐标系：所有几何画在「短边 = 1000」的虚拟坐标里，整层 path 用
  *     `transform="scale(q)"` 放大到真实像素 → 坐标与分辨率解耦，整数即可。
  *   - 每层所有树合并为**一条** path（同向子路径 nonzero 并集，无叠色），
  *     锯齿轮廓用相对 `l` 命令 + 整数增量，单点 ≈ 6 字节。
- *   - 雪花：零长度子路径 + 圆头描边（`m dx dy h0`，≈ 9 字节/片），
- *     按 3 档尺寸各一条 path，装进一张与画布等大的 tile（便于动画无缝循环）。
+ *   - 雪：共享 `_snow.ts`，4 个深度层（远小暗密 → 近大亮疏），圆点为主夹少量六角星，
+ *     零长度子路径 + 圆头描边，每「层 × 子组 × 形状」一条 path（≈ 9 字节/片）。
  *   - BYTE_CAP：树形细节（枝层数 / 小锯齿）按档位逐级降低直到总字节落入上限，
  *     超宽画幅也稳在 20KB 内。
- * 动画（仅预览，cfg.animate && snowfall）：雪花 tile 整体匀速下落一个画布高度后循环。
+ * 动画（仅预览，cfg.animate && snowfall）：各深度层下落速度 / 摆幅不同（视差），
+ * 层内子组周期与起始偏移错开，`<use>` 上方补副本一屏无缝循环。
  */
-import { g, path, rect } from '../../engine/svg';
+import { path, rect } from '../../engine/svg';
+import { renderSnow } from './_snow';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
 
 /** 四层树 + 雪花 path 数据合计字节上限（其余标记 < 1.2KB → 整体 < 20KB）。 */
 const BYTE_CAP = 17800;
 /** 树轮廓独占的上限（雪花少时也不让树把预算吃满，默认画面体积更可控）。 */
 const TREE_CAP = 15800;
-/** 雪花片数上限（≈ 9~12B/片）。 */
-const SNOW_MAX = 240;
+/** 雪层 path 数据字节上限（≈ 9~10B/片）。 */
+const SNOW_CAP = 3000;
+/** 雪量 = 1 时每「短边见方」的雪片数。 */
+const SNOW_PER_SCREEN = 300;
 /** 虚拟坐标短边。 */
 const V = 600;
 /** 每棵树预抽的随机数个数（不同细节档位复用同一组，保证降档不改布局）。 */
@@ -271,23 +275,24 @@ const def: PatternDef = {
     ];
     const baseTeeth = jag < 0.2 ? 0 : jag < 0.5 ? 1 : 2;
     const snow = elements.get('snow')!;
-    const count = Math.min(SNOW_MAX, Math.round(snowAmt * 70 * (Wv / V) * (Hv / V)));
-    // 雪花布局先于树轮廓抽取（rng 消耗顺序固定），按实际字节给树让出预算
-    const sizes = [5, 9, 15].map((s) => (s * snowSize * V) / 1000);
-    const buckets = ['', '', ''];
-    const last: Array<[number, number] | null> = [null, null, null];
-    for (let i = 0; i < count; i++) {
-      const r = rng();
-      const b = r < 0.5 ? 0 : r < 0.85 ? 1 : 2;
-      const m = sizes[b];
-      // 避开 tile 上下边缘，循环动画时不被切半
-      const x = Math.round(rng() * Wv);
-      const y = Math.round(m + rng() * (Hv - 2 * m));
-      const L = last[b];
-      buckets[b] += L === null ? `M${x} ${y}h0` : `m${x - L[0]} ${y - L[1]}h0`;
-      last[b] = [x, y];
-    }
-    const snowBytes = snow.visible ? buckets.reduce((a, d) => a + d.length, 0) : 0;
+    // 雪先于树轮廓生成（rng 消耗顺序固定），按实际字节给树让出预算；见 _snow.ts
+    const Sp = Math.min(W, H);
+    const sn = snow.visible
+      ? renderSnow({
+          W,
+          H,
+          rng,
+          api,
+          count: Math.round(snowAmt * SNOW_PER_SCREEN * ((W * H) / (Sp * Sp))),
+          size: 0.0085 * snowSize,
+          color: snow.paintValue,
+          opacity: snow.opacity,
+          cap: SNOW_CAP,
+          falling: animate && snowfall,
+          idPrefix: `pf${cfg.seed}s`,
+        })
+      : { markup: '', bytes: 0 };
+    const snowBytes = sn.bytes;
     const treeCap = Math.min(TREE_CAP, BYTE_CAP - snowBytes);
     let ds: string[] = [];
     const floorY = Math.ceil(Hv) + 2;
@@ -318,28 +323,8 @@ const def: PatternDef = {
       parts.push(path(d, { fill: e.paintValue, 'fill-opacity': e.opacity * fade, transform: tf }));
     });
 
-    // ── 雪花：3 档尺寸，零长度圆头描边 ────────────────────────
-    if (snow.visible && count > 0) {
-      const inner = buckets
-        .map((d, b) =>
-          d === ''
-            ? ''
-            : path(d, { stroke: snow.paintValue, 'stroke-width': Math.round(sizes[b] * 10) / 10, 'stroke-linecap': 'round', fill: 'none' }),
-        )
-        .join('');
-      const ref = api.tile({ key: `pf-snow-${count}`, w: Math.round(Wv * 100) / 100, h: Math.round(Hv * 100) / 100, transform: tf, content: inner });
-      if (animate && snowfall) {
-        const name = api.keyframes('vw-pine-snow', `from{transform:translateY(0)}to{transform:translateY(${Math.round(H)}px)}`);
-        parts.push(
-          g(
-            { class: name, style: `animation:${name} 40s linear infinite` },
-            rect(0, -H, W, H * 2, { fill: ref, 'fill-opacity': snow.opacity }),
-          ),
-        );
-      } else {
-        parts.push(rect(0, 0, W, H, { fill: ref, 'fill-opacity': snow.opacity }));
-      }
-    }
+    // ── 雪：4 个深度层（远小暗慢密 → 近大亮快疏）────────────
+    if (sn.markup !== '') parts.push(sn.markup);
 
     return { body: parts.join('') };
   },

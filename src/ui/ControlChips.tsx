@@ -15,7 +15,7 @@
 import { useMemo } from 'react';
 import { Popover } from '@cloudflare/kumo/components/popover';
 import { Switch } from '@cloudflare/kumo/components/switch';
-import { IconSliders } from './icons';
+import { IconChevron, IconSliders } from './icons';
 import { setParam, usePatternDef, useWorkbenchSelector } from './store';
 import { Button, SliderChip, inputClass } from './primitives';
 import type { ControlDef, ParamValue } from '../patterns/types';
@@ -41,10 +41,13 @@ export function ControlsPopover() {
     <Popover>
       <Popover.Trigger
         render={
-          <Button variant="secondary" size="sm" aria-label="形态参数">
+          // 子元素一律 pointer-events-none：点到图标/计数/箭头时事件目标仍是按钮本身，
+          // 否则点右侧箭头区域弹层不响应（Rei 2026-10-12）
+          <Button variant="secondary" size="sm" aria-label="形态参数" className="*:pointer-events-none">
             <IconSliders size={15} />
             参数
             <span className="font-mono text-[0.9em] text-fg-mute">{count}</span>
+            <IconChevron dir="up" size={13} />
           </Button>
         }
       />
