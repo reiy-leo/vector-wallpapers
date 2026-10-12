@@ -486,6 +486,7 @@ export function SliderChip({
   step,
   onChange,
   format,
+  showValue = true,
 }: {
   label: string;
   value: number;
@@ -494,13 +495,19 @@ export function SliderChip({
   step: number;
   onChange: (v: number) => void;
   format?: (v: number) => string;
+  /** false：隐藏右侧数值列（参数弹层里只看画面调，不显示数字） */
+  showValue?: boolean;
 }) {
   const id = useId();
   const text = format ? format(value) : String(value);
   // ⭐ tabular-nums：数字等宽，否则滑块拖动时右侧数值列会左右抖动
   return (
     // 三列网格：标签定宽 / 滑条撑满 / 数值定宽右对齐 —— 多个滑块上下对齐成整齐的列
-    <div className="grid min-w-0 grid-cols-[5em_minmax(0,1fr)_3.5em] items-center gap-2">
+    <div
+      className={`grid min-w-0 items-center gap-2 ${
+        showValue ? 'grid-cols-[5em_minmax(0,1fr)_3.5em]' : 'grid-cols-[5em_minmax(0,1fr)]'
+      }`}
+    >
       <label htmlFor={id} className="truncate text-base text-fg-soft" title={label}>
         {label}
       </label>
@@ -513,10 +520,13 @@ export function SliderChip({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        aria-valuetext={text}
       />
-      <code className="text-right font-mono text-[0.9em] tabular-nums text-fg-mute">
-        {text}
-      </code>
+      {showValue && (
+        <code className="text-right font-mono text-[0.9em] tabular-nums text-fg-mute">
+          {text}
+        </code>
+      )}
     </div>
   );
 }

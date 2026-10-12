@@ -100,6 +100,7 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
         max={359}
         step={1}
         format={(v) => `${v}°`}
+        showValue={false}
         onChange={(v) => setParam(control.key, v)}
       />
     );
@@ -107,14 +108,16 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
 
   if (control.type === 'toggle') {
     return (
-      <Switch
-        label={control.label}
-        controlFirst={false}
-        size="sm"
-        checked={value === true}
-        onCheckedChange={(v) => setParam(control.key, v)}
-        className="justify-between"
-      />
+      // 与滑块同一套「标签左 / 控件右」对齐：标签样式同滑块，开关贴右
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="truncate text-base text-fg-soft">{control.label}</span>
+        <Switch
+          aria-label={control.label}
+          size="sm"
+          checked={value === true}
+          onCheckedChange={(v) => setParam(control.key, v)}
+        />
+      </div>
     );
   }
 
@@ -128,6 +131,7 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
       max={control.max}
       step={control.step}
       format={(v) => (control.unit ? `${v}${control.unit}` : String(v))}
+      showValue={false}
       onChange={(v) => setParam(control.key, v)}
     />
   );
