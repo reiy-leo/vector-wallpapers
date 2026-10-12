@@ -72,6 +72,9 @@
   --color-success: var(--vw-success);
   --color-success-tint: var(--vw-success-tint);
 
+  /* 收藏星标：已收藏 = 实心黄（Rei 2026-10-12），未收藏 = 空心描边 */
+  --color-star: oklch(0.82 0.165 85);
+
   /* 字体：系统栈，零 Web Font（PRD P0-9） */
   --font-sans:
     system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;

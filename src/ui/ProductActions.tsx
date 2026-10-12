@@ -80,7 +80,7 @@ export function ProductActions({ onNotice }: { onNotice: NoticeFn }) {
           nativeTitle={false}
           variant="secondary"
           aria-pressed={isFavorite}
-          className={isFavorite ? 'text-brand' : ''}
+          className={isFavorite ? 'text-star hover:text-star' : ''}
           onClick={toggleFavorite}
         >
           <IconStar size={16} filled={isFavorite} />

@@ -168,7 +168,7 @@ function ThumbCard({
           className="aspect-[8/5] w-full object-cover"
         />
         {favorite && (
-          <span className="absolute right-1 top-1 rounded-full bg-overlay p-0.5 text-on-brand">
+          <span className="absolute right-1 top-1 rounded-full bg-overlay p-0.5 text-star">
             <IconStar size={11} filled />
           </span>
         )}
