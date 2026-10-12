@@ -24,48 +24,52 @@ const def: PatternDef = {
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#0a0a0a' }, opacity: 1, visible: true, configurable: true },
-    { id: 'cell_a', label: '格 · A', role: 'primary', paint: { type: 'solid', color: '#fafafa' }, opacity: 1, visible: true, configurable: true },
-    { id: 'cell_b', label: '格 · B', role: 'secondary', paint: { type: 'solid', color: '#171717' }, opacity: 1, visible: true, configurable: true },
-    { id: 'mesh', label: '网格线', role: 'detail', paint: { type: 'solid', color: '#525252' }, opacity: 0.8, visible: true, configurable: true },
+    // 2026-10-12 审美复核：原默认纯黑白 64px 小棋盘在 2560 宽下产生强烈视觉震动。
+    // 改为同色系低对比双色（燕麦 / 亚麻），格子放大，网格线退为极淡的分隔。
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#e6dfd3' }, opacity: 1, visible: true, configurable: true },
+    { id: 'cell_a', label: '格 · A', role: 'primary', paint: { type: 'solid', color: '#efe9df' }, opacity: 1, visible: true, configurable: true },
+    { id: 'cell_b', label: '格 · B', role: 'secondary', paint: { type: 'solid', color: '#ddd4c5' }, opacity: 1, visible: true, configurable: true },
+    { id: 'mesh', label: '网格线', role: 'detail', paint: { type: 'solid', color: '#b9ad99' }, opacity: 0.35, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'size', label: '格边长', type: 'range', min: 12, max: 200, step: 2, default: 64, heavy: true },
-    { key: 'grout', label: '留缝', type: 'range', min: 0, max: 0.42, step: 0.01, default: 0.08 },
-    { key: 'meshW', label: '网格线宽', type: 'range', min: 0, max: 5, step: 0.1, default: 1.2, unit: 'px' },
+    // size / meshW 以 1080p 短边为基准，渲染时乘 unit = 短边/1080（2560×1440 下 ×1.33）
+    { key: 'size', label: '格边长', type: 'range', min: 24, max: 320, step: 2, default: 132, heavy: true },
+    { key: 'grout', label: '留缝', type: 'range', min: 0, max: 0.42, step: 0.01, default: 0.04 },
+    { key: 'meshW', label: '网格线宽', type: 'range', min: 0, max: 5, step: 0.1, default: 1, unit: 'px' },
     { key: 'mesh', label: '显示网格线', type: 'toggle', default: true },
   ],
 
   presets: [
     {
+      // 保留 id；不再是纯黑白高对比，而是炭灰双色的「暗色版」
       id: 'noir',
-      label: '黑白',
+      label: '炭灰',
       elements: {
-        bg: { paint: { type: 'solid', color: '#0a0a0a' } },
-        cell_a: { paint: { type: 'solid', color: '#fafafa' } },
-        cell_b: { paint: { type: 'solid', color: '#171717' } },
-     mesh: { paint: { type: 'solid', color: '#525252' } },
+        bg: { paint: { type: 'solid', color: '#1d1e21' } },
+        cell_a: { paint: { type: 'solid', color: '#2a2b2f' } },
+        cell_b: { paint: { type: 'solid', color: '#222326' } },
+        mesh: { paint: { type: 'solid', color: '#4a4c52' }, opacity: 0.4 },
       },
     },
     {
       id: 'sherbet',
       label: '汽水',
       elements: {
-      bg: { paint: { type: 'solid', color: '#fff7ed' } },
-        cell_a: { paint: { type: 'solid', color: '#fb923c' } },
-        cell_b: { paint: { type: 'solid', color: '#0ea5e9' } },
-        mesh: { paint: { type: 'solid', color: '#7c2d12' } },
+        bg: { paint: { type: 'solid', color: '#f8ece3' } },
+        cell_a: { paint: { type: 'solid', color: '#f6d9c6' } },
+        cell_b: { paint: { type: 'solid', color: '#f3e6da' } },
+        mesh: { paint: { type: 'solid', color: '#d9a98a' }, opacity: 0.3 },
       },
     },
     {
       id: 'terminal',
-      label: '终端',
+      label: '墨绿',
       elements: {
-   bg: { paint: { type: 'solid', color: '#022c22' } },
-   cell_a: { paint: { type: 'solid', color: '#22c55e' } },
-        cell_b: { paint: { type: 'solid', color: '#052e16' } },
-  mesh: { paint: { type: 'solid', color: '#bbf7d0' } },
+        bg: { paint: { type: 'solid', color: '#11251f' } },
+        cell_a: { paint: { type: 'solid', color: '#1a352c' } },
+        cell_b: { paint: { type: 'solid', color: '#142c25' } },
+        mesh: { paint: { type: 'solid', color: '#3f6b5a' }, opacity: 0.45 },
       },
     },
   ],
@@ -74,9 +78,11 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const s = Math.max(6, Number(params.size));
+    // 尺寸以 1080p 短边为基准：取短边而非宽边，竖屏到带鱼屏都保持同样的观感密度
+    const unit = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
+    const s = Math.max(6, Number(params.size) * unit);
     const grout = Math.max(0, Math.min(0.42, Number(params.grout)));
-    const meshW = Math.max(0, Number(params.meshW));
+    const meshW = Math.max(0, Number(params.meshW) * unit);
  const showMesh = params.mesh === true;
 
     const bg = elements.get('bg')!;
@@ -87,7 +93,7 @@ const def: PatternDef = {
     // 相位：决定单元内哪个格子是 A。两种相位构成不同的棋盘。
     const phaseA = rng() < 0.5 ? 0 : 1;
     // 每格 seeded 微缩进（连续量）—— 与相位叠加后碰撞概率可忽略。
-    const jitter = rng() * s * 0.12;
+    const jitter = rng() * s * 0.04; // 0.12 → 0.04：大格下 12% 的缩进会露出过宽的底色缝
 
     const tileW = s * 2;
     const tileH = s * 2;

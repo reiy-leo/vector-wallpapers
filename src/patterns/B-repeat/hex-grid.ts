@@ -13,53 +13,57 @@ const def: PatternDef = {
   id: 'hex-grid',
   name: '六边形网格',
   category: 'B-repeat',
-  description: '蜂窝状六边形网格，按填充率点亮部分单元，科技感秩序。',
+  description: '清晰安静的蜂窝六边形网格，按填充率低调点亮部分单元，缀以少量节点圆点。',
   seedable: true,
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#0e1116' }, opacity: 1, visible: true, configurable: true },
-    { id: 'line', label: '网格线', role: 'secondary', paint: { type: 'solid', color: '#4b5563' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'fill', label: '填充六边形', role: 'primary', paint: { type: 'solid', color: '#22d3ee' }, opacity: 0.85, visible: true, configurable: true },
-    { id: 'dot', label: '节点圆点', role: 'accent', paint: { type: 'solid', color: '#f472b6' }, opacity: 1, visible: true, configurable: true },
+    // 2026-10-12 审美复核：原实现每个单元只画了 1 个完整 + 2 个「四分之一」六边形，
+    // 跨边界的另一半从未画出 → 全屏只剩稀疏的青色短划，六边形几乎不可见。
+    // 现改为「超单元」完整画出蜂窝，默认深石板底 + 清晰而安静的网格线 + 少量低调填充。
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#151a21' }, opacity: 1, visible: true, configurable: true },
+    { id: 'line', label: '网格线', role: 'secondary', paint: { type: 'solid', color: '#445163' }, opacity: 0.9, visible: true, configurable: true },
+    { id: 'fill', label: '填充六边形', role: 'primary', paint: { type: 'solid', color: '#2c4152' }, opacity: 0.85, visible: true, configurable: true },
+    { id: 'dot', label: '节点圆点', role: 'accent', paint: { type: 'solid', color: '#d9b26f' }, opacity: 0.9, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'size', label: '边长', type: 'range', min: 10, max: 120, step: 2, default: 34, heavy: true },
-    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 5, step: 0.1, default: 1.3, unit: 'px' },
-    { key: 'ratio', label: '填充率', type: 'range', min: 0, max: 1, step: 0.01, default: 0.32 },
+    // size / weight 以 1080p 短边为基准，渲染时乘 unit = 短边/1080（2560×1440 下 ×1.33）
+    { key: 'size', label: '边长', type: 'range', min: 24, max: 180, step: 2, default: 72, heavy: true },
+    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 5, step: 0.1, default: 1.4, unit: 'px' },
+    { key: 'ratio', label: '填充率', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25 },
     { key: 'nodes', label: '节点圆点', type: 'toggle', default: true },
   ],
 
   presets: [
     {
       id: 'cyber',
-      label: '赛博',
+      label: '深海',
       elements: {
-        bg: { paint: { type: 'solid', color: '#0b0f14' } },
-        line: { paint: { type: 'solid', color: '#334155' } },
-        fill: { paint: { type: 'solid', color: '#06b6d4' } },
-        dot: { paint: { type: 'solid', color: '#f0abfc' } },
+        bg: { paint: { type: 'solid', color: '#0f1820' } },
+        line: { paint: { type: 'solid', color: '#2a4356' } },
+        fill: { paint: { type: 'solid', color: '#1d4a57' } },
+        dot: { paint: { type: 'solid', color: '#7fcdbb' } },
       },
     },
     {
       id: 'mint',
       label: '薄荷',
       elements: {
-        bg: { paint: { type: 'solid', color: '#f0fdf4' } },
-        line: { paint: { type: 'solid', color: '#86efac' } },
-        fill: { paint: { type: 'solid', color: '#059669' } },
-        dot: { paint: { type: 'solid', color: '#065f46' } },
+        bg: { paint: { type: 'solid', color: '#f1f5f0' } },
+        line: { paint: { type: 'solid', color: '#c4d6c6' } },
+        fill: { paint: { type: 'solid', color: '#dce9dc' } },
+        dot: { paint: { type: 'solid', color: '#5f8f6f' } },
       },
     },
     {
       id: 'amber',
       label: '琥珀',
       elements: {
-        bg: { paint: { type: 'solid', color: '#1c1408' } },
-        line: { paint: { type: 'solid', color: '#78350f' } },
-        fill: { paint: { type: 'solid', color: '#f59e0b' } },
-        dot: { paint: { type: 'solid', color: '#fde68a' } },
+        bg: { paint: { type: 'solid', color: '#1b1610' } },
+        line: { paint: { type: 'solid', color: '#3d3122' } },
+        fill: { paint: { type: 'solid', color: '#4a3923' } },
+        dot: { paint: { type: 'solid', color: '#e0b25e' } },
       },
     },
   ],
@@ -68,8 +72,9 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const s = Math.max(4, Number(params.size));
-    const weight = Number(params.weight);
+    const unit = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
+    const s = Math.max(4, Number(params.size) * unit);
+    const weight = Number(params.weight) * unit;
     const ratio = Number(params.ratio);
     const showNodes = params.nodes === true;
 
@@ -78,71 +83,85 @@ const def: PatternDef = {
     const fill = elements.get('fill')!;
     const dot = elements.get('dot')!;
 
-    // 平铺六边形（尖角朝上）：外接矩形宽 √3·s、高 3s，两行错位半格
+    // 尖角朝上的正六边形：外接圆半径 s，宽 √3·s，行距 1.5·s，奇数行右移半个宽度
     const hexW = Math.sqrt(3) * s;
     const rowH = s * 1.5;
-    const tileH = rowH * 2;
-    const R = (Math.sqrt(3) / 2) * s;
 
-    /** 以 (cx, cy) 为中心画一个尖角朝上的正六边形。 */
-    const hexPath = (cx: number, cy: number): string => {
-      const pts: string[] = [];
+    /** 以 (cx, cy) 为中心、外接圆半径 r 的尖角朝上六边形（子路径，可拼接）。 */
+    const hexPath = (cx: number, cy: number, r: number): string => {
+      let d = '';
       for (let i = 0; i < 6; i++) {
         const ang = (Math.PI / 180) * (60 * i - 90);
-        pts.push(`${api.n(cx + R * Math.cos(ang))},${api.n(cy + R * Math.sin(ang))}`);
+        d += `${i === 0 ? 'M' : 'L'}${api.n(cx + r * Math.cos(ang))} ${api.n(cy + r * Math.sin(ang))}`;
       }
-      return `M${pts[0]} L${pts[1]} L${pts[2]} L${pts[3]} L${pts[4]} L${pts[5]} Z`;
+      return `${d}Z`;
     };
 
-    const marks: string[] = [];
+    /**
+     * 超单元：C 列 × R 行（R 必须为偶数，奇偶行错位才能无缝衔接）。
+     * 每个逻辑六边形 (i, j) 跨单元边界时，在所有可见的复制位置各画一份，
+     * pattern 裁切后拼回完整的蜂窝。超单元越大，填充分布的重复感越弱。
+     */
+    const C = 6;
+    const R = 4;
+    const tileW = C * hexW;
+    const tileH = R * rowH;
 
-    // 平铺单元内的 3 个六边形中心（蜂窝咬合：下沿两个各被切成两半，
-    // 与相邻单元的另一半拼成完整六边形）
-    const spots: Array<[number, number]> = [
-      [R, rowH],
-      [0, 0],
-      [0, tileH],
-    ];
-
-    for (const [cx, cy] of spots) {
-      marks.push(
-        path(hexPath(cx, cy), {
-          fill: 'none',
-          stroke: line.paintValue,
-          'stroke-width': weight,
-          'stroke-opacity': line.opacity,
-        }),
-      );
-    }
-
-    // 填充率 → **精确个数**的填充单元，再用seeded rng 决定填哪几个。
-    // 之所以不用「每个格独立掷骰子」：那样填充率只是概率期望，
-    // 两个不同 seed 可能碰巧得到同一张图，破坏「换 seed 必得新变体」的契约。
-    const fillCount = Math.round(Math.max(0, Math.min(1, ratio)) * spots.length);
-    const order = [0, 1, 2];
+    // 填充率 → **精确个数**，seeded 洗牌决定填哪几格
+    const total = C * R;
+    const fillCount = Math.round(Math.max(0, Math.min(1, ratio)) * total);
+    const order = Array.from({ length: total }, (_, i) => i);
     for (let i = order.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
-    for (let i = 0; i < fillCount; i++) {
-      const [bx, by] = spots[order[i]];
-      // 连续量微偏移：打乱顺序只决定「填哪几格」（离散，碰撞率约 1/3），
-      // 微偏移则保证任何两个不同 seed 的产物都不可能逐字节相同。
-      // 偏移幅度远小于格距，视觉上只是细微差别，网格秩序不受影响。
-      const cx = bx + (rng() - 0.5) * R * 0.4;
-      const cy = by + (rng() - 0.5) * R * 0.4;
-      if (fill.visible) {
-        marks.push(path(hexPath(cx, cy), { fill: fill.paintValue, 'fill-opacity': fill.opacity }));
-      }
-      // 节点圆点跟随第一个被填充的单元，让 accent 也随 seed 变化
-      if (i === 0 && showNodes && dot.visible) {
-        marks.push(circle(cx, cy, Math.max(0.6, s * 0.12), { fill: dot.paintValue, 'fill-opacity': dot.opacity }));
+    // 每个被填充格的 seeded 明度（0.55~1）：不同 seed 必得不同产物，也让填充有深浅层次
+    const fillTone = new Map<number, number>();
+    for (let i = 0; i < fillCount; i++) fillTone.set(order[i], 0.55 + rng() * 0.45);
+    // 节点圆点：只落在第 1 个填充格的中心（克制的点缀）
+    const dotCells = new Set(order.slice(0, Math.min(1, fillCount)));
+
+    let outline = '';
+    const fills: string[] = [];
+    const dots: string[] = [];
+    for (let j = -1; j <= R; j++) {
+      for (let i = -1; i <= C; i++) {
+        const cx = i * hexW + (((j % 2) + 2) % 2 === 1 ? hexW / 2 : 0);
+        const cy = j * rowH;
+        // 只保留与单元相交的六边形
+        if (cx + hexW / 2 < 0 || cx - hexW / 2 > tileW || cy + s < 0 || cy - s > tileH) continue;
+        outline += hexPath(cx, cy, s);
+        const li = ((i % C) + C) % C;
+        const lj = ((j % R) + R) % R;
+        const idx = lj * C + li;
+        const tone = fillTone.get(idx);
+        if (tone !== undefined && fill.visible) {
+          // 内缩到 0.84：填充与网格线之间留一圈底色，线条保持清晰
+          fills.push(path(hexPath(cx, cy, s * 0.84), { fill: fill.paintValue, 'fill-opacity': fill.opacity * tone }));
+        }
+        if (dotCells.has(idx) && showNodes && dot.visible) {
+          dots.push(circle(cx, cy, Math.max(0.6, s * 0.09), { fill: dot.paintValue, 'fill-opacity': dot.opacity }));
+        }
       }
     }
 
+    const marks: string[] = [...fills];
+    if (line.visible && weight > 0) {
+      marks.push(
+        path(outline, {
+          fill: 'none',
+          stroke: line.paintValue,
+          'stroke-width': weight,
+          'stroke-opacity': line.opacity,
+          'stroke-linejoin': 'round',
+        }),
+      );
+    }
+    marks.push(...dots);
+
     const tileRef = api.tile({
-      key: `hg-${api.n(s)}-${api.n(weight)}`,
-      w: hexW,
+      key: `hg-${api.n(s)}-${api.n(weight)}-${api.n(ratio)}-${showNodes ? 1 : 0}`,
+      w: tileW,
       h: tileH,
       content: marks.join(''),
     });

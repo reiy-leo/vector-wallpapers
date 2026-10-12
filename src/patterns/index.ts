@@ -42,6 +42,21 @@ import pixelTerrain from './D-pixel/pixel-terrain';
 import glitchRgb from './D-pixel/glitch-rgb';
 import isometricVoxel from './D-pixel/isometric-voxel';
 
+// 第三批（2026-10-12）
+import stripeBands from './A-lines/stripe-bands';
+import nestedShapes from './A-lines/nested-shapes';
+import spiralPolygons from './A-lines/spiral-polygons';
+import nodeWeb from './A-lines/node-web';
+import chevron from './B-repeat/chevron';
+import fishScales from './B-repeat/fish-scales';
+import sunburst from './A-lines/sunburst';
+import squareRings from './B-repeat/square-rings';
+import raisedTiles from './B-repeat/raised-tiles';
+import tortoiseGrid from './B-repeat/tortoise-grid';
+import arrowRepeat from './B-repeat/arrow-repeat';
+import pyramidFacets from './C-organic/pyramid-facets';
+import conicMesh from './C-organic/conic-mesh';
+
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
   flowLines,
@@ -72,6 +87,20 @@ const ALL: PatternDef[] = [
   nouveauScroll,
   isometricVoxel,
   lowpolyFacet,
+  // 第三批（2026-10-12，svgbackgrounds.com 免费集风格参考，自行实现）
+  stripeBands,
+  nestedShapes,
+  spiralPolygons,
+  nodeWeb,
+  chevron,
+  fishScales,
+  sunburst,
+  squareRings,
+  raisedTiles,
+  tortoiseGrid,
+  arrowRepeat,
+  pyramidFacets,
+  conicMesh,
 ];
 
 export const registry = createRegistry();

@@ -1,41 +1,47 @@
 /**
  * 等距体素 —— D 像素 / 复古游戏。
  *
- * 构图要点：30° 轴测投影下的立方体堆叠。
- * 与 `pixel-terrain` 的本质区别（`STYLE-100-ANALYSIS.md` §4.2）：
- *  - `pixel-terrain` 是**2D 像素高度场**（正视图，逐列高度）
- *  - 本母题是**轴测立方体**（顶面 + 左面 + 右手面三个可见面）
- * 投影机制与数据结构都不同，不是同一母题的换色。
+ * 2026-10-12 重做：旧版把 3×3 根柱子塞进一个矩形 <pattern>，
+ * 但单元宽高与轴测网格的周期**对不上**，相邻单元在接缝处错位，
+ * 平铺出来是一条条锯齿横带。
  *
- * 轴测投影：世界坐标 (x, y, z) → 屏幕 (x−y)·cos30, (x+y)·sin30 − z
- *
- * ⭐ 节点控制：立方体数 = 高宽深三者组合，必须走 <pattern>，
- * 否则「体素数量」参数一拉就破 60 节点上限。
+ * 新版是**正确的周期性轴测高度场**：
+ *   - 世界网格 (i, j) 的高度表以 N×N 为周期（seeded），
+ *     投影 X = (i − j)·c、Y = (i + j)·s/2 − z·s（c = s·√3/2，真 30° 轴测）。
+ *   - 周期格的两个格向量投影为 u = (N·c, N·s/2)、v = (−N·c, N·s/2)，
+ *     其和/差 (0, N·s)、(2N·c, 0) 构成**严格对齐**的矩形 <pattern> 单元 → 无接缝。
+ *   - 单元内绘制所有「投影与单元相交」的柱子（含邻周期的副本），
+ *     按 i + j 由后向前画（轴测高度场的正确画家顺序）。
+ *   - 每根柱子：顶面 / 左面 / 右面三色；被前方邻柱完全挡住的侧面直接跳过（省体积）。
+ *   - 阴影：左后方邻柱更高时，在本格顶面（或地面）靠该邻柱一侧压一条阴影带。
  */
-import { g, path, rect } from '../../engine/svg';
+import { g, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
+
+/** 高度表周期（格）。5 格周期在大尺寸体素下已不易察觉重复，且单元体积可控。 */
+const N = 5;
 
 const def: PatternDef = {
   id: 'isometric-voxel',
   name: '等距体素',
   category: 'D-pixel',
-  description: '30 度轴测投影的立方体堆叠，立体像素地形，玩具般的几何感。',
+  description: '30 度轴测投影的立方体高度场，三面三色、无缝平铺，玩具般的几何感。',
   seedable: true,
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#1b2438' }, opacity: 1, visible: true, configurable: true },
-    { id: 'top', label: '顶面', role: 'primary', paint: { type: 'solid', color: '#7fd1ae' }, opacity: 1, visible: true, configurable: true },
-    { id: 'left', label: '左面', role: 'secondary', paint: { type: 'solid', color: '#4a7fa8' }, opacity: 1, visible: true, configurable: true },
-    { id: 'right', label: '右面', role: 'accent', paint: { type: 'solid', color: '#2d4f6e' }, opacity: 1, visible: true, configurable: true },
-    { id: 'shadow', label: '阴影面', role: 'detail', paint: { type: 'solid', color: '#0d1420' }, opacity: 0.55, visible: true, configurable: true },
+    { id: 'bg', label: '地面', role: 'bg', paint: { type: 'solid', color: '#36485c' }, opacity: 1, visible: true, configurable: true },
+    { id: 'top', label: '顶面', role: 'primary', paint: { type: 'solid', color: '#b4cdbf' }, opacity: 1, visible: true, configurable: true },
+    { id: 'left', label: '左面', role: 'secondary', paint: { type: 'solid', color: '#7f9db0' }, opacity: 1, visible: true, configurable: true },
+    { id: 'right', label: '右面', role: 'accent', paint: { type: 'solid', color: '#587389' }, opacity: 1, visible: true, configurable: true },
+    { id: 'shadow', label: '阴影', role: 'detail', paint: { type: 'solid', color: '#141c28' }, opacity: 0.35, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'size', label: '体素尺寸', type: 'range', min: 14, max: 90, step: 2, default: 38, heavy: true },
-    { key: 'height', label: '堆叠高度', type: 'range', min: 1, max: 6, step: 1, default: 3 },
-    { key: 'density', label: '生成密度', type: 'range', min: 0.2, max: 0.9, step: 0.05, default: 0.55 },
-    { key: 'shadows', label: '阴影面', type: 'toggle', default: true },
+    { key: 'size', label: '体素尺寸', type: 'range', min: 14, max: 90, step: 2, default: 80, heavy: true },
+    { key: 'height', label: '堆叠高度', type: 'range', min: 1, max: 6, step: 1, default: 2 },
+    { key: 'density', label: '生成密度', type: 'range', min: 0.2, max: 0.9, step: 0.05, default: 0.35 },
+    { key: 'shadows', label: '阴影', type: 'toggle', default: true },
   ],
 
   presets: [
@@ -43,33 +49,33 @@ const def: PatternDef = {
       id: 'meadow',
       label: '草地',
       elements: {
-        bg: { paint: { type: 'solid', color: '#1b2438' } },
-        top: { paint: { type: 'solid', color: '#7fd1ae' } },
-        left: { paint: { type: 'solid', color: '#4a7fa8' } },
-        right: { paint: { type: 'solid', color: '#2d4f6e' } },
-        shadow: { paint: { type: 'solid', color: '#0d1420' } },
+        bg: { paint: { type: 'solid', color: '#36485c' } },
+        top: { paint: { type: 'solid', color: '#b4cdbf' } },
+        left: { paint: { type: 'solid', color: '#7f9db0' } },
+        right: { paint: { type: 'solid', color: '#587389' } },
+        shadow: { paint: { type: 'solid', color: '#141c28' } },
       },
     },
     {
       id: 'desert',
       label: '荒漠',
       elements: {
-        bg: { paint: { type: 'solid', color: '#3b2416' } },
-        top: { paint: { type: 'solid', color: '#e8c07d' } },
-        left: { paint: { type: 'solid', color: '#b4763c' } },
-        right: { paint: { type: 'solid', color: '#7a4a24' } },
-        shadow: { paint: { type: 'solid', color: '#2a170c' } },
+        bg: { paint: { type: 'solid', color: '#7a5a45' } },
+        top: { paint: { type: 'solid', color: '#e6c79a' } },
+        left: { paint: { type: 'solid', color: '#b98a62' } },
+        right: { paint: { type: 'solid', color: '#8a6047' } },
+        shadow: { paint: { type: 'solid', color: '#2e1f16' } },
       },
     },
     {
       id: 'frost',
       label: '霜原',
       elements: {
-        bg: { paint: { type: 'solid', color: '#141c2e' } },
-        top: { paint: { type: 'solid', color: '#dbeafe' } },
-        left: { paint: { type: 'solid', color: '#7fa8d8' } },
-        right: { paint: { type: 'solid', color: '#41618f' } },
-        shadow: { paint: { type: 'solid', color: '#0a0f1c' } },
+        bg: { paint: { type: 'solid', color: '#c9d3e1' } },
+        top: { paint: { type: 'solid', color: '#fbfcfe' } },
+        left: { paint: { type: 'solid', color: '#dce4ef' } },
+        right: { paint: { type: 'solid', color: '#b3c1d4' } },
+        shadow: { paint: { type: 'solid', color: '#5f6f8a' } },
       },
     },
   ],
@@ -84,7 +90,8 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const size = Math.max(14, Number(params.size));
+    const S = Math.min(W, H);
+    const s = Math.max(6, (Math.max(14, Number(params.size)) * S) / 1080);
     const maxH = Math.round(Math.max(1, Math.min(6, Number(params.height))));
     const density = Math.max(0.2, Math.min(0.9, Number(params.density)));
     const showShadow = params.shadows === true;
@@ -95,107 +102,70 @@ const def: PatternDef = {
     const right = elements.get('right')!;
     const shadow = elements.get('shadow')!;
 
-    const COS30 = Math.cos(Math.PI / 6);
-    const SIN30 = Math.sin(Math.PI / 6);
+    const c = (s * Math.sqrt(3)) / 2;
+    const tw = 2 * N * c;
+    const th = N * s;
 
-    /** 单个立方体：底面中心 (gx, gy) 为地面锚点，高 h 层。 */
-    const cube = (gx: number, gy: number, h: number): string => {
-      const s = size;
-      // 轴测：地面菱形的四个顶点
-      const p = {
-        top: [gx, gy - h * s * SIN30 - s * 0.5],
-        right: [gx + s * COS30, gy - h * s * SIN30 + s * 0.25],
-        bottom: [gx, gy - h * s * SIN30 + s],
-        left: [gx - s * COS30, gy - h * s * SIN30 + s * 0.25],
-      };
-      const lift = h * s * SIN30;
-
-      const out: string[] = [];
-
-      // 右侧面（从 right 顶点到 bottom，带高度）
-      if (right.visible) {
-        out.push(
-          path(
-            `M${api.n(p.right[0])} ${api.n(p.right[1])}` +
-              ` L${api.n(p.bottom[0])} ${api.n(p.bottom[1])}` +
-              ` L${api.n(p.bottom[0])} ${api.n(p.bottom[1] + lift)}` +
-              ` L${api.n(p.right[0])} ${api.n(p.right[1] + lift)} Z`,
-            { fill: right.paintValue, 'fill-opacity': right.opacity },
-          ),
-        );
-      }
-      // 左侧面
-      if (left.visible) {
-        out.push(
-          path(
-            `M${api.n(p.left[0])} ${api.n(p.left[1])}` +
-              ` L${api.n(p.bottom[0])} ${api.n(p.bottom[1])}` +
-              ` L${api.n(p.bottom[0])} ${api.n(p.bottom[1] + lift)}` +
-              ` L${api.n(p.left[0])} ${api.n(p.left[1] + lift)} Z`,
-            { fill: left.paintValue, 'fill-opacity': left.opacity },
-          ),
-        );
-      }
-      // 顶面（菱形）
-      if (top.visible) {
-        out.push(
-          path(
-            `M${api.n(p.top[0])} ${api.n(p.top[1] - lift)}` +
-              ` L${api.n(p.right[0])} ${api.n(p.right[1] - lift)}` +
-              ` L${api.n(p.bottom[0])} ${api.n(p.bottom[1] - lift)}` +
-              ` L${api.n(p.left[0])} ${api.n(p.left[1] - lift)} Z`,
-            { fill: top.paintValue, 'fill-opacity': top.opacity },
-          ),
-        );
-      }
-      return out.join('');
-    };
-
-    /*
-     * 平铺单元：3×3 根柱，高度由 seeded rng 决定。
-     *
-     * ⚠️ 随机量必须在进 tile 前抽完（与 papercut 同理），
-     * 否则单元内容每次渲染都变，defs 去重会失效且无法复现。
-     */
-    const N = 3;
+    // 周期高度表（随机量全部在进 tile 前抽完）
     const heights: number[] = [];
-    for (let i = 0; i < N * N; i++) {
-      heights.push(rng() < density ? 1 + Math.floor(rng() * maxH) : 0);
+    for (let k = 0; k < N * N; k++) heights.push(rng() < density ? 1 + Math.floor(rng() * maxH) : 0);
+    const mod = (a: number): number => ((a % N) + N) % N;
+    const hAt = (i: number, j: number): number => heights[mod(j) * N + mod(i)];
+
+    // 坐标保留 1 位小数：体素边长 ≥ 数十 px，0.05px 的误差不可见，却能省下约 15% 体积
+    const n = (v: number): string => api.n(Math.round(v * 10) / 10);
+    const P = (i: number, j: number, z: number): string => `${n((i - j) * c)} ${n(((i + j) * s) / 2 - z * s)}`;
+    const quad = (a: string, b: string, cc: string, d: string): string => `M${a} ${b} ${cc} ${d}z`;
+    const face = (fill: string, op: number, d: string): string =>
+      `<path fill="${fill}"${op < 1 ? ` fill-opacity="${api.n(op)}"` : ''} d="${d}"/>`;
+
+    // 候选柱：投影包围盒与单元 [0,tw]×[0,th] 相交者
+    const M = 2 * N + maxH + 3;
+    const cells: Array<[number, number]> = [];
+    for (let i = -M; i <= M; i++) {
+      for (let j = -M; j <= M; j++) {
+        const h = hAt(i, j);
+        const x0 = (i - j - 1) * c;
+        const x1 = (i - j + 1) * c;
+        const y0 = ((i + j) * s) / 2 - h * s;
+        const y1 = ((i + j + 2) * s) / 2;
+        if (x1 <= 0 || x0 >= tw || y1 <= 0 || y0 >= th) continue;
+        cells.push([i, j]);
+      }
     }
+    cells.sort((a, b) => a[0] + a[1] - (b[0] + b[1]) || a[0] - b[0]);
 
-    const marks: string[] = [];
-    const spanX = size * COS30 * N * 1.5;
-    const originX = spanX / 2;
-    const originY = size * SIN30 * N * 2;
-
-    // 由后向前绘制：靠下的柱子先画，靠后的柱子后画 → 正确遮挡
-    for (let gy = 0; gy < N; gy++) {
-      for (let gx = 0; gx < N; gx++) {
-        const h = heights[gy * N + gx];
-        if (h <= 0) continue;
-        const px = originX + (gx - gy) * size * COS30;
-        const py = originY + (gx + gy) * size * SIN30;
-        // 地面阴影垫底
-        if (showShadow && shadow.visible) {
-          marks.push(
-            path(
-              `M${api.n(px - size * COS30)} ${api.n(py + size * 0.25)}` +
-                ` L${api.n(px)} ${api.n(py - size * 0.5)}` +
-                ` L${api.n(px + size * COS30)} ${api.n(py + size * 0.25)}` +
-                ` L${api.n(px)} ${api.n(py + size)} Z`,
-              { fill: shadow.paintValue, 'fill-opacity': shadow.opacity * 0.5 },
-            ),
-          );
+    const out: string[] = [];
+    for (const [i, j] of cells) {
+      const h = hAt(i, j);
+      if (h > 0) {
+        // 右面：位于 i+1 平面，被 (i+1, j) 挡住其高度以下部分
+        const hr = Math.min(h, hAt(i + 1, j));
+        if (right.visible && hr < h) {
+          out.push(face(right.paintValue, right.opacity, quad(P(i + 1, j, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hr), P(i + 1, j, hr))));
         }
-        marks.push(cube(px, py, h));
+        // 左面：位于 j+1 平面，被 (i, j+1) 挡住其高度以下部分
+        const hl = Math.min(h, hAt(i, j + 1));
+        if (left.visible && hl < h) {
+          out.push(face(left.paintValue, left.opacity, quad(P(i, j + 1, h), P(i + 1, j + 1, h), P(i + 1, j + 1, hl), P(i, j + 1, hl))));
+        }
+        if (top.visible) {
+          out.push(face(top.paintValue, top.opacity, quad(P(i, j, h), P(i + 1, j, h), P(i + 1, j + 1, h), P(i, j + 1, h))));
+        }
+      }
+      // 阴影：左后方邻柱 (i−1, j) 更高 → 本格顶面（或地面）靠该侧压一条阴影带
+      const hb = hAt(i - 1, j);
+      if (showShadow && shadow.visible && hb > h) {
+        const w = Math.min(0.8, 0.32 * (hb - h) + 0.12);
+        out.push(face(shadow.paintValue, shadow.opacity, quad(P(i, j, h), P(i, j + 1, h), P(i + w, j + 1, h), P(i + w, j, h))));
       }
     }
 
     const tileRef = api.tile({
-      key: `ivx-${api.n(size)}-${maxH}-${api.n(density)}-${showShadow ? 1 : 0}`,
-      w: spanX,
-      h: originY + size * 1.5,
-      content: g({}, marks.join('')),
+      key: `ivx-${api.n(s)}-${maxH}-${n(density)}-${showShadow ? 1 : 0}`,
+      w: tw,
+      h: th,
+      content: g({}, out.join('')),
     });
 
     return {

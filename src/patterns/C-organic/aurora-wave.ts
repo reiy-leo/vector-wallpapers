@@ -1,28 +1,34 @@
 /**
- * 极光波浪 —— C渐变流体 / 有机形态。
+ * 极光波浪 —— C 渐变流体 / 有机形态。
  *
- * 构图要点：夜空竖向渐变打底，上 1/3 到中部悬着若干条**极光光帘**。
+ * 2026-10-12 视觉重做（Rei 反馈「看上去让人不舒服」）：
+ * 旧版是「硬边多段折线色带 + 密集硬光射线 + 满屏平铺星点」，
+ * 折线锯齿与细亮竖线在暗底上产生视觉震动，星点平铺读起来像网格。
  *
- * ⭐ 为什么是「光帘」而不是「色带」——三件事决定它像不像极光：
- *   1. **下缘锐利亮边 + 向上快速衰减成雾**：真实极光的视觉重心在帘幕下沿，
- *      往上迅速弥散成雾。所以每条帘幕用「下亮上透」的 stop 序列（依赖引擎新增的
- *      `stop-opacity`），并在底缘单独描一条亮线。
- *   2. **垂直光射线**：帘幕上密布细窄竖线、上端渐隐 —— 这是极光最标志性的
- *      curtain texture，缺了它就只是色块。
- *   3. **柔和辉光**：整条帘幕过一道轻微软化（feGaussianBlur），
- *      而底缘亮边不参与模糊，于是「柔」与「锐」同时存在。
+ * 新版思路 —— 安静的多层极光帘幕：
+ *   1. 帘幕轮廓全部是**平滑三次贝塞尔**（Catmull-Rom → Bezier），没有任何折角。
+ *   2. 每层帘幕 = 「光雾」（大半径模糊、向上 stop-opacity 羽化到 0）
+ *      + 「下缘柔光」（贴着下缘的一条窄亮带，轻度模糊）——
+ *      保留极光「下沿亮、向上化雾」的物理特征，但没有硬边。
+ *   3. 颜色默认低饱和（灰青绿 → 淡紫），层与层交替 A/B，远层更淡。
+ *   4. 星点稀疏、微弱，只分布在上 3/4 天空，两档大尺寸互质单元平铺，看不出晶格。
  *
- * 体积策略：星点必须 tile（多档互质单元打破网格感）；
- * 帘幕本体每条只有 3 个节点（幕身/ 射线 / 亮边），层数拉满也不会逼近节点红线。
+ * 体积策略：每层 2 条 path（光雾 + 柔光带），贝塞尔采样点固定 9 个，
+ * 层数拉满（6）在 4K 下也远低于 20KB。
  */
 import { g, path, rect } from '../../engine/svg';
 import type { PaintSpec, PatternDef, RenderApi, RenderResult, ResolvedConfig } from '../types';
+
+/** 帘幕轮廓的采样点数（含两端）。曲线由贝塞尔插值，9 点已足够平滑。 */
+const PTS = 9;
+/** 上缘采样点数：上缘带「火焰状」褶皱，需要更密的采样。 */
+const TOP_PTS = 21;
 
 const def: PatternDef = {
   id: 'aurora-wave',
   name: '极光波浪',
   category: 'C-organic',
-  description: '夜空之上悬着数条极光光帘，帘幕下缘亮、向上化作光雾，垂下细密光射线。',
+  description: '深蓝夜空中几层柔和的极光帘幕，下缘微亮、向上化作光雾，星点稀疏。',
   seedable: true,
   animatable: true,
 
@@ -35,25 +41,25 @@ const def: PatternDef = {
         type: 'linear',
         angle: 90,
         stops: [
-          { offset: 0, color: '#020617' },
-          { offset: 0.55, color: '#0b1e3d' },
-          { offset: 1, color: '#1e293b' },
+          { offset: 0, color: '#070b16' },
+          { offset: 0.6, color: '#0e1626' },
+          { offset: 1, color: '#18212f' },
         ],
       },
       opacity: 1,
       visible: true,
       configurable: true,
     },
-    { id: 'band_a', label: '极光带 · A', role: 'primary', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#a7f3d0' }, { offset: 1, color: '#22d3ee' }] }, opacity: 0.55, visible: true, configurable: true },
-    { id: 'band_b', label: '极光带 · B', role: 'secondary', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#c4b5fd' }, { offset: 1, color: '#f0abfc' }] }, opacity: 0.45, visible: true, configurable: true },
-    { id: 'stars', label: '星点', role: 'detail', paint: { type: 'solid', color: '#e2e8f0' }, opacity: 0.9, visible: true, configurable: true },
+    { id: 'band_a', label: '极光带 · A', role: 'primary', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#8fd6c0' }, { offset: 1, color: '#5f9fb0' }] }, opacity: 0.8, visible: true, configurable: true },
+    { id: 'band_b', label: '极光带 · B', role: 'secondary', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#aea6d8' }, { offset: 1, color: '#7f86bf' }] }, opacity: 0.65, visible: true, configurable: true },
+    { id: 'stars', label: '星点', role: 'detail', paint: { type: 'solid', color: '#dfe6ef' }, opacity: 0.55, visible: true, configurable: true },
   ],
 
   controls: [
     { key: 'bands', label: '层数', type: 'range', min: 2, max: 6, step: 1, default: 3, heavy: true },
-    { key: 'amp', label: '波幅', type: 'range', min: 0.01, max: 0.25, step: 0.01, default: 0.09 },
-    { key: 'thickness', label: '厚度', type: 'range', min: 0.04, max: 0.35, step: 0.01, default: 0.16 },
-    { key: 'stars', label: '星点密度', type: 'range', min: 0, max: 30, step: 1, default: 12 },
+    { key: 'amp', label: '波幅', type: 'range', min: 0.01, max: 0.25, step: 0.01, default: 0.08 },
+    { key: 'thickness', label: '厚度', type: 'range', min: 0.04, max: 0.35, step: 0.01, default: 0.2 },
+    { key: 'stars', label: '星点密度', type: 'range', min: 0, max: 30, step: 1, default: 8 },
     { key: 'sway', label: '摆动动画', type: 'toggle', default: false, group: '动画' },
   ],
 
@@ -62,43 +68,55 @@ const def: PatternDef = {
       id: 'boreal',
       label: '极北',
       elements: {
-        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#010409' }, { offset: 0.6, color: '#052e2b' }, { offset: 1, color: '#0f172a' }] } },
-        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#6ee7b7' }, { offset: 1, color: '#0891b2' }] } },
-        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#a5b4fc' }, { offset: 1, color: '#e879f9' }] } },
-        stars: { paint: { type: 'solid', color: '#f8fafc' } },
+        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#050a10' }, { offset: 0.6, color: '#0b1a1c' }, { offset: 1, color: '#14222a' }] } },
+        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9adbb8' }, { offset: 1, color: '#5c9c9a' }] } },
+        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9fc7d6' }, { offset: 1, color: '#6d86b5' }] } },
+        stars: { paint: { type: 'solid', color: '#e6efef' } },
       },
     },
     {
       id: 'nebula',
       label: '星云',
       elements: {
-        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#0b0416' }, { offset: 0.55, color: '#2e1065' }, { offset: 1, color: '#1e1b4b' }] } },
-        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#f0abfc' }, { offset: 1, color: '#7c3aed' }] } },
-        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#67e8f9' }, { offset: 1, color: '#4f46e5' }] } },
-        stars: { paint: { type: 'solid', color: '#ddd6fe' } },
+        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#0b0915' }, { offset: 0.6, color: '#161229' }, { offset: 1, color: '#211b33' }] } },
+        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#c7a9d6' }, { offset: 1, color: '#8a78b8' }] } },
+        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9cc3d4' }, { offset: 1, color: '#6a7fb4' }] } },
+        stars: { paint: { type: 'solid', color: '#e4def0' } },
       },
     },
     {
       id: 'ember',
       label: '余烬',
       elements: {
-        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1a0b04' }, { offset: 0.6, color: '#431407' }, { offset: 1, color: '#1c1917' }] } },
-        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#fcd34d' }, { offset: 1, color: '#ea580c' }] } },
-        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#fb7185' }, { offset: 1, color: '#9f1239' }] } },
-        stars: { paint: { type: 'solid', color: '#fed7aa' } },
+        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#0f0b0a' }, { offset: 0.6, color: '#1e1512' }, { offset: 1, color: '#2a1d18' }] } },
+        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#e6b98f' }, { offset: 1, color: '#b77a64' }] } },
+        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#d79a9a' }, { offset: 1, color: '#8f6178' }] } },
+        stars: { paint: { type: 'solid', color: '#f1e3d3' } },
       },
+    },
+    {
+      id: 'dawn',
+      label: '晨雾',
+      elements: {
+        sky: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#3b4a66' }, { offset: 0.6, color: '#6f7f99' }, { offset: 1, color: '#b9b8c4' }] } },
+        band_a: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#c9ecdf' }, { offset: 1, color: '#9cc9cf' }] } },
+        band_b: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#e2d6ee' }, { offset: 1, color: '#b7b4dc' }] } },
+        stars: { paint: { type: 'solid', color: '#f4f6fa' } },
+      },
+      params: { stars: 4 },
     },
   ],
 
   paletteSlots: { bg: ['sky'], primary: ['band_a'], secondary: ['band_b'], detail: ['stars'] },
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
-  const { width: W, height: H, params, elements, rng, animate } = cfg;
+    const { width: W, height: H, params, elements, rng, animate } = cfg;
     const bandCount = Math.max(1, Math.min(6, Math.round(Number(params.bands))));
     const amp = Number(params.amp);
     const thickness = Number(params.thickness);
     const starDensity = Math.round(Number(params.stars));
     const sway = params.sway === true;
+    const S = Math.min(W, H);
 
     const sky = elements.get('sky')!;
     const bandA = elements.get('band_a')!;
@@ -107,243 +125,208 @@ const def: PatternDef = {
 
     const parts: string[] = [rect(0, 0, W, H, { fill: sky.paintValue, 'fill-opacity': sky.opacity })];
 
-    // ── 星点：多档互质单元叠加 ────────────────────────────────
-    // 单档tile 的重复周期只有 ~120px，一眼就能看出晶格。
-    // 三档尺寸互质（大/中/小）叠加后，视觉重复周期被拉到远大于视野。
+    // ── 星点：稀疏、微弱；两档大尺寸互质单元，只铺上 3/4 天空 ─────────
+    // 随机量一律在此处抽完（无论是否绘制），保证极光形态不随星点密度变化。
+    const starCells: Array<{ cell: number; dots: string }> = [];
+    const starScales: Array<[number, number]> = [
+      [0.53, 1],
+      [0.37, 0.6],
+    ];
+    for (const [ratio, bright] of starScales) {
+      const cell = S * ratio;
+      const count = Math.max(0, Math.round((starDensity / 30) * 7 * bright));
+      let dots = '';
+      for (let i = 0; i < count; i++) {
+        const x = rng() * cell;
+        const y = rng() * cell;
+        const r = S * (0.0011 + rng() * 0.0016) * (0.8 + bright * 0.4);
+        const o = (0.35 + rng() * 0.65) * bright * stars.opacity;
+        dots += `<circle cx="${api.n(x)}" cy="${api.n(y)}" r="${api.n(r)}" fill="${stars.paintValue}" fill-opacity="${api.n(o)}"/>`;
+      }
+      starCells.push({ cell, dots });
+    }
     if (stars.visible && starDensity > 0) {
-      const base = Math.min(W, H) / Math.max(4, starDensity);
-      const scales: Array<[number, number]> = [
-        [1, 7],
-        [0.43, 5],
-        [0.19, 11],
-      ];
-  for (const [ratio, count] of scales) {
-      const cell = base * ratio;
-   if (cell < 8) continue;
-  const dots: string[] = [];
-        for (let i = 0; i < count; i++) {
-  // 位置/半径/透明度全部随机 → 单元自身就没有可辨识的规律
-          const r = Math.max(0.25, cell * (0.012 + rng() * 0.03));
-          const o = 0.25 + rng() * 0.75;
-          dots.push(
-      `<circle cx="${api.n(rng() * cell)}" cy="${api.n(rng() * cell)}" r="${api.n(r)}" fill="${stars.paintValue}" fill-opacity="${api.n(o * stars.opacity)}"/>`,
-       );
-        }
-     parts.push(
-     rect(0, 0, W, H, {
-        fill: api.tile({ key: `aw-s${api.n(cell)}-${count}`, w: cell, h: cell, content: dots.join('') }),
-   }),
-      );
+      for (const { cell, dots } of starCells) {
+        if (dots === '') continue;
+        parts.push(
+          rect(0, 0, W, H * 0.78, {
+            fill: api.tile({ key: `aw-s${api.n(cell)}`, w: cell, h: cell, content: dots }),
+          }),
+        );
       }
     }
 
-    // ── 极光光帘 ────────────────────────────────────────────────
-    // 带子集中在画面上 1/3 到中部：aurora 悬在高处，堆在正中央会糊成一团脏色。
-    // 各带的相位「相关而非随机」—— 相邻带轻微偏移，才像同一股气流的几层幕。
+    // ── 极光帘幕 ──────────────────────────────────────────────
+    // 共享一股「气流」：各层同频、相位相邻偏移 → 像同一片极光的几层幕，而非乱线。
     const basePhase = rng() * Math.PI * 2;
-    const baseCycles = 2.2 + rng() * 2.2;
-    /**
-     * 轮廓采样数**随褶皱频率自适应**，而不是固定值。
-     *
-     * 固定 18 段在低频时是浪费（2.2 周期用 18 段远超奈奎斯特需求）；
-     * 但直接压到 12 段会在高频时翻车 —— baseCycles 最高 4.4，
-     * 12 段只有 2.7 点/周期，逼近奈奎斯特极限，正弦会渲出明显的折线。
-     *
-     * 因此取「每周期至少 5 个采样点」，并以 18 封顶（等于原值，绝不劣化）。
-     * 低频省字节、高频保质量。
+    const cycles = 0.8 + rng() * 0.9; // 低频：整幅只有 1~2 个大起伏，安静
+    const tilt = (rng() - 0.5) * 0.12; // 整体轻微倾斜，避免死板的水平构图
+
+    const curtainBodies: string[] = [];
+    const curtainEdges: string[] = [];
+
+    /*
+     * ⚠️ 帘幕**不横贯全幅**，两端在画布内收尖、淡出。
+     * 原因有二：
+     *   1. 真实极光是有起止的弧幕，横贯全幅反而像一条「发光管」；
+     *      错开起止也给画面留出呼吸的空白。
+     *   2. feGaussianBlur 在多数光栅器里只在可视区域内取样，
+     *      图形贴着画布边缘时，边缘外的像素按透明处理 → 两侧出现一条「暗边」。
+     *      让模糊内容整体离开边缘（≥ 4% W）即可根治。
      */
-    const segs = Math.min(18, Math.max(10, Math.ceil(baseCycles * 5)));
-
+    const EDGE = W * 0.04;
     for (let i = 0; i < bandCount; i++) {
-    const e = i % 2 === 0 ? bandA : bandB;
-      if (!e.visible) continue;
+      const e = i % 2 === 0 ? bandA : bandB;
+      // 远层（i 大）更淡、更薄
+      const depth = bandCount === 1 ? 0 : i / (bandCount - 1);
       const t = (i + 1) / (bandCount + 1);
-      // 帘幕高度（不含位置），先算出来才能据此安排基线
-      const curtainH = H * thickness * 1.05 * (1 - i * 0.1);
-      /**
-       * 底缘基线：**随帘幕高度动态下沉**。
-       *
-       * 之前 baseY 是固定区间 `H*(0.23 + t*0.23)`，只有默认 thickness 恰好放得下；
-       * thickness 拉到 max(0.35) 时 curtainH≈529px，topY 变成 -198px，
-       * 帘子顶端冲出画布 —— 用户会看到「半截帘子被切」，不像刻意设计。
-       *
-       * 现在保证 topY ≥ margin：基线至少要离上边界有「帘幕高 + 最大波幅」那么高，
-     * 厚帘自然往下沉，薄帘仍然停在画面上 1/3。
-       *
-       * ⚠️ 裕量里必须**包含波幅项** `H*amp*0.5`：bottomY 会在 baseY 上下摆动，
-       * 只按 curtainH 留裕量的话，amp 拉满时 topY 仍会越过上边界。
-       */
-      const topMargin = H * 0.03;
- const minBaseY = curtainH + H * amp * 0.5 + topMargin;
-      const baseY = Math.max(H * (0.23 + t * 0.23), minBaseY);
-      // 相关相位：相邻带只偏移 0.55rad，并共享 cycles → 同源而非乱线
-      const phase = basePhase + i * 0.55;
-      const cycles = baseCycles + (rng() - 0.5) * 0.4;
-      // 起笔错位：各带不从同一点起笔，避免所有带在 x=0 处对齐起笔
-      const xShift = rng() * W;
+      const curtainH = H * thickness * (1.15 - depth * 0.35);
+      const waveA = H * amp * (0.5 + 0.18 * (1 - depth));
+      const phase = basePhase + i * 0.7 + rng() * 0.4;
+      const c2 = cycles * (1.8 + rng() * 0.6);
+      const p2 = rng() * Math.PI * 2;
+      // 上缘褶皱：中频起伏，让帘幕顶端像一簇簇升起的光焰
+      const fold = 2.5 + rng() * 1.5;
+      const pf = rng() * Math.PI * 2;
+      // 起止：跨度 80%~100% 的可用宽度，位置随 seed 错开
+      const avail = W - EDGE * 2;
+      const span = avail * (0.8 + rng() * 0.2);
+      const x0 = EDGE + rng() * (avail - span);
 
-      /**
-       * 帘幕上缘 / 下缘。
-       *
-       * ⭐ 横向必须有多「折」：极光帘幕的辨识度来自**竖直褶皱**，
-       * 若 cycles 接近 1，上缘就是一条近乎笔直的水平线，
-       * 整体立刻退化成「发光横条」—— 这正是上一版被嫌丑的主因。
-       * 下缘起伏刻意更浅：它是极光的「刀刃」，太乱就散了。
-       */
+      // 基线：帘幕集中在上 1/4 ~ 中部，并保证顶端（含波幅）不越出画布
+      const topMargin = H * 0.04;
+      const minBase = curtainH + waveA * 1.3 + topMargin;
+      const baseY = Math.min(H * 0.9, Math.max(H * (0.22 + t * 0.5), minBase));
+
       const bottomY = (x: number): number => {
-        const u = ((x - xShift) / W) * Math.PI * 2 * cycles + phase;
-  return baseY + Math.sin(u) * H * amp * 0.5;
+        const u = x / W;
+        const y =
+          baseY +
+          Math.sin(u * Math.PI * 2 * cycles + phase) * waveA +
+          Math.sin(u * Math.PI * 2 * c2 + p2) * waveA * 0.28 +
+          (u - 0.5) * tilt * H;
+        return Math.max(topMargin, Math.min(H, y));
       };
       const topY = (x: number): number => {
-      const u = ((x - xShift) / W) * Math.PI * 2 * cycles + phase;
-        // 上缘跟随下缘同相，但幅度大得多 → 帘幕厚度随褶皱起伏
-        return bottomY(x) - curtainH * (0.72 + 0.28 * Math.sin(u + 0.9));
+        const u = x / W;
+        const v = (x - x0) / span; // 0~1 沿帘幕
+        // 两端收尖：平顶包络，中段保持满高、只在两端约 20% 内平滑收到 0
+        const env = Math.pow(Math.min(1, Math.max(0, Math.sin(Math.PI * v)) * 1.9), 0.85);
+        // 帘幕高度沿横向缓慢起伏：有的地方高耸、有的地方矮，像真实的光幕
+        const k =
+          0.62 +
+          0.22 * Math.sin(u * Math.PI * 2 * cycles * 1.3 + phase + 1.7) +
+          0.16 * Math.sin(u * Math.PI * 2 * fold + pf);
+        return Math.max(0, bottomY(x) - curtainH * k * env);
       };
 
-      // ── 幕身：下亮上透 ──
-      // 关键：光雾必须靠 stop 变透明实现。末端再暗的实色也是实色，
-    // 只有 alpha 归零才得到真正的「向上化雾」。
-  let d = '';
-      for (let k = 0; k <= segs; k++) {
-        const x = (k / segs) * W;
-        d += `${k === 0 ? 'M' : 'L'}${api.n(x)} ${api.n(topY(x))}`;
-      }
-      for (let k = segs; k >= 0; k--) {
-        const x = (k / segs) * W;
-  d += ` L${api.n(x)} ${api.n(bottomY(x))}`;
-      }
-      d += ' Z';
+      const xs: number[] = [];
+      for (let k = 0; k < PTS; k++) xs.push(x0 + (k / (PTS - 1)) * span);
+      const xt: number[] = [];
+      for (let k = 0; k < TOP_PTS; k++) xt.push(x0 + (k / (TOP_PTS - 1)) * span);
+      const bottom = xs.map((x) => [x, bottomY(x)] as [number, number]);
+      const top = xt.map((x) => [x, topY(x)] as [number, number]);
 
-      // 由元件自身颜色派生「下亮上透」的渐变：
-      // 保留用户配色（改色命中率 100%），只重排 stop 的位置与透明度。
+      // 隐藏的元件不注册任何渐变（否则其颜色会残留在 <defs> 里）；随机量已在上方抽完
+      if (!e.visible) {
+        curtainBodies.push('');
+        curtainEdges.push('');
+        continue;
+      }
+      const lo = colorOf(e.paint, 0);
+      const hi = colorOf(e.paint, 1);
+
+      // 光雾：下缘起亮，向上平滑羽化到完全透明
       const fade = api.linear({
-        angle: 270, // 自下而上：offset 0 落在幕身下缘
+        angle: 270,
         key: `aw-fade-${e.id}`,
         stops: [
-    // 下缘最亮 → 向上快速衰减 → 在 0.82 处彻底归零。
-          // 提前收尾是有意的：若拖到 1.0，帘幕顶端会留下一条悬在夜空里的淡边，
-        // 看起来像「没画完」而不是「化进夜空」。
-          { offset: 0, color: curtainColor(e.paint, 0), opacity: 0.98 },
-          { offset: 0.18, color: curtainColor(e.paint, 1), opacity: 0.8 },
-   { offset: 0.5, color: curtainColor(e.paint, 1), opacity: 0.3 },
-      { offset: 0.82, color: curtainColor(e.paint, 1), opacity: 0 },
+          { offset: 0, color: lo, opacity: 0.2 },
+          { offset: 0.1, color: lo, opacity: 0.85 },
+          { offset: 0.32, color: hi, opacity: 0.5 },
+          { offset: 0.65, color: hi, opacity: 0.16 },
+          { offset: 1, color: hi, opacity: 0 },
         ],
       });
+      const d = `${smooth(top, api, true)} L${api.n(bottom[PTS - 1][0])} ${api.n(bottom[PTS - 1][1])}${smooth([...bottom].reverse(), api, false)} Z`;
+      curtainBodies.push(path(d, { fill: fade, 'fill-opacity': e.opacity * (1 - depth * 0.35) }));
 
-      /**
-       * 光线专用渐变：比幕身**更早**归零（0.55 vs 0.82）。
-       *
-     * 为什么必须分开：幕身是大面积半透明色块，光线是细亮线。
-       * 两者用同一条衰减曲线时，细线在暗背景上的「视觉重量」远超同透明度的色块，
-       * 结果光线一直亮到帘幕顶端，在夜空里排成一根根竖条，像条形码。
-   * 让光线只在帘幕下半段发光，正好符合真实极光「下亮上散」的观感。
-       */
-      const rayFade = api.linear({
-        angle: 270,
-        key: `aw-ray-${e.id}`,
+      // 下缘柔光：沿下缘的一条柔和亮线（描边 + 轻度模糊），两端横向淡出
+      const edgeFade = api.linear({
+        angle: 0,
+        key: `aw-edge-${e.id}`,
         stops: [
-  { offset: 0, color: curtainColor(e.paint, 0), opacity: 1 },
-    { offset: 0.22, color: curtainColor(e.paint, 1), opacity: 0.75 },
-          { offset: 0.55, color: curtainColor(e.paint, 1), opacity: 0 },
-     ],
+          { offset: 0, color: lo, opacity: 0 },
+          { offset: 0.14, color: lo, opacity: 1 },
+          { offset: 0.86, color: lo, opacity: 1 },
+          { offset: 1, color: lo, opacity: 0 },
+        ],
       });
-
-      // ── 垂直光射线：curtain texture 的关键 ──
-      // 每条光线从下缘一直延伸到上缘（跟随帘幕轮廓），
-      // 这样竖直褶皱才会与幕身轮廓**对齐** —— 若光线长度随机，
-      // 褶皱结构就散了，帘幕又变回一团雾。
-      //
-      // 单条 path 内 stroke-width 单一，所以用两组叠加制造粗细浓淡对比：
-      // 细而密的一组打底，粗而稀的一组提亮，避免整齐如百叶窗。
-      let raysFine = '';
-      let raysBold = '';
-      const rayCount = 34;
-      for (let k = 0; k < rayCount; k++) {
-        const x = (k / rayCount) * W + (rng() - 0.5) * (W / rayCount) * 1.4;
-   // 只向下取偏移：光线必须始终**留在帘幕内部**。
-        // 允许越过上缘会冒出一排悬空的竖线，像刺猬的头发而不是极光。
- const yTop = topY(x) + rng() * curtainH * 0.32;
-        const yBot = bottomY(x);
-        if (yBot - yTop < 2) continue;
-        // 整数坐标：光柱本身有宽度，亚像素精度没有视觉意义，却要多付 6~8 字节/条
-        const xi = String(Math.round(x));
-        const seg = ` M${xi} ${String(Math.round(yTop))} L${xi} ${String(Math.round(yBot))}`;
-        raysFine += seg;
-    if (rng() > 0.74) raysBold += seg;
-      }
-
-      // ── 辉光：只模糊幕身，得到柔和雾感 ──
-      // ⚠️ 光线**不能**参与模糊：stdDeviation 与线宽同量级时，
-      // 一根 2px 的线会被糊成几乎不可见，帘幕的curtain texture 就消失了
-      // （实测踩过：光线在模糊组里时整幅图退化成一条发光色带）。
-      // 真实极光的竖直光柱本来就是 comparatively 锐利的。
-      const soft = api.blur(H * 0.012);
-      parts.push(
-  g({ filter: soft }, path(d, { fill: fade, 'fill-opacity': 0.66 })),
-      );
-
-      // 细光线：清晰、不模糊 —— 帘幕的织物质感由此而来
-      parts.push(
-        path(raysFine, {
+      curtainEdges.push(
+        path(smooth(bottom, api, true), {
           fill: 'none',
-          stroke: rayFade,
-    'stroke-width': Math.max(0.7, H * 0.0018),
-          'stroke-opacity': 0.7,
-   'stroke-linecap': 'round',
+          stroke: edgeFade,
+          'stroke-width': H * (0.008 + thickness * 0.025),
+          'stroke-opacity': Math.min(1, e.opacity * 0.75) * (1 - depth * 0.4),
+          'stroke-linecap': 'round',
         }),
       );
-
-      // 粗亮光线：清晰、不模糊 —— 这是「帘幕」读起来的关键
-      parts.push(
-        path(raysBold, {
-        fill: 'none',
-      stroke: rayFade,
-       'stroke-width': Math.max(1.6, H * 0.0038),
-          'stroke-opacity': 0.62,
-       'stroke-linecap': 'round',
-        }),
-      );
-
-      // ── 下缘亮边：极光的灵魂。不参与模糊，所以格外锐利 ──
-      let edge = '';
-      for (let k = 0; k <= segs; k++) {
-        const x = (k / segs) * W;
-  edge += `${k === 0 ? 'M' : 'L'}${api.n(x)} ${api.n(bottomY(x))}`;
     }
-      parts.push(
-      path(edge, {
-          fill: 'none',
-  stroke: fade,
-   'stroke-width': Math.max(1.4, H * 0.003),
-     'stroke-opacity': Math.min(1, e.opacity + 0.5),
-        }),
-      );
+
+    // 远层先画（数组倒序），近层压在上面
+    const visibleIdx = (i: number): boolean => (i % 2 === 0 ? bandA : bandB).visible;
+    const bodyOut: string[] = [];
+    const edgeOut: string[] = [];
+    for (let i = bandCount - 1; i >= 0; i--) {
+      if (!visibleIdx(i)) continue;
+      bodyOut.push(curtainBodies[i]);
+      edgeOut.push(curtainEdges[i]);
+    }
+    if (bodyOut.length > 0) {
+      parts.push(g({ filter: api.blur(H * 0.018) }, bodyOut.join('')));
+      parts.push(g({ filter: api.blur(H * 0.007) }, edgeOut.join('')));
     }
 
     const body = parts.join('');
     if (!animate || !sway) return { body };
 
-    // 摆动：光帘整体缓慢横移。柔和光幕横移比硬边色带自然得多。
+    // 摆动：光帘整体缓慢横移
     const name = api.keyframes(
       'vw-aurora',
-  `from{transform:translateX(0)}to{transform:translateX(${api.n(W * 0.04)}px)}`,
+      `from{transform:translateX(0)}to{transform:translateX(${api.n(W * 0.03)}px)}`,
     );
-    return { body: g({ style: `animation:${name} 20s ease-in-out infinite alternate` }, body) };
+    return { body: g({ style: `animation:${name} 24s ease-in-out infinite alternate` }, body) };
   },
 };
 
+/**
+ * 过点序列 → 平滑三次贝塞尔（Catmull-Rom，张力 1/6）。
+ * `move=true` 时以 M 起笔；否则直接接 C 段（调用方已用 L 连到首点）。
+ */
+function smooth(pts: Array<[number, number]>, api: RenderApi, move: boolean): string {
+  const n = api.n;
+  let d = move ? `M${n(pts[0][0])} ${n(pts[0][1])}` : '';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = Math.max(0, p1[1] + (p2[1] - p0[1]) / 6);
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = Math.max(0, p2[1] - (p3[1] - p1[1]) / 6);
+    d += ` C${n(c1x)} ${n(c1y)} ${n(c2x)} ${n(c2y)} ${n(p2[0])} ${n(p2[1])}`;
+  }
+  return d;
+}
+
 /** 取 PaintSpec 的代表色（实色直取；渐变取首/末色标）。 */
-function paintColorOf(paint: PaintSpec, end: 0 | 1): string {
+function colorOf(paint: PaintSpec, end: 0 | 1): string {
   if (paint.type === 'solid') return paint.color;
   if (paint.type === 'none') return '#000000';
   const stops = paint.stops;
   if (stops.length === 0) return '#000000';
   return (end === 0 ? stops[0] : stops[stops.length - 1]).color;
-}
-
-/** 幕身渐变用色：下缘取该role 的「主色」，上缘取其「辅色」，形成色相过渡。 */
-function curtainColor(paint: PaintSpec, end: 0 | 1): string {
-  return paintColorOf(paint, end);
 }
 
 export default def;

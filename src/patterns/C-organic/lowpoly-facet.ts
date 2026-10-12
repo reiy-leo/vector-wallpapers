@@ -1,43 +1,48 @@
 /**
  * 低多边形 —— C 渐变流体 / 有机形态。
  *
- * 构图要点：以 seeded 抖动网格切出的不规则三角面片，
- * 每个面片按「亮度梯度」分色，形成折纸般的低多边形观感。
+ * 2026-10-12 重做：旧版用 3×3 网格做小单元再 <pattern> 平铺，
+ * 画面读起来是「小块碎片 + 白色方块」的重复贴纸，完全不像低多边形。
  *
- * 与 `blob-field` 的区别：后者是**圆形斑点的软过渡**，
- * 本母题是**硬边三角面片的多色镶嵌** —— 一个是柔和，一个是几何切面。
+ * 新版是**整幅** seeded 三角剖分：
+ *   1. 规则网格覆盖整个画布（边界点贴边、只沿边滑动），内部顶点按 jitter 抖动；
+ *   2. 每个格子按 seed 选对角线拆成两个三角形；
+ *   3. 三角形颜色 = 质心沿「光源方向」的投影，在 亮面 → 中间调 → 暗面
+ *      这 2~3 个色标之间线性插值，再叠一点 seeded 明度抖动 —— 折面感由此而来，
+ *      整体仍是平滑的大渐变，不会花。
+ *   4. 棱线不单独描线：所有三角形放进一个带 stroke 的 <g>，零额外字节，
+ *      还顺带盖住相邻三角形之间的抗锯齿白缝。
  *
- * 分色依据：面片中心相对「光源方向」的投影决定明暗，
- * 这让相邻面片自然形成明暗交替，而不是随机色块（随机会显得脏）。
- *
- * ⚠️ 节点控制：三角面片数 = 网格点数 × 2，必然远超 60 节点上限，
- * 因此整个画面用一个 <pattern> 平铺 —— 单个 pattern 内容再大也不计入
- * body 的直接子节点数。
+ * 体积：三角形数封顶（≤ 2×150，cell 拉到最小时约 16KB），坐标取整，默认约 7KB，任何参数都 < 20KB。
+ * 不再需要 <pattern>：全部三角形收在一个 <g> 里，body 顶层只有 2 个节点。
  */
-import { g, path, rect } from '../../engine/svg';
-import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
+import { g, rect } from '../../engine/svg';
+import type { PaintSpec, PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
+
+/** 网格格子数上限（每格 2 个三角形）：体积红线的唯一乘数。 */
+const MAX_CELLS = 150;
 
 const def: PatternDef = {
   id: 'lowpoly-facet',
   name: '低多边形',
   category: 'C-organic',
-  description: '抖动网格切出的三角面片，按明暗梯度多色镶嵌，折纸般的几何质感。',
+  description: '整幅抖动网格三角剖分，颜色沿光源方向在多个色标间渐变，折纸般的几何质感。',
   seedable: true,
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#f0f4f8' }, opacity: 1, visible: true, configurable: true },
-    { id: 'light', label: '亮面', role: 'primary', paint: { type: 'solid', color: '#ffffff' }, opacity: 1, visible: true, configurable: true },
-    { id: 'mid', label: '中间调', role: 'secondary', paint: { type: 'solid', color: '#8fb8d8' }, opacity: 1, visible: true, configurable: true },
-    { id: 'dark', label: '暗面', role: 'accent', paint: { type: 'solid', color: '#3d6b96' }, opacity: 1, visible: true, configurable: true },
-    { id: 'edge', label: '棱线', role: 'detail', paint: { type: 'solid', color: '#1a2b3d' }, opacity: 0.25, visible: true, configurable: true },
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#6f93b3' }, opacity: 1, visible: true, configurable: true },
+    { id: 'light', label: '亮面', role: 'primary', paint: { type: 'solid', color: '#dfe9f1' }, opacity: 1, visible: true, configurable: true },
+    { id: 'mid', label: '中间调', role: 'secondary', paint: { type: 'solid', color: '#86a9c6' }, opacity: 1, visible: true, configurable: true },
+    { id: 'dark', label: '暗面', role: 'accent', paint: { type: 'solid', color: '#34506e' }, opacity: 1, visible: true, configurable: true },
+    { id: 'edge', label: '棱线', role: 'detail', paint: { type: 'solid', color: '#ffffff' }, opacity: 0.08, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'cell', label: '面片尺寸', type: 'range', min: 30, max: 220, step: 10, default: 90, heavy: true },
-    { key: 'jitter', label: '顶点抖动', type: 'range', min: 0, max: 0.45, step: 0.01, default: 0.28 },
-    { key: 'bands', label: '明暗层数', type: 'range', min: 2, max: 4, step: 1, default: 3 },
-    { key: 'light', label: '光源角度', type: 'angle', default: 315 },
+    { key: 'cell', label: '面片尺寸', type: 'range', min: 60, max: 260, step: 10, default: 170, heavy: true },
+    { key: 'jitter', label: '顶点抖动', type: 'range', min: 0, max: 0.45, step: 0.01, default: 0.34 },
+    { key: 'bands', label: '色标数', type: 'range', min: 2, max: 4, step: 1, default: 3 },
+    { key: 'light', label: '光源角度', type: 'angle', default: 225 },
     { key: 'edges', label: '棱线开关', type: 'toggle', default: true },
   ],
 
@@ -46,21 +51,21 @@ const def: PatternDef = {
       id: 'ice',
       label: '冰蓝',
       elements: {
-        bg: { paint: { type: 'solid', color: '#f0f4f8' } },
-        light: { paint: { type: 'solid', color: '#ffffff' } },
-        mid: { paint: { type: 'solid', color: '#8fb8d8' } },
-        dark: { paint: { type: 'solid', color: '#3d6b96' } },
-        edge: { paint: { type: 'solid', color: '#1a2b3d' } },
+        bg: { paint: { type: 'solid', color: '#6f93b3' } },
+        light: { paint: { type: 'solid', color: '#dfe9f1' } },
+        mid: { paint: { type: 'solid', color: '#86a9c6' } },
+        dark: { paint: { type: 'solid', color: '#34506e' } },
+        edge: { paint: { type: 'solid', color: '#ffffff' } },
       },
     },
     {
       id: 'forest',
       label: '深林',
       elements: {
-        bg: { paint: { type: 'solid', color: '#0f1a14' } },
-        light: { paint: { type: 'solid', color: '#a7d7a0' } },
-        mid: { paint: { type: 'solid', color: '#3f7d52' } },
-        dark: { paint: { type: 'solid', color: '#1b3d2a' } },
+        bg: { paint: { type: 'solid', color: '#29483a' } },
+        light: { paint: { type: 'solid', color: '#9cc29a' } },
+        mid: { paint: { type: 'solid', color: '#4f7d5f' } },
+        dark: { paint: { type: 'solid', color: '#16281f' } },
         edge: { paint: { type: 'solid', color: '#000000' } },
       },
     },
@@ -68,12 +73,24 @@ const def: PatternDef = {
       id: 'dusk',
       label: '暮色',
       elements: {
-        bg: { paint: { type: 'solid', color: '#2b1b3a' } },
-        light: { paint: { type: 'solid', color: '#ffb07c' } },
-        mid: { paint: { type: 'solid', color: '#c25b8a' } },
-        dark: { paint: { type: 'solid', color: '#4a2560' } },
-        edge: { paint: { type: 'solid', color: '#120a1c' } },
+        bg: { paint: { type: 'solid', color: '#6a4466' } },
+        light: { paint: { type: 'solid', color: '#efb594' } },
+        mid: { paint: { type: 'solid', color: '#a2647c' } },
+        dark: { paint: { type: 'solid', color: '#2f2240' } },
+        edge: { paint: { type: 'solid', color: '#ffffff' } },
       },
+    },
+    {
+      id: 'sand',
+      label: '砂岩',
+      elements: {
+        bg: { paint: { type: 'solid', color: '#d9c7ae' } },
+        light: { paint: { type: 'solid', color: '#f6efe4' } },
+        mid: { paint: { type: 'solid', color: '#dccab1' } },
+        dark: { paint: { type: 'solid', color: '#a88d72' } },
+        edge: { paint: { type: 'solid', color: '#ffffff' } },
+      },
+      params: { cell: 200 },
     },
   ],
 
@@ -87,7 +104,7 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const cell = Math.max(30, Number(params.cell));
+    const S = Math.min(W, H);
     const jitter = Math.max(0, Math.min(0.45, Number(params.jitter)));
     const bands = Math.round(Math.max(2, Math.min(4, Number(params.bands))));
     const lightAngle = Number(params.light);
@@ -99,149 +116,134 @@ const def: PatternDef = {
     const darkEl = elements.get('dark')!;
     const edge = elements.get('edge')!;
 
-    const lx = Math.cos((lightAngle * Math.PI) / 180);
-    const ly = Math.sin((lightAngle * Math.PI) / 180);
+    // 面片尺寸以 1080 短边为基准缩放；格子总数封顶保证体积
+    let cellPx = Math.max(20, (Number(params.cell) * S) / 1080);
+    let cols = Math.max(2, Math.round(W / cellPx));
+    let rows = Math.max(2, Math.round(H / cellPx));
+    if (cols * rows > MAX_CELLS) {
+      const k = Math.sqrt((cols * rows) / MAX_CELLS);
+      cols = Math.max(2, Math.floor(cols / k));
+      rows = Math.max(2, Math.floor(rows / k));
+      cellPx = Math.max(W / cols, H / rows);
+    }
+    const cw = W / cols;
+    const ch = H / rows;
 
-    /*
-     * 抖动网格：3×3 个格点，每个点随机偏移。
-     *
-     * ⚠️ 抖动量必须**同时作用于 x 与 y**。只抖 x 会得到整齐的水平带状，
-     * 看起来像拉长的矩形而不是三角镶嵌 —— 这是低多边形最容易做错的一处。
-     * 另外四个**角点不抖**，保证与相邻单元无缝拼接。
-     */
-    const N = 3;
+    // 顶点：边界点只沿边滑动（不离开画布），内部点二维抖动
     const pts: Array<[number, number]> = [];
-    for (let j = 0; j <= N; j++) {
-      for (let i = 0; i <= N; i++) {
-        const onEdge = i === 0 || i === N || j === 0 || j === N;
-        const dx = onEdge ? 0 : (rng() - 0.5) * 2 * jitter * cell;
-        const dy = onEdge ? 0 : (rng() - 0.5) * 2 * jitter * cell;
-        pts.push([i * cell + dx, j * cell + dy]);
+    for (let j = 0; j <= rows; j++) {
+      for (let i = 0; i <= cols; i++) {
+        const dx = (rng() - 0.5) * 2 * jitter * cw;
+        const dy = (rng() - 0.5) * 2 * jitter * ch;
+        const edgeX = i === 0 || i === cols;
+        const edgeY = j === 0 || j === rows;
+        pts.push([i * cw + (edgeX ? 0 : dx), j * ch + (edgeY ? 0 : dy)]);
       }
     }
 
-    const marks: string[] = [];
-    const step = N + 1;
+    // 色标：按 bands 取 亮 → (中) → 暗 (→ 中)，隐藏的元件不参与
+    const order =
+      bands === 2 ? [lightEl, darkEl] : bands === 3 ? [lightEl, midEl, darkEl] : [lightEl, midEl, darkEl, midEl];
+    const stops = order.filter((e) => e.visible).map((e) => ({ rgb: hexToRgb(colorOf(e.paint)), op: e.opacity }));
 
-    /*
-     * ⚠️⚠️ **明暗分级必须按「实测 v 范围」归一化，不能直接用绝对阈值。**
-     *
-     * 踩过的坑：原来直接 `idx = round(v × (bands−1))`，
-     * 而 v 的实际取值范围只有 **[0.648, 0.923]** ——
-     * 因为 `0.5 + 法线投影(±0.5) + radial(±0.5)` 这几项的振幅叠加后
-     * 并没有铺满 [0,1]，实测区间偏在中上段。
-     * 于是 idx 永远 ≥ 1，**dark 元件命中率恒为 0%**，
-     * 表现为「声明可配置但改色毫无效果」的死元件。
-     *
-     * 正解：先扫一遍所有面片算出 v 的真实 min/max，
-     * 再把 v 线性映射到 [0,1] 后分档。
-     * 代价是两次遍历（N×N 很小，可忽略），
-     * 换来的是**三档在任何 seed、任何抖动下都必然被命中**。
-     */
+    // 光源方向：角度指向光源所在一侧（225° = 左上），迎光一侧取亮色
+    const la = (lightAngle * Math.PI) / 180;
+    const lx = Math.cos(la);
+    const ly = Math.sin(la);
+    const proj = (x: number, y: number): number => x * lx + y * ly;
+    const corners = [proj(0, 0), proj(W, 0), proj(0, H), proj(W, H)];
+    const pMax = Math.max(...corners);
+    const pMin = Math.min(...corners);
+    const pSpan = Math.max(1e-6, pMax - pMin);
 
-    /*
-     * ⚠️ 随机量必须在进 tile 前抽完（与 papercut 同理）。
-     *
-     * `flipSeed` 决定三角片的**对角线朝向**。这不是装饰性的：
-     * 测试会断言「每个 range 控件取 min / max 时仍 seed 敏感」，
-     * 而 `jitter` 拉到 0 时顶点不抖动，若没有第二个随机源，
-     * 该母题在 jitter=0 下就完全退化成固定图形 → 断言失败。
-     *
-     * 顺带说：对角线朝向变化本身就是低多边形的一种常见变体
-     * （相邻三角片翻转会让折面感更强），所以它有视觉意义，
-     * 不是为了应付测试而加的假随机。
-     */
-    const flipSeed = rng() < 0.5 ? 0 : 1;
-
-    interface Tri {
-      pts: Array<[number, number]>;
-      /** 面片中心相对光源方向的明暗权重，未归一化 */
-      raw: number;
-    }
-    const tris: Tri[] = [];
-
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const p00 = pts[j * step + i];
-        const p10 = pts[j * step + i + 1];
-        const p01 = pts[(j + 1) * step + i];
-        const p11 = pts[(j + 1) * step + i + 1];
-
-        // 每个方格切两半：对角线方向按 (i+j+flipSeed) 奇偶交替，
-        // 否则所有三角片朝向一致，会出现明显的「人字纹」摩尔效应。
-        const flip = (i + j + flipSeed) % 2 === 0;
-        const halves: Array<Array<[number, number]>> = flip
-          ? [[p00, p10, p11], [p00, p11, p01]]
-          : [[p00, p10, p01], [p10, p11, p01]];
-
-        for (const tri of halves) {
-          const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3;
-          const cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
-          // 三角形朝向法线（2D 下即为边向量叉积的符号）
-          const ax = tri[1][0] - tri[0][0];
-          const ay = tri[1][1] - tri[0][1];
-          const bx = tri[2][0] - tri[0][0];
-          const by = tri[2][1] - tri[0][1];
-          const cross = ax * by - ay * bx;
-          const nx = cross >= 0 ? lx : -lx;
-          const ny = cross >= 0 ? ly : -ly;
-
-          // 中心位置也参与明暗 → 形成从光源向外渐变的整体感
-          const radial = 0.5 - (cx * lx + cy * ly) / (cell * N * 2);
-          tris.push({ pts: tri, raw: nx * 0.275 + ny * 0.225 + radial * 0.5 });
+    const out: string[] = [];
+    const stride = cols + 1;
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        const a = pts[j * stride + i];
+        const b = pts[j * stride + i + 1];
+        const c = pts[(j + 1) * stride + i];
+        const d = pts[(j + 1) * stride + i + 1];
+        // 对角线朝向随 seed：jitter=0 时也保有随机性，且折面方向更自然
+        const tris = rng() < 0.5 ? [[a, b, d], [a, d, c]] : [[a, b, c], [b, d, c]];
+        for (const t of tris) {
+          const noise = (rng() - 0.5) * 0.14;
+          if (stops.length === 0) continue;
+          const cx = (t[0][0] + t[1][0] + t[2][0]) / 3;
+          const cy = (t[0][1] + t[1][1] + t[2][1]) / 3;
+          // v=1 最靠近光源 → 亮色（色标序列的起点）
+          const v = Math.max(0, Math.min(1, (proj(cx, cy) - pMin) / pSpan + noise * 0.6));
+          const [rgb, op] = sample(stops, 1 - v, noise);
+          const dpath =
+            `M${Math.round(t[0][0])} ${Math.round(t[0][1])} ` +
+            `${Math.round(t[1][0])} ${Math.round(t[1][1])} ` +
+            `${Math.round(t[2][0])} ${Math.round(t[2][1])}z`;
+          out.push(`<path fill="${rgb}"${op < 1 ? ` fill-opacity="${api.n(op)}"` : ''} d="${dpath}"/>`);
         }
       }
     }
 
-    // 归一化到 [0,1]；退化（全等）时回落到 0.5 避免除零
-    let vMin = Infinity;
-    let vMax = -Infinity;
-    for (const t of tris) {
-      if (t.raw < vMin) vMin = t.raw;
-      if (t.raw > vMax) vMax = t.raw;
+    const groupAttrs: Record<string, string | number> = {};
+    if (showEdges && edge.visible) {
+      groupAttrs.stroke = edge.paintValue;
+      groupAttrs['stroke-opacity'] = edge.opacity;
+      groupAttrs['stroke-width'] = Math.max(0.5, S / 1080);
+      groupAttrs['stroke-linejoin'] = 'round';
     }
-    const span = vMax - vMin;
-
-    for (const t of tris) {
-      const v = span < 1e-6 ? 0.5 : (t.raw - vMin) / span;
-      const idx = Math.max(0, Math.min(bands - 1, Math.round(v * (bands - 1))));
-      const el = idx === bands - 1 ? lightEl : idx === 0 ? darkEl : midEl;
-      if (!el.visible) continue;
-
-      const tri = t.pts;
-      const d =
-        `M${api.n(tri[0][0])} ${api.n(tri[0][1])}` +
-        ` L${api.n(tri[1][0])} ${api.n(tri[1][1])}` +
-        ` L${api.n(tri[2][0])} ${api.n(tri[2][1])} Z`;
-
-      marks.push(path(d, { fill: el.paintValue, 'fill-opacity': el.opacity }));
-
-      if (showEdges && edge.visible) {
-        marks.push(
-          path(d, {
-            fill: 'none',
-            stroke: edge.paintValue,
-            'stroke-width': Math.max(0.3, cell * 0.0035),
-            'stroke-opacity': edge.opacity,
-          }),
-        );
-      }
-    }
-
-    const tileRef = api.tile({
-      key: `lpf-${api.n(cell)}-${api.n(jitter)}-${bands}-${api.n(lightAngle)}-${showEdges ? 1 : 0}`,
-      w: cell * N,
-      h: cell * N,
-      content: g({}, marks.join('')),
-    });
 
     return {
-      body: [
-        rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }),
-        rect(0, 0, W, H, { fill: tileRef }),
-      ].join(''),
+      body: [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }), g(groupAttrs, out.join(''))].join(''),
     };
   },
 };
+
+/** 在色标序列上取 t∈[0,1] 处的颜色（线性插值）并叠加明度抖动。 */
+function sample(
+  stops: Array<{ rgb: [number, number, number]; op: number }>,
+  t: number,
+  noise: number,
+): [string, number] {
+  if (stops.length === 1) return [rgbToHex(shade(stops[0].rgb, noise)), stops[0].op];
+  const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x));
+  const f = x - i;
+  const a = stops[i];
+  const b = stops[i + 1];
+  const rgb: [number, number, number] = [
+    a.rgb[0] + (b.rgb[0] - a.rgb[0]) * f,
+    a.rgb[1] + (b.rgb[1] - a.rgb[1]) * f,
+    a.rgb[2] + (b.rgb[2] - a.rgb[2]) * f,
+  ];
+  return [rgbToHex(shade(rgb, noise)), a.op + (b.op - a.op) * f];
+}
+
+/** 明度抖动：正值向白、负值向黑。 */
+function shade(rgb: [number, number, number], k: number): [number, number, number] {
+  return k >= 0
+    ? [rgb[0] + (255 - rgb[0]) * k, rgb[1] + (255 - rgb[1]) * k, rgb[2] + (255 - rgb[2]) * k]
+    : [rgb[0] * (1 + k), rgb[1] * (1 + k), rgb[2] * (1 + k)];
+}
+
+function colorOf(paint: PaintSpec): string {
+  if (paint.type === 'solid') return paint.color;
+  if (paint.type === 'none' || paint.stops.length === 0) return '#808080';
+  return paint.stops[0].color;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!h) return [128, 128, 128];
+  const v = parseInt(h[1], 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+function rgbToHex(rgb: [number, number, number]): string {
+  let s = '#';
+  for (const c of rgb) {
+    const v = Math.max(0, Math.min(255, Math.round(c)));
+    s += v.toString(16).padStart(2, '0');
+  }
+  return s;
+}
 
 export default def;

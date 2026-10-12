@@ -53,18 +53,18 @@ function maxConfig(patternId: string) {
  * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
  * 写死字面量会让人下意识以为是测试写错了。
  */
-const TOTAL_EXPECTED = 27;
+const TOTAL_EXPECTED = 40;
 
 /** 分类分布：B 类增量最多（4 个新母题都落在重复纹样）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
-  'A-lines': 6,
-  'B-repeat': 9,
-  'C-organic': 6,
+  'A-lines': 11,
+  'B-repeat': 15,
+  'C-organic': 8,
   'D-pixel': 6,
 };
 
 describe('实现数量与 id 契约', () => {
-  it(`共 ${TOTAL_EXPECTED} 个 pattern（首批 19 + 第二批 8）`, () => {
+  it(`共 ${TOTAL_EXPECTED} 个 pattern（首批 19 + 第二批 8 + 第三批 13）`, () => {
     expect(ALL).toHaveLength(TOTAL_EXPECTED);
   });
 
@@ -226,7 +226,7 @@ describe('体积红线 ⭐ PRD NFR 硬指标', () => {
       // eslint-disable-next-line no-console
       console.log(`[budget] ${r.id.padEnd(16)} default=${String(r.bytes).padStart(5)}B  max=${String(r.maxBytes).padStart(5)}B`);
     }
-    expect(report).toHaveLength(27);
+    expect(report).toHaveLength(TOTAL_EXPECTED);
   });
 });
 
@@ -306,13 +306,13 @@ describe('registry', () => {
   it('重复注册同一对象是幂等的（不算冲突）', () => {
     const original = registry.get('polka-dots')!;
     expect(() => registry.register([original])).not.toThrow();
-    expect(registry.size).toBe(27);
+    expect(registry.size).toBe(TOTAL_EXPECTED);
   });
 
   it('search 按 id / 中文名 / 描述模糊匹配', () => {
     expect(registry.search('polka').map((d) => d.id)).toContain('polka-dots');
     expect(registry.search('波点').map((d) => d.id)).toContain('polka-dots');
-    expect(registry.search('')).toHaveLength(27);
+    expect(registry.search('')).toHaveLength(TOTAL_EXPECTED);
     expect(registry.search('zzz-不存在')).toHaveLength(0);
   });
 

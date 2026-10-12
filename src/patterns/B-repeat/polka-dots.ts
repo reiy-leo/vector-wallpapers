@@ -11,23 +11,23 @@ const def: PatternDef = {
   id: 'polka-dots',
   name: '波点圆点',
   category: 'B-repeat',
-  description: '经典波点圆点，三档尺寸错位排布，密度与体积解耦。',
+  description: '经典波点圆点，三档尺寸错位排布，疏朗留白，密度与体积解耦。',
   // 规则几何本身没有随机性：换seed 只会改参数默认值，不会改构图。
   // 如实标注可避免 UI 亮起一个无效的骰子按钮。
   seedable: false,
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#fdf6e3' }, opacity: 1, visible: true, configurable: true },
-    { id: 'dot_l', label: '大点', role: 'primary', paint: { type: 'solid', color: '#1e293b' }, opacity: 1, visible: true, configurable: true },
-    { id: 'dot_m', label: '中点', role: 'secondary', paint: { type: 'solid', color: '#e11d48' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'dot_s', label: '小点', role: 'accent', paint: { type: 'solid', color: '#0ea5e9' }, opacity: 0.8, visible: true, configurable: true },
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#f6f0e6' }, opacity: 1, visible: true, configurable: true },
+    { id: 'dot_l', label: '大点', role: 'primary', paint: { type: 'solid', color: '#3f4a5a' }, opacity: 1, visible: true, configurable: true },
+    { id: 'dot_m', label: '中点', role: 'secondary', paint: { type: 'solid', color: '#c8806a' }, opacity: 0.9, visible: true, configurable: true },
+    { id: 'dot_s', label: '小点', role: 'accent', paint: { type: 'solid', color: '#8fb0a9' }, opacity: 0.85, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'density', label: '密度', type: 'range', min: 4, max: 60, step: 1, default: 18, heavy: true },
-    { key: 'sizeL', label: '大点尺寸', type: 'range', min: 2, max: 40, step: 1, default: 14 },
-    { key: 'sizeM', label: '中点尺寸', type: 'range', min: 1, max: 30, step: 1, default: 8 },
+    { key: 'density', label: '密度', type: 'range', min: 4, max: 60, step: 1, default: 10, heavy: true },
+    { key: 'sizeL', label: '大点尺寸', type: 'range', min: 2, max: 14, step: 1, default: 8 },
+    { key: 'sizeM', label: '中点尺寸', type: 'range', min: 1, max: 5, step: 1, default: 4 },
     { key: 'stagger', label: '错位', type: 'toggle', default: true },
     { key: 'rotate', label: '旋转', type: 'angle', default: 0 },
   ],
@@ -37,32 +37,32 @@ const def: PatternDef = {
       id: 'cream',
       label: '奶油',
       elements: {
-        bg: { paint: { type: 'solid', color: '#fdf6e3' } },
-        dot_l: { paint: { type: 'solid', color: '#1e293b' } },
-        dot_m: { paint: { type: 'solid', color: '#e11d48' } },
-        dot_s: { paint: { type: 'solid', color: '#0ea5e9' } },
+        bg: { paint: { type: 'solid', color: '#f6f0e6' } },
+        dot_l: { paint: { type: 'solid', color: '#3f4a5a' } },
+        dot_m: { paint: { type: 'solid', color: '#c8806a' } },
+        dot_s: { paint: { type: 'solid', color: '#8fb0a9' } },
       },
     },
     {
       id: 'mono',
       label: '单色',
       elements: {
-        bg: { paint: { type: 'solid', color: '#111827' } },
-        dot_l: { paint: { type: 'solid', color: '#f9fafb' } },
-        dot_m: { paint: { type: 'solid', color: '#9ca3af' } },
-        dot_s: { paint: { type: 'solid', color: '#4b5563' } },
+        bg: { paint: { type: 'solid', color: '#1c2129' } },
+        dot_l: { paint: { type: 'solid', color: '#c9ced6' } },
+        dot_m: { paint: { type: 'solid', color: '#7d8590' } },
+        dot_s: { paint: { type: 'solid', color: '#4f5762' } },
       },
     },
     {
       id: 'candy',
       label: '糖果',
       elements: {
-        bg: { paint: { type: 'solid', color: '#fff1f6' } },
-        dot_l: { paint: { type: 'solid', color: '#db2777' } },
-        dot_m: { paint: { type: 'solid', color: '#7c3aed' } },
-        dot_s: { paint: { type: 'solid', color: '#06b6d4' } },
+        bg: { paint: { type: 'solid', color: '#fbf0f2' } },
+        dot_l: { paint: { type: 'solid', color: '#d98ba0' } },
+        dot_m: { paint: { type: 'solid', color: '#a596c9' } },
+        dot_s: { paint: { type: 'solid', color: '#e8b98f' } },
       },
-      params: { density: 24 },
+      params: { density: 12 },
     },
   ],
 
@@ -82,11 +82,13 @@ const def: PatternDef = {
 
     // 错位排布：主点居中；开启 stagger 后中点与小点挪到单元对角，
     // 于是平铺后形成「一大一中一小」的三层波点肌理（经典波点 Wallpaper 的做法）。
-const cx = cell * 0.5;
+    const cx = cell * 0.5;
     const cy = cell * 0.5;
-    const rL = Math.max(0.5, (cell * Number(params.sizeL)) / 28);
-    const rM = Math.max(0.4, (cell * Number(params.sizeM)) / 28);
-    const rS = Math.max(0.3, rM * 0.45);
+    // 半径上限：大点 ≤ 0.25 单元（直径占一半，相邻点间距 ≥ 半个单元，不会相切），
+    // 中点 ≤ 0.09 单元（位于 0.82 角位，不越出单元边界被 <pattern> 裁切）。
+    const rL = Math.max(0.5, Math.min(cell * 0.25, (cell * Number(params.sizeL)) / 56));
+    const rM = Math.max(0.4, Math.min(cell * 0.09, (cell * Number(params.sizeM)) / 56));
+    const rS = Math.max(0.3, rM * 0.6);
 
     const marks: string[] = [];
     if (dotL.visible) {

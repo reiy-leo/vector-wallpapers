@@ -220,4 +220,18 @@ export type PatternId =
   | 'art-deco-fan'
   | 'nouveau-scroll'
   | 'isometric-voxel'
-  | 'lowpoly-facet';
+  | 'lowpoly-facet'
+  // 第三批（2026-10-12，svgbackgrounds.com 免费集风格参考，自行实现）
+  | 'stripe-bands'
+  | 'nested-shapes'
+  | 'spiral-polygons'
+  | 'node-web'
+  | 'chevron'
+  | 'fish-scales'
+  | 'sunburst'
+  | 'square-rings'
+  | 'raised-tiles'
+  | 'tortoise-grid'
+  | 'arrow-repeat'
+  | 'pyramid-facets'
+  | 'conic-mesh';

@@ -1,31 +1,25 @@
 /**
  * 有机斑点场 —— C 渐变流体 / 有机形态。
  *
- * 构图要点：柔和底色上散布大小不一的有机斑点，按三组配色。
- * 每个斑点由 3~4 个重叠圆构成，边缘互相消融，得到「 metaball / 有机」观感。
+ * 构图要点（2026-10-12 审美返修）：整幅画布上 seeded 随机散布**少量大而柔的斑点**，
+ * 每团由数个重叠的径向渐变圆构成（stop-opacity 羽化 → 边缘雾化消融，无硬边），
+ * 再点缀极少量同色小实心圆点作景深（bokeh）。
  *
- * ⭐⭐ 命中率的正解（memphis-grid 教训的直接应用）：
- * 本 pattern **不做随机采样决定谁出现**。单元内的斑点**槽位是固定的**，
- * 每个槽位绑定了确定的色组（slot % 3），因此三组色在**每个**单元内
- * 都必然出现 —— 改色命中率恒为 100%，与参数、seed 无关。
- * seed 只改变斑点的大小、圆心偏移与重叠子圆的排布。
+ * ⚠️ 返修原因：旧版走 <pattern> 平铺小单元，2560 宽下一眼可见重复的泡泡阵列。
+ * 斑点数量本就很少（默认约 10 团），**不平铺**、整幅直接绘制体积反而更小，
+ * 也彻底消除了重复感。斑点数按短边归一化的「间距」推导 → 与分辨率无关、体积有上限。
+ *
+ * ⭐⭐ 命中率（memphis-grid 教训）：槽位 → 色组是**固定映射**（i % 3），
+ * 三组色在任意 seed / 参数下都必然出现；seed 只改变位置、大小与子圆排布。
  */
 import { circle, g, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
-
-/** 单元内斑点槽位数：固定值 → 体积可预测。 */
-const SLOTS = 9;
-
-/** 取小数部分（低差异序列用，保证结果恒在 [0,1)）。 */
-function frac(x: number): number {
-  return x - Math.floor(x);
-}
 
 const def: PatternDef = {
   id: 'blob-field',
   name: '有机斑点场',
   category: 'C-organic',
-  description: '大小不一的有机斑点散布，三组配色互相消融，柔软安静。',
+  description: '大而柔的雾化斑点在整幅画面中随机散布，三组配色互相消融，柔软安静。',
   seedable: true,
   animatable: false,
 
@@ -38,24 +32,25 @@ const def: PatternDef = {
         type: 'linear',
         angle: 90,
         stops: [
-  { offset: 0, color: '#fdf4ff' },
-  { offset: 1, color: '#e0e7ff' },
+          { offset: 0, color: '#f7f2f8' },
+          { offset: 1, color: '#e6e9f4' },
         ],
-   },
+      },
       opacity: 1,
       visible: true,
       configurable: true,
     },
-    { id: 'blob_a', label: '斑点 · A', role: 'primary', paint: { type: 'solid', color: '#c084fc' }, opacity: 0.75, visible: true, configurable: true },
-    { id: 'blob_b', label: '斑点 · B', role: 'secondary', paint: { type: 'solid', color: '#67e8f9' }, opacity: 0.7, visible: true, configurable: true },
-    { id: 'blob_c', label: '斑点 · C', role: 'accent', paint: { type: 'solid', color: '#fda4af' }, opacity: 0.7, visible: true, configurable: true },
+    { id: 'blob_a', label: '斑点 · A', role: 'primary', paint: { type: 'solid', color: '#c4a3d9' }, opacity: 0.75, visible: true, configurable: true },
+    { id: 'blob_b', label: '斑点 · B', role: 'secondary', paint: { type: 'solid', color: '#9cc7d6' }, opacity: 0.7, visible: true, configurable: true },
+    { id: 'blob_c', label: '斑点 · C', role: 'accent', paint: { type: 'solid', color: '#e8b4bc' }, opacity: 0.7, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'size', label: '单元尺寸', type: 'range', min: 160, max: 900, step: 10, default: 430, heavy: true },
-    // 下限 0.6：0.2 时最小单元下斑点只有 1~1.4px，属于「画了看不见」
+    // 「单元尺寸」= 斑点间距（以 1080 短边为基准的设计像素，按短边等比缩放）。
+    // 下限 300：再密就回到「满屏泡泡」，且斑点数 × 子圆数会逼近体积红线。
+    { key: 'size', label: '单元尺寸', type: 'range', min: 300, max: 900, step: 10, default: 520, heavy: true },
     { key: 'scale', label: '斑点大小', type: 'range', min: 0.6, max: 2.4, step: 0.05, default: 1.5 },
-  { key: 'lobes', label: '重叠子圆', type: 'range', min: 2, max: 5, step: 1, default: 3 },
+    { key: 'lobes', label: '重叠子圆', type: 'range', min: 2, max: 5, step: 1, default: 3 },
     { key: 'jitter', label: '随机游走', type: 'range', min: 0, max: 0.14, step: 0.01, default: 0.1 },
   ],
 
@@ -64,57 +59,30 @@ const def: PatternDef = {
       id: 'candy',
       label: '糖果',
       elements: {
-        bg: {
-          paint: {
-            type: 'linear',
- angle: 90,
-      stops: [
-              { offset: 0, color: '#fff1f2' },
-  { offset: 1, color: '#ede9fe' },
-      ],
-          },
-    },
-        blob_a: { paint: { type: 'solid', color: '#fb7185' } },
-   blob_b: { paint: { type: 'solid', color: '#fbbf24' } },
-     blob_c: { paint: { type: 'solid', color: '#34d399' } },
+        bg: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#fbf3f1' }, { offset: 1, color: '#f3ecf6' }] } },
+        blob_a: { paint: { type: 'solid', color: '#eba3a8' } },
+        blob_b: { paint: { type: 'solid', color: '#f2cf94' } },
+        blob_c: { paint: { type: 'solid', color: '#a9d4bf' } },
       },
     },
     {
       id: 'moss',
       label: '苔痕',
       elements: {
-        bg: {
-  paint: {
- type: 'linear',
-   angle: 90,
-       stops: [
-   { offset: 0, color: '#f7fee7' },
-  { offset: 1, color: '#ccfbf1' },
-     ],
-      },
-        },
-      blob_a: { paint: { type: 'solid', color: '#65a30d' } },
-        blob_b: { paint: { type: 'solid', color: '#0d9488' } },
-    blob_c: { paint: { type: 'solid', color: '#ca8a04' } },
+        bg: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#f3f5ea' }, { offset: 1, color: '#e3efe9' }] } },
+        blob_a: { paint: { type: 'solid', color: '#9bb47a' } },
+        blob_b: { paint: { type: 'solid', color: '#7fb0a6' } },
+        blob_c: { paint: { type: 'solid', color: '#d2b673' } },
       },
     },
     {
       id: 'dusk',
       label: '暮色',
       elements: {
-        bg: {
- paint: {
-       type: 'linear',
-         angle: 90,
-   stops: [
-        { offset: 0, color: '#1e1b4b' },
-     { offset: 1, color: '#4c1d95' },
-    ],
-   },
-      },
-        blob_a: { paint: { type: 'solid', color: '#a78bfa' } },
-        blob_b: { paint: { type: 'solid', color: '#f0abfc' } },
-      blob_c: { paint: { type: 'solid', color: '#67e8f9' } },
+        bg: { paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1f1d3a' }, { offset: 1, color: '#352a55' }] } },
+        blob_a: { paint: { type: 'solid', color: '#8f7cc8' } },
+        blob_b: { paint: { type: 'solid', color: '#c98fb8' } },
+        blob_c: { paint: { type: 'solid', color: '#6fa3c0' } },
       },
     },
   ],
@@ -123,115 +91,98 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng } = cfg;
-    const cell = Math.max(60, Number(params.size));
+    const unitPx = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
+    const step = Math.max(300, Number(params.size)) * unitPx;
     const scale = Math.max(0.1, Number(params.scale));
     const lobes = Math.max(2, Math.min(5, Math.round(Number(params.lobes))));
-    const jitter = Math.max(0, Math.min(0.5, Number(params.jitter)));
+    // jitter 0~0.14 → 子圆偏离团心的幅度 0.3~1（越大轮廓越不规则），同时让落位更随性
+    const jitter = Math.max(0, Math.min(0.14, Number(params.jitter)));
+    const wander = 0.3 + (jitter / 0.14) * 0.7;
 
     const bg = elements.get('bg')!;
-    const A = elements.get('blob_a')!;
-    const B = elements.get('blob_b')!;
-    const C = elements.get('blob_c')!;
-    const GROUPS = [A, B, C];
+    const GROUPS = [elements.get('blob_a')!, elements.get('blob_b')!, elements.get('blob_c')!];
 
-    const parts: string[] = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
+    // 每组一个径向渐变：中心实、向外经 stop-opacity 羽化到全透明 —— 雾化边缘的来源。
+    // 元件若被用户改成渐变（paintValue 为 url），退化为直接使用其 paintValue。
+    const fills = GROUPS.map((e, gi) => {
+      if (!e.visible || e.paint.type !== 'solid') return e.paintValue;
+      const c = e.paintValue;
+      return api.radial({
+        key: `bf-${gi}-${c}`,
+        cx: 0.5,
+        cy: 0.5,
+        r: 0.5,
+        stops: [
+          { offset: 0, color: c, opacity: 1 },
+          { offset: 0.45, color: c, opacity: 0.78 },
+          { offset: 0.78, color: c, opacity: 0.26 },
+          { offset: 1, color: c, opacity: 0 },
+        ],
+      });
+    });
 
     /**
-     * 只用**单档**单元，不做多档叠加。
-     *
-     * 为什么不靠「行错位」打破 3×3 格点感：行错位会让最右一列的槽位
-     * 落到 tile 之外（1.166 cell），被裁成半圆 —— 实测会看到规律的
-     * 「半个斑点」阵列，比原来的方格更糟。
-     *
-     * 决定依据（两条，都是实测/推理结论，不是偏好）：
-     * 1. 多档叠加本来是为了打破 3×3 格点感，但真正解决格点问题的是
-     *    **低差异序列**（见下）。序列一换，方格感就消失了，叠加层就不再必要。
- * 2. 第二档（0.41×，约 176px）会让槽位余量 `room` 变得极小，
-     *    产出一批半径 1px 的隐形圆点 —— 这类点贡献不了画面，
-     *    却仍然占用「槽位 → 色组」的固定映射配额，是纯粹的负担。
-  *    因此叠加方案被删除，而不是留着修修补补。
+     * 斑点落位：best-candidate（Mitchell）采样 —— 每颗斑点从若干 seeded 候选点里
+     * 取「离已有斑点最远」的那个。结果是**随机但均匀**：没有网格感，也不会扎堆或留大空洞。
+     * 采样区域向外出血 8%，让部分斑点从画布边缘探入，构图更松弛。
+     * 数量由「间距」按面积推导，且所有尺寸按短边归一化 → 与分辨率无关、体积有上限。
      */
-    const LAYERS = [1];
+    const count = Math.max(6, Math.round(((W * H) / (step * step)) * 1.5));
+    const bx = W * 0.08;
+    const by = H * 0.08;
+    // 候选数随 jitter 增大而减少：jitter 越大越「随性」，越小越均匀
+    const cand = Math.max(2, Math.round(10 - (jitter / 0.14) * 7));
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i < count; i++) {
+      let best: [number, number] = [0, 0];
+      let bestD = -1;
+      for (let k = 0; k < cand; k++) {
+        const x = -bx + rng() * (W + 2 * bx);
+        const y = -by + rng() * (H + 2 * by);
+        let d = Infinity;
+        for (const [px, py] of pts) d = Math.min(d, (px - x) ** 2 + (py - y) ** 2);
+        if (d > bestD) {
+          bestD = d;
+          best = [x, y];
+        }
+      }
+      pts.push(best);
+    }
 
-    for (let li = 0; li < LAYERS.length; li++) {
-      const unit = cell * LAYERS[li];
-      const marks: string[] = [];
-
-      for (let i = 0; i < SLOTS; i++) {
-        /**
-         * ⭐ 槽位 → 色组是**固定映射**，不是随机结果。
-         * 这是本 pattern 命中率 100% 的根据：三组色在每个单元内都必然出现。
-         * 若改成「随机挑组」，就会重演 memphis-grid 那种 30% 命中率的问题。
-         */
-    const e = GROUPS[i % 3];
-    if (!e.visible) continue;
-
-/**
-         * 位置用**黄金比低差异序列**而不是 3×3 方格。
-         *
-         * ⚠️ 踩过的坑：早先按 3×3 等距槽位排布，即使加 30% 间距的抖动，
-         * 整幅图仍能一眼看出方形网格（实测可见）—— 等距点阵的「格」
-         * 比斑点本身更强。改用无理数序列后，9 个点在视觉上无明显规律，
-         * 分布却依然均匀（低差异序列的性质），格点感消失。
-     */
-        /**
-         * ⭐ 序列值先**内缩到 [MARGIN, 1−MARGIN]**，再乘以 unit。
-         *
-* 这一步是修「退化斑点」的关键。frac() 的取值可以任意接近 0 或 1，
-         * 于是槽位可能落在 tile 边界上甚至之外：
-         *   - 越界 → 圆心出现**负坐标**（实测见到 cy = −12.09），整颗斑点被裁掉；
-       *   - 贴边 → 缩小 `room`，半径被夹成 1px 的隐形点。
-         * 而「槽位 → 色组」是固定映射，一个退化的槽位等于**白白消耗掉某个色组
-         * 的出场配额**，那正是本 pattern 命中率保证的根基。
-       *
-         * 内缩后每个槽位到边至少有 0.14·unit 的距离，退化从「靠 clamp 兜底」
-       * 变成「结构上不可能发生」—— 不用跳过槽位（跳过会破坏固定映射），
-         * 也不用把半径硬夹成隐形点。
-         */
-        const MARGIN = 0.14;
-        const span = 1 - 2 * MARGIN;
-        const u = MARGIN + span * frac(0.5 + i * 0.6180339887);
-     const v = MARGIN + span * frac(0.5 + i * 0.7548776662);
-        const cx = unit * u + (rng() - 0.5) * unit * jitter;
-        const cy = unit * v + (rng() - 0.5) * unit * jitter;
-
-        /**
-         * 余量 = 该点到四条边的实际最近距离，逐点精确。
-         * 内缩 + jitter 上限 0.14 保证它恒为正，不会退化成夹到下限的隐形点。
-         */
-        const room = Math.min(cx, unit - cx, cy, unit - cy) - 1;
-        // 防御：余量确为负时（理论上已被 MARGIN 排除）退回一个安全的小值，
-        // 而不是 Math.max(1, …) 那种「夹出一个看不见的点」。
-        if (room < 2) continue;
-const r0 = Math.min(unit * 0.1 * scale * (0.55 + rng() * 0.9), room);
-
-        // 若干重叠子圆 → 边缘互相消融，形成有机轮廓
+    const soft: string[][] = [[], [], []];
+    const dots: string[][] = [[], [], []];
+    pts.forEach(([cx, cy], i) => {
+      const gi = i % 3;
+      const e = GROUPS[gi];
+      // 大小起伏要明显：大团 + 小团交错，才有主次
+      const big = rng() < 0.45;
+      const r0 = step * 0.3 * scale * (big ? 1 + rng() * 0.4 : 0.45 + rng() * 0.3);
+      const wobble: number[] = [];
+      for (let k = 0; k < lobes * 3; k++) wobble.push(rng());
+      const dotRoll = [rng(), rng(), rng(), rng()];
+      if (!e.visible) return;
       for (let k = 0; k < lobes; k++) {
-          const spread = Math.min(r0 * 0.6, Math.max(0, room - r0));
-          const ox = k === 0 ? 0 : (rng() - 0.5) * spread;
-          const oy = k === 0 ? 0 : (rng() - 0.5) * spread;
-   // 子圆半径下限 1.5px：不允许出现「画了但看不见」的微点。
-          // 上界由余量收敛 —— room − |ox| − |oy| ≥ r0，故不会越出 tile。
-          const r = Math.max(
-            1.5,
- Math.min(r0 * (k === 0 ? 1 : 0.45 + rng() * 0.55), room - Math.abs(ox) - Math.abs(oy)),
-    );
-          marks.push(circle(cx + ox, cy + oy, r, { fill: e.paintValue, 'fill-opacity': e.opacity / lobes }));
+        const a = wobble[k * 3] * Math.PI * 2;
+        const off = k === 0 ? 0 : r0 * (0.3 + wobble[k * 3 + 1] * 0.4) * wander;
+        const rr = k === 0 ? r0 : r0 * (0.55 + wobble[k * 3 + 2] * 0.35);
+        soft[gi].push(circle(cx + Math.cos(a) * off, cy + Math.sin(a) * off, rr));
       }
+      // 景深小圆点：约 1/4 的斑点附带一颗（前 3 个必带，保证每组可见），同色实心
+      if (dotRoll[0] < 0.25 || i < 3) {
+        const a = dotRoll[1] * Math.PI * 2;
+        const d = r0 * (1.05 + dotRoll[2] * 0.45);
+        const rd = Math.max(3, step * (0.014 + dotRoll[3] * 0.014));
+        dots[gi].push(circle(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rd, { fill: e.paintValue }));
       }
+    });
 
-      if (marks.length > 0) {
-    parts.push(
-     rect(0, 0, W, H, {
-            fill: api.tile({
-    key: `bf${li}-${api.n(unit)}-${api.n(scale)}-${lobes}-${api.n(jitter)}`,
-     w: unit,
-   h: unit,
-              content: g({}, marks.join('')),
-            }),
-   }),
-        );
-      }
+    const parts: string[] = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
+    for (let gi = 0; gi < 3; gi++) {
+      const e = GROUPS[gi];
+      if (!e.visible) continue;
+      // 子圆叠加会累积不透明度 → 按子圆数折算，使「重叠子圆」只改轮廓不改浓淡
+      if (soft[gi].length) parts.push(g({ fill: fills[gi], 'fill-opacity': Math.min(1, (e.opacity * 2) / lobes) }, soft[gi].join('')));
+      if (dots[gi].length) parts.push(g({ 'fill-opacity': e.opacity * 0.6 }, dots[gi].join('')));
     }
 
     return { body: parts.join('') };

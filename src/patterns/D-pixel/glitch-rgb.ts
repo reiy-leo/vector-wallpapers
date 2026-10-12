@@ -10,6 +10,12 @@
  *
  * ⭐ D 类由引擎自动加`shape-rendering="crispEdges"`，
  * 像素必须硬边，缺了会被插值糊掉。
+ *
+ * 2026-10-12 审美返修：旧版紫底满屏碎块（平铺的条带单元）→ 混乱、刺眼。
+ * 现在以**大块平静底色**为主：一条宽而淡的色域横贯画面，
+ * 少量（默认 5 条）错位切片聚成 1~2 簇，每条切片按 R/G/B 三色水平错开叠印，
+ * 再散落几粒同样三色错位的小像素块。其余大面积留白。
+ * 全部尺寸按短边归一化（与分辨率无关），配色降饱和。
  */
 import { g, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
@@ -18,22 +24,24 @@ const def: PatternDef = {
   id: 'glitch-rgb',
   name: '通道错位',
   category: 'D-pixel',
-  description: 'RGB 三通道分离错位叠印，横向扫描线，数字显示故障感。',
+  description: '大块平静底色上稀疏点缀 RGB 三通道错位切片，克制的数字显示故障感。',
   seedable: true,
   animatable: true,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#0a0a0f' }, opacity: 1, visible: true, configurable: true },
-    { id: 'ch_r', label: 'R 通道', role: 'primary', paint: { type: 'solid', color: '#ff2d55' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'ch_g', label: 'G 通道', role: 'secondary', paint: { type: 'solid', color: '#00f0ff' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'ch_b', label: 'B 通道', role: 'accent', paint: { type: 'solid', color: '#7c3aed' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'scan', label: '扫描线', role: 'detail', paint: { type: 'solid', color: '#000000' }, opacity: 0.35, visible: true, configurable: true },
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#1c2030' }, opacity: 1, visible: true, configurable: true },
+    { id: 'ch_r', label: 'R 通道', role: 'primary', paint: { type: 'solid', color: '#c9798c' }, opacity: 0.85, visible: true, configurable: true },
+    { id: 'ch_g', label: 'G 通道', role: 'secondary', paint: { type: 'solid', color: '#8bb8c8' }, opacity: 0.85, visible: true, configurable: true },
+    { id: 'ch_b', label: 'B 通道', role: 'accent', paint: { type: 'solid', color: '#6f6db0' }, opacity: 0.85, visible: true, configurable: true },
+    { id: 'scan', label: '扫描线', role: 'detail', paint: { type: 'solid', color: '#000000' }, opacity: 0.16, visible: true, configurable: true },
   ],
 
   controls: [
-    { key: 'blocks', label: '色块密度', type: 'range', min: 6, max: 40, step: 1, default: 18, heavy: true },
+    // 散落的三色错位小像素块数量（旧版为满屏条带密度；key 沿用以保持分享链接兼容）
+    { key: 'blocks', label: '色块数量', type: 'range', min: 6, max: 40, step: 1, default: 8, heavy: true },
+    // 以 1080 短边为基准的设计像素，按短边等比缩放
     { key: 'shift', label: '通道错位', type: 'range', min: 0, max: 40, step: 1, default: 14, unit: 'px' },
-    { key: 'scanGap', label: '扫描线间距', type: 'range', min: 2, max: 12, step: 1, default: 4 },
+    { key: 'scanGap', label: '扫描线间距', type: 'range', min: 2, max: 12, step: 1, default: 5 },
     { key: 'bands', label: '错位色带', type: 'range', min: 0, max: 12, step: 1, default: 5 },
     { key: 'animate', label: '滚动动画', type: 'toggle', default: false, group: '动画' },
   ],
@@ -43,10 +51,10 @@ const def: PatternDef = {
       id: 'corrupt',
       label: '损坏',
       elements: {
-        bg: { paint: { type: 'solid', color: '#0a0a0f' } },
-        ch_r: { paint: { type: 'solid', color: '#ff2d55' } },
-        ch_g: { paint: { type: 'solid', color: '#00f0ff' } },
-        ch_b: { paint: { type: 'solid', color: '#7c3aed' } },
+        bg: { paint: { type: 'solid', color: '#15151d' } },
+        ch_r: { paint: { type: 'solid', color: '#d9667e' } },
+        ch_g: { paint: { type: 'solid', color: '#6fc3d1' } },
+        ch_b: { paint: { type: 'solid', color: '#7a62c4' } },
         scan: { paint: { type: 'solid', color: '#000000' } },
       },
     },
@@ -54,10 +62,10 @@ const def: PatternDef = {
       id: 'matrix',
       label: '矩阵',
       elements: {
-        bg: { paint: { type: 'solid', color: '#04140a' } },
-        ch_r: { paint: { type: 'solid', color: '#22c55e' } },
-        ch_g: { paint: { type: 'solid', color: '#4ade80' } },
-        ch_b: { paint: { type: 'solid', color: '#14532d' } },
+        bg: { paint: { type: 'solid', color: '#0d1a13' } },
+        ch_r: { paint: { type: 'solid', color: '#4f9e6e' } },
+        ch_g: { paint: { type: 'solid', color: '#9fd4ae' } },
+        ch_b: { paint: { type: 'solid', color: '#2b5c40' } },
         scan: { paint: { type: 'solid', color: '#000000' } },
       },
     },
@@ -65,10 +73,10 @@ const def: PatternDef = {
       id: 'amber-crt',
       label: '琥珀显像管',
       elements: {
-        bg: { paint: { type: 'solid', color: '#1a1206' } },
-        ch_r: { paint: { type: 'solid', color: '#f59e0b' } },
-        ch_g: { paint: { type: 'solid', color: '#fbbf24' } },
-        ch_b: { paint: { type: 'solid', color: '#78350f' } },
+        bg: { paint: { type: 'solid', color: '#1d150c' } },
+        ch_r: { paint: { type: 'solid', color: '#d29a4a' } },
+        ch_g: { paint: { type: 'solid', color: '#eccb8a' } },
+        ch_b: { paint: { type: 'solid', color: '#7a4a24' } },
         scan: { paint: { type: 'solid', color: '#000000' } },
       },
     },
@@ -84,9 +92,10 @@ const def: PatternDef = {
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng, animate } = cfg;
-    const blocks = Math.round(Math.max(6, Math.min(40, Number(params.blocks))));
-    const shift = Math.max(0, Number(params.shift));
-    const scanGap = Math.max(2, Math.min(12, Number(params.scanGap)));
+    const unit = Math.max(0.5, Math.min(4, Math.min(W, H) / 1080));
+    const blockCount = Math.round(Math.max(6, Math.min(40, Number(params.blocks))));
+    const shift = Math.max(0, Number(params.shift)) * unit;
+    const scanGap = Math.max(2, Math.min(12, Number(params.scanGap))) * unit;
     const bandCount = Math.round(Math.max(0, Math.min(12, Number(params.bands))));
     const doAnimate = params.animate === true;
 
@@ -97,132 +106,79 @@ const def: PatternDef = {
     const scan = elements.get('scan')!;
 
     /**
-     * 随机量必须在进平铺前抽完（与 papercut 同理）。
-     *
-     * 通道错位量：三通道各自独立偏移，形成阶梯式重影。
-     *
-     * ⚠️ G 通道的偏移必须**显著**。原写成 `shift × (rng−0.5) × 0.5`
-     * （最大 ±2.5px），结果 G 层被错位更大的 R/B 完全覆盖 ——
-     * 改 G 的颜色时产物一个字节都不变，命中率 0%，
-     * 即「声明可配置实则死元件」。这是元数据与实现不一致的典型，
-     * 由 `patterns.test.ts` 的死元件检测抓到。
-     * 现在 G 取 0.2~0.45 倍错位量，三层呈 R-左 / G-中 / B-右 的清晰阶梯。
+     * 三通道水平偏移：R 左 / G 居中略偏 / B 右，形成清晰的色差阶梯。
+     * ⚠️ G 偏移必须显著且 G 层画在最上 —— 否则被 R/B 完全覆盖，改 G 色无效（死元件）。
+     * shift = 0 时三层重合，G 在顶层仍可见，命中率不受影响。
      */
-    const shiftR = -shift * (0.8 + rng() * 0.4);
-    const shiftG = shift * (0.2 + rng() * 0.25);
-    const shiftB = shift * (0.8 + rng() * 0.4);
+    const dR = -shift * (0.8 + rng() * 0.4);
+    const dG = shift * (0.15 + rng() * 0.2);
+    const dB = shift * (0.8 + rng() * 0.4);
 
+    const n = api.n;
+    const R: string[] = [];
+    const G: string[] = [];
+    const B: string[] = [];
     /**
-     * 像素条带图形单元。
-     *
-     * 横向长条为主 + 少量竖向块，构成「数据块被截断」的观感。
-     * 单元为 `blocks × blocks` 的正方形，高密度时靠 <pattern> 铺满。
+     * 一块「被错位的数据」：同一矩形按三通道各画一份，且每个通道被撕开的范围略有不同
+     * （R 最长、B 偏右一截、G 最短且更薄居中）→ 三色都能读到，而不是只剩一圈色边。
      */
-    const unit = Math.max(8, Math.min(W, H) / 8);
-    const barH = Math.max(2, unit / blocks);
-    const bars: string[] = [];
+    const slice = (x: number, y: number, w: number, h: number): void => {
+      R.push(rect(x + dR, y, w * (0.75 + rng() * 0.25), h));
+      const bOff = w * rng() * 0.3;
+      B.push(rect(x + dB + bOff, y, w * (0.5 + rng() * 0.4), h));
+      const gOff = w * (0.1 + rng() * 0.3);
+      G.push(rect(x + dG + gOff, y + h * 0.2, w * (0.3 + rng() * 0.3), h * 0.6));
+    };
 
-    for (let i = 0; i < blocks; i++) {
-      const y = (i * unit) / blocks;
-      // 每行的宽度与水平位置由 seed 决定，制造「有的行被截断」的效果
-      const wFrac = 0.25 + rng() * 0.75;
-      const xFrac = rng() * (1 - wFrac);
-      bars.push(
-        rect(unit * xFrac, y, unit * wFrac, barH, { fill: '#ffffff' }),
-      );
-      // 约 1/4 的行额外加一个竖向短块，打破全横向的单调
-      if (rng() > 0.75) {
-        const bx = rng() * unit;
-        const by = rng() * unit;
-        bars.push(rect(bx, by, barH * 2, unit * (0.1 + rng() * 0.25), { fill: '#ffffff' }));
-      }
-    }
+    // ① 平静的大色域：一条宽而淡的横向色带（B 通道色，低不透明度），占画面 25%~40% 高
+    const fieldH = H * (0.25 + rng() * 0.15);
+    const fieldY = H * (0.12 + rng() * 0.5);
 
-    /*
-     * 通道合成用「不透明度叠印」而非 mix-blend-mode。
-     *
-     * ⚠️ 不用 `mix-blend-mode: screen` 的原因：它需要 CSS，
-     * 而本项目只在 `animate=true` 时才注入 `<style>`，
-     * 而导出产物必须无外部依赖（架构 §9.4 字节级可复现）。
-     * 在深底上叠印三个半透明通道，观感与滤色接近。
-     */
-
-    /*
-     * 通道层：把同一份「条带布局」用三个通道各自的**颜色**各画一遍，
-     * 再各自水平平移后叠印。
-     *
-     * ⚠️⚠️ 这里踩过两个叠加在一起的坑，都表现为「G 通道改色毫无效果」：
-     *
-     * 坑一：条带画成白色（`fill: '#ffffff'`），通道 rect 只写 `fill: url(#tile)`
-     *      —— 于是三个通道的颜色**根本没进产物**，改 ch_g 的颜色无任何变化。
-     *      「通道」变成了「同色重复三次」，只有位移没有分色。
-     *
-     * 坑二：若把条带做成白色 pattern 再让三个 rect 引用它，
-     *      三个 channel pattern 的 content 逐字节相同 → defs 签名撞车 →
-     *      只剩一层。**平移必须写在 patternTransform**（进签名），
-     *      且每层用各自颜色（content 不同），两条同时满足才不会合并。
-     *
-     * 正确做法：条带布局用**占位符**生成一次，再按通道替换 fill 字符串，
-     * 保证三层的 content 天然不同。
-     */
-    const layout = bars.join('').split('#ffffff').join('%C%');
-
-    const layers: string[] = [];
-    const channels: Array<[typeof chR, number]> = [
-      [chR, shiftR],
-      [chG, shiftG],
-      [chB, shiftB],
-    ];
-    for (const [e, dx] of channels) {
-      if (!e.visible) continue;
-      const fillRef = api.tile({
-        // key 含 element id：颜色不同 → content 不同 → 签名不同，三层不会合并
-        key: `gx-ch-${e.id}`,
-        w: unit,
-        h: unit,
-        content: g({}, layout.split('%C%').join(e.paintValue)),
-        // ⭐ 平移写在这里 —— patternTransform 参与签名去重
-        transform: `translate(${api.n(dx)} 0)`,
-      });
-      layers.push(rect(0, 0, W, H, { fill: fillRef, 'fill-opacity': e.opacity }));
-    }
-
-
-    // 横向错位色带：模拟「整行数据被搬到别处」的撕裂
-    const bandMarks: string[] = [];
+    // ② 错位切片聚成 1~2 簇（真实故障是成片发生的，不是均匀撒满）
+    const clusters = [H * (0.15 + rng() * 0.7)];
+    if (rng() < 0.6) clusters.push(H * (0.15 + rng() * 0.7));
+    const near = (): number => {
+      const c = clusters[Math.floor(rng() * clusters.length)];
+      return Math.max(0, Math.min(H, c + (rng() + rng() - 1) * H * 0.12));
+    };
     for (let i = 0; i < bandCount; i++) {
-      const y = rng() * H;
-      const h = Math.max(3, H * (0.004 + rng() * 0.02));
-      const w = W * (0.2 + rng() * 0.8);
+      const y = near();
+      // 大多是细条，偶尔一条较厚 —— 主次分明
+      const h = H * (rng() < 0.25 ? 0.025 + rng() * 0.03 : 0.004 + rng() * 0.01);
+      const w = W * (0.18 + rng() * 0.5);
       const x = rng() * (W - w);
-      const use = rng() > 0.5 ? chR : chB;
-      if (!use.visible) continue;
-      bandMarks.push(
-        rect(x, y, w, h, { fill: use.paintValue, 'fill-opacity': Math.min(1, use.opacity * 1.2) }),
-      );
+      slice(x, y, w, h);
     }
 
-    // 扫描线：整幅平铺的细横线
-    let scanRef = '';
-    if (scan.visible && scan.opacity > 0) {
-      const g0 = scanGap;
-      scanRef = api.tile({
-        key: `gx-scan-${api.n(g0)}`,
-        w: 4,
-        h: g0,
-        content: rect(0, 0, 4, Math.max(1, g0 * 0.5), {
-          fill: scan.paintValue,
-          'fill-opacity': scan.opacity,
-        }),
-      });
+    // ③ 零星像素块：贴着切片簇散落，尺寸按短边归一化
+    for (let i = 0; i < blockCount; i++) {
+      const s = unit * (10 + rng() * 30);
+      slice(rng() * W, near(), s * (1 + rng() * 3), s);
     }
 
-    const parts = [
-      rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }),
-      ...layers,
-      ...bandMarks,
+    const parts: string[] = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
+    if (chB.visible) parts.push(rect(0, fieldY, W, fieldH, { fill: chB.paintValue, 'fill-opacity': chB.opacity * 0.14 }));
+    // 叠印顺序：R、B 在下，G 在上（保证 G 可见）
+    const layers: Array<[typeof chR, string[]]> = [
+      [chR, R],
+      [chB, B],
+      [chG, G],
     ];
-    if (scanRef !== '') parts.push(rect(0, 0, W, H, { fill: scanRef }));
+    for (const [e, list] of layers) {
+      if (!e.visible || list.length === 0) continue;
+      parts.push(g({ fill: e.paintValue, 'fill-opacity': e.opacity }, list.join('')));
+    }
+
+    // 扫描线：低不透明度细横线平铺（间距按短边缩放，避免高分屏上过密产生摩尔纹）
+    if (scan.visible && scan.opacity > 0) {
+      const scanRef = api.tile({
+        key: `gx-scan-${n(scanGap)}`,
+        w: 4,
+        h: scanGap,
+        content: rect(0, 0, 4, Math.max(1, scanGap * 0.4), { fill: scan.paintValue, 'fill-opacity': scan.opacity }),
+      });
+      parts.push(rect(0, 0, W, H, { fill: scanRef }));
+    }
 
     let body = parts.join('');
 
@@ -231,7 +187,7 @@ const def: PatternDef = {
       // keyframes() 的第二个参数是**声明体**，函数内部会自行拼 `@keyframes 名称{...}`
       const name = api.keyframes(
         'vwGlitchScroll',
-        `from{transform:translateY(0)}to{transform:translateY(${api.n(scanGap)}px)}`,
+        `from{transform:translateY(0)}to{transform:translateY(${n(scanGap)}px)}`,
       );
       body = g({ style: `animation:${name} 0.4s linear infinite` }, body);
     }

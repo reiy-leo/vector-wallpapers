@@ -83,20 +83,13 @@ export const CURATED_SETS: readonly CuratedSet[] = [
       {
         patternId: 'aurora-wave',
         seed: 3,
-        params: { bands: 3, stars: 10 },
+        params: {},
         colors: {
-          sky: {
-            type: 'linear',
-            angle: 90,
-            stops: [
-              { offset: 0, color: '#020617' },
-              { offset: 1, color: '#1e293b' },
-            ],
-          },
-          band_a: { type: 'solid', color: '#22d3ee' },
-          band_b: { type: 'solid', color: '#818cf8' },
-          stars: { type: 'solid', color: '#e2e8f0' },
-        },
+        sky: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#050a10' }, { offset: 0.6, color: '#0b1a1c' }, { offset: 1, color: '#14222a' }] },
+        band_a: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9adbb8' }, { offset: 1, color: '#5c9c9a' }] },
+        band_b: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9fc7d6' }, { offset: 1, color: '#6d86b5' }] },
+        stars: { type: 'solid', color: '#e6efef' },
+      },
       },
       {
         patternId: 'hex-grid',
@@ -156,21 +149,15 @@ export const CURATED_SETS: readonly CuratedSet[] = [
       {
         patternId: 'new-wave-sunset',
         seed: 512,
-        params: { stripes: 11, sunY: 0.46 },
+        params: {},
         colors: {
-          sky: {
-            type: 'linear',
-            angle: 90,
-            stops: [
-              { offset: 0, color: '#1e1b4b' },
-              { offset: 1, color: '#f472b6' },
-            ],
-          },
-          sun: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#fde047' }, { offset: 1, color: '#fb7185' }] },
-          horizon: { type: 'solid', color: '#4c1d95' },
-          silhouette: { type: 'solid', color: '#2e1065' },
-          glare: { type: 'solid', color: '#f0abfc' },
-        },
+        sky: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1d1c38' }, { offset: 0.45, color: '#4a3f6b' }, { offset: 0.78, color: '#a7708a' }, { offset: 1, color: '#e9a88a' }] },
+        sun: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#ffe2b8' }, { offset: 1, color: '#ef9a86' }] },
+        horizon: { type: 'solid', color: '#211d3a' },
+        silhouette: { type: 'solid', color: '#352c55' },
+        glare: { type: 'solid', color: '#f4b394' },
+        grid: { type: 'solid', color: '#e59a8f' },
+      },
       },
     ],
   },
@@ -255,13 +242,13 @@ export const CURATED_SETS: readonly CuratedSet[] = [
       {
         patternId: 'aurora-wave',
         seed: 2024,
-        params: { bands: 4, amp: 0.13 },
+        params: {},
         colors: {
-          sky: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#010409' }, { offset: 1, color: '#0f172a' }] },
-          band_a: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#a7f3d0' }, { offset: 1, color: '#22d3ee' }] },
-          band_b: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#bae6fd' }, { offset: 1, color: '#38bdf8' }] },
-          stars: { type: 'solid', color: '#f8fafc' },
-        },
+        sky: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#0b0915' }, { offset: 0.6, color: '#161229' }, { offset: 1, color: '#211b33' }] },
+        band_a: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#c7a9d6' }, { offset: 1, color: '#8a78b8' }] },
+        band_b: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#9cc3d4' }, { offset: 1, color: '#6a7fb4' }] },
+        stars: { type: 'solid', color: '#e4def0' },
+      },
       },
       {
         patternId: 'liquid-mesh',
@@ -285,22 +272,15 @@ export const CURATED_SETS: readonly CuratedSet[] = [
       {
         patternId: 'new-wave-sunset',
         seed: 1984,
-        params: { stripes: 14, sunR: 0.24, horizonH: 0.7 },
+        params: {},
         colors: {
-          sky: {
-            type: 'linear',
-            angle: 90,
-            stops: [
-              { offset: 0, color: '#1a1033' },
-              { offset: 0.45, color: '#c026d3' },
-              { offset: 1, color: '#fbbf24' },
-            ],
-          },
-          sun: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#fde047' }, { offset: 1, color: '#f97316' }] },
-          horizon: { type: 'solid', color: '#4c1d95' },
-          silhouette: { type: 'solid', color: '#1e0b3a' },
-          glare: { type: 'solid', color: '#fda4af' },
-        },
+        sky: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#090b17' }, { offset: 0.5, color: '#161834' }, { offset: 0.82, color: '#2e2a4f' }, { offset: 1, color: '#4f3d5e' }] },
+        sun: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#e6cfd6' }, { offset: 1, color: '#a07892' }] },
+        horizon: { type: 'solid', color: '#0b0c19' },
+        silhouette: { type: 'solid', color: '#191a33' },
+        glare: { type: 'solid', color: '#8d7397' },
+        grid: { type: 'solid', color: '#7c6a9e' },
+      },
       },
       {
         patternId: 'dusk-ridges',
