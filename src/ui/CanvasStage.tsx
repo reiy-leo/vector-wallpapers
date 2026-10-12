@@ -18,7 +18,7 @@ import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from '
 import { shuffleCurrent } from './Panels';
 import { applyTone, bgTone, type BgTone } from './coloring';
 import { Button, IconButton, Segmented, Tooltip, inputClass } from './primitives';
-import { ControlChips, DiscreteChips } from './ControlChips';
+import { ControlsPopover, DiscreteChips } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
   IconClose,
@@ -127,9 +127,9 @@ export function CanvasStage({
       </div>
 
       {/* ───────────────────────────────────────────────────────────
-          工具条：两行，每行一个职责。
-            行① 画布（尺寸）+ 模式（离散选项）｜ 右侧：诊断（体积/节点）+ 视图动作
-            行② 连续参数：等宽网格，标签 / 滑条 / 数值三列上下对齐
+          工具条：单行。
+            左：画布（尺寸）｜ 参数上拉列表（kumo Popover）+ 模式（离散选项）
+            右：诊断（体积/节点）+ 视图动作
           ─────────────────────────────────────────────────────────── */}
       <div className="grid shrink-0 gap-3 border-t border-line px-5 py-3">
         {/* 行① */}
@@ -139,6 +139,7 @@ export function CanvasStage({
           {/* 竖分隔线：尺寸是「画布」，右边是「内容」的模式选项 */}
           <div aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-line sm:block" />
 
+          <ControlsPopover />
           <DiscreteChips />
 
           <div className="ml-auto flex items-center gap-3">
@@ -196,9 +197,6 @@ export function CanvasStage({
             </div>
           </div>
         </div>
-
-        {/* 行② 连续参数 */}
-        <ControlChips />
       </div>
     </div>
   );

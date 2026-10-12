@@ -13,8 +13,10 @@
  * （它服务于「复现/分享」，属配置而非形态）与全部参数的长说明。
  */
 import { useMemo } from 'react';
+import { Popover } from '@cloudflare/kumo/components/popover';
+import { IconChevron, IconSliders } from './icons';
 import { setParam, usePatternDef, useWorkbenchSelector } from './store';
-import { Chip, SliderChip, inputClass } from './primitives';
+import { Button, Chip, SliderChip, inputClass } from './primitives';
 import type { ControlDef, ParamValue } from '../patterns/types';
 import type { PatternConfig } from '../engine/types';
 
@@ -26,6 +28,33 @@ import type { PatternConfig } from '../engine/types';
  *  - select / toggle / angle → 退化为 chip 或原生 select，
  *    塞进工具条时**统一降级为单行紧凑形态**，绝不撑高整条工具栏。
  */
+/**
+ * 形态参数「上拉列表」：工具条里只留一个按钮，点开后向上弹出 kumo Popover，
+ * 滑块在里面竖排对齐。工具条因此恒为一行，不再随母题参数个数忽高忽低。
+ */
+export function ControlsPopover() {
+  const def = usePatternDef();
+  const count = useMemo(() => visibleControls(def.controls).length, [def.controls]);
+  if (count === 0) return null;
+  return (
+    <Popover>
+      <Popover.Trigger
+        render={
+          <Button variant="secondary" size="sm" aria-label="形态参数">
+            <IconSliders size={15} />
+            参数
+            <span className="font-mono text-[0.9em] text-fg-mute">{count}</span>
+            <IconChevron dir="up" size={13} />
+          </Button>
+        }
+      />
+      <Popover.Content side="top" sideOffset={8}>
+        <ControlChips />
+      </Popover.Content>
+    </Popover>
+  );
+}
+
 export function ControlChips() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
@@ -38,7 +67,7 @@ export function ControlChips() {
     <div
       role="group"
       aria-label="形态参数"
-      className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-x-8 gap-y-2"
+      className="grid w-72 gap-y-3"
     >
       {controls.map((c) => (
         <ControlChip key={c.key} control={c} cfg={cfg} />
