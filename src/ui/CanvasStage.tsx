@@ -17,7 +17,7 @@ import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
 import { applyTone, bgTone, type BgTone } from './coloring';
-import { Button, IconButton, Segmented, Tooltip, inputClass } from './primitives';
+import { IconButton, Segmented, Tooltip, inputClass } from './primitives';
 import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
@@ -91,11 +91,10 @@ export function CanvasStage({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Tooltip content="换 seed + 从色板重排配色">
-            <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
-              <IconShuffle size={15} />
-              换一版
-            </Button>
+          <Tooltip side="bottom" content="换一版：换 seed + 从色板重排配色">
+            <IconButton label="换一版" nativeTitle={false} variant="secondary" onClick={() => shuffleCurrent(strategy)}>
+              <IconShuffle size={16} />
+            </IconButton>
           </Tooltip>
           <ProductActions onNotice={onNotice} />
         </div>

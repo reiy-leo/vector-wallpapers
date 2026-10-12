@@ -17,32 +17,21 @@
  * 图片右上角的是**壁纸本身**的浅底/深底切换，二者作用域不同。
  */
 import { useEffect, useState } from 'react';
-import { getConfig, savedKey, setUI, toggleSaved, usePatternDef, useWorkbenchSelector } from './store';
+import { setUI, useWorkbenchSelector } from './store';
 import { FavoritesDialog } from './FavoritesDialog';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
-import { consumeLoginError, loadMe, loginBlocker, logout, requireLogin, startLogin, useAuth } from './auth';
-import { IconAuto, IconGoogle, IconMoon, IconPanel, IconStar, IconSun } from './icons';
+import { consumeLoginError, loadMe, loginBlocker, logout, startLogin, useAuth } from './auth';
+import { IconAuto, IconGoogle, IconMoon, IconPanel, IconSun } from './icons';
 import type { UIState } from '../engine/types';
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
 export type NoticeFn = (message: string, tone?: NoticeTone) => void;
 
 export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
-  const def = usePatternDef();
   const panel = useWorkbenchSelector((s) => s.ui.panel);
   const theme = useWorkbenchSelector((s) => s.ui.theme);
-  // 收藏的是「这一张」：当前配置（配色 / 参数 / seed）的编码在收藏里即为已收藏
-  const cfg = useWorkbenchSelector((s) => s.cfg);
-  const saved = useWorkbenchSelector((s) => s.saved);
-  const isFavorite = saved.some((x) => x.q === savedKey(cfg));
 
-  const toggleFavorite = () => {
-    // 收藏需要 Google 登录：未登录时弹出门禁，不改动收藏
-    if (!requireLogin('favorite')) return;
-    toggleSaved(getConfig());
-    onNotice(isFavorite ? '已取消收藏' : `已收藏这张「${def.name}」，可在头像菜单「管理收藏」查看`, 'success');
-  };
 
   return (
     <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2">
@@ -67,22 +56,12 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
         <Tooltip side="bottom" content={panel === 'right' ? '把面板移到左侧' : '把面板移到右侧'}>
           <IconButton
             label="切换面板位置"
+            nativeTitle={false}
             aria-pressed={panel === 'left'}
             className={panel === 'left' ? 'bg-brand-tint text-brand' : ''}
             onClick={() => setUI({ panel: panel === 'right' ? 'left' : 'right' })}
           >
             <IconPanel size={16} />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip side="bottom" content={isFavorite ? '取消收藏这张' : '收藏这张壁纸'}>
-          <IconButton
-            label={isFavorite ? '取消收藏' : '收藏'}
-            aria-pressed={isFavorite}
-            className={isFavorite ? 'text-brand' : ''}
-            onClick={toggleFavorite}
-          >
-            <IconStar size={16} filled={isFavorite} />
           </IconButton>
         </Tooltip>
       </div>

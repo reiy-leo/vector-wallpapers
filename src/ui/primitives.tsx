@@ -169,17 +169,26 @@ export function Button({
 export function IconButton({
   label,
   size = 'sm',
+  variant = 'ghost',
+  nativeTitle = true,
   className = '',
   children,
   ...rest
-}: { label: string; size?: ButtonSize; className?: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
+}: {
+  label: string;
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+  /** 外层已包 `Tooltip` 时传 false：原生 title 有 ~1s 延迟，还会与自绘提示重复出现。 */
+  nativeTitle?: boolean;
+  className?: string;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
   const box = ICON_BOX[size];
   return (
     <button
       type="button"
-      title={label}
+      title={nativeTitle ? label : undefined}
       aria-label={label}
-      className={`${BUTTON_BASE} ${BUTTON_VARIANT.ghost} ${box} shrink-0 ${className}`}
+      className={`${BUTTON_BASE} ${BUTTON_VARIANT[variant]} ${box} shrink-0 ${className}`}
       {...rest}
     >
       {children}
@@ -649,7 +658,8 @@ export function Tooltip({
         className={[
           'pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap',
           'rounded-xs bg-fg px-2 py-1 text-xs text-fg-inverse opacity-0',
-          'transition-opacity duration-100 group-hover/tt:opacity-100 group-focus-within/tt:opacity-100',
+          // 无延迟、极短淡入：hover 即现（Rei 2026-10-12「tooltip 很快」）
+          'transition-opacity duration-75 group-hover/tt:opacity-100 group-focus-within/tt:opacity-100',
           side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
         ].join(' ')}
       >

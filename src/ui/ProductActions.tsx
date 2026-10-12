@@ -18,10 +18,10 @@ import { useEffect, useState } from 'react';
 import { registry } from '../patterns';
 import { detectPlatform, guardCanvasSize, type ExportScale } from '../shared/guards';
 import { copyBackgroundCSS, copySVGSource, exportPNG, exportSVG } from './exporters';
-import { getConfig, usePatternDef, useWorkbenchSelector } from './store';
+import { getConfig, savedKey, toggleSaved, usePatternDef, useWorkbenchSelector } from './store';
 import { requireLogin } from './auth';
-import { Button, Dialog, Segmented } from './primitives';
-import { IconCode } from './icons';
+import { Button, Dialog, IconButton, Segmented, Tooltip } from './primitives';
+import { IconCode, IconDownload, IconStar } from './icons';
 import type { NoticeFn } from './TopBar';
 
 /** 导出类动作的登录守卫：未登录时弹出门禁并跳过动作。 */
@@ -49,16 +49,43 @@ export function ProductActions({ onNotice }: { onNotice: NoticeFn }) {
     });
   });
 
+  // 收藏「这一张」（配色 / 参数 / seed）—— 从顶栏移到导出右侧（Rei 2026-10-12）
+  const cfg = useWorkbenchSelector((s) => s.cfg);
+  const saved = useWorkbenchSelector((s) => s.saved);
+  const isFavorite = saved.some((x) => x.q === savedKey(cfg));
+  const toggleFavorite = () => {
+    if (!requireLogin('favorite')) return;
+    toggleSaved(getConfig());
+    onNotice(isFavorite ? '已取消收藏' : `已收藏这张「${def.name}」，可在头像菜单「管理收藏」查看`, 'success');
+  };
+
   return (
     <>
-      <Button variant="secondary" size="sm" onClick={copyCss}>
-        复制 CSS
-      </Button>
+      <Tooltip side="bottom" content="复制 CSS 背景">
+        <IconButton label="复制 CSS" nativeTitle={false} variant="secondary" onClick={copyCss}>
+          <IconCode size={16} />
+        </IconButton>
+      </Tooltip>
 
       {/* 导出：单个主动作，对话框里再选格式 */}
-      <Button variant="primary" size="sm" onClick={gated(() => setExportOpen(true))}>
-        导出
-      </Button>
+      <Tooltip side="bottom" content="导出 SVG / PNG">
+        <IconButton label="导出" nativeTitle={false} variant="primary" onClick={gated(() => setExportOpen(true))}>
+          <IconDownload size={16} />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip side="bottom" content={isFavorite ? '取消收藏这张' : '收藏这张壁纸'}>
+        <IconButton
+          label={isFavorite ? '取消收藏' : '收藏'}
+          nativeTitle={false}
+          variant="secondary"
+          aria-pressed={isFavorite}
+          className={isFavorite ? 'text-brand' : ''}
+          onClick={toggleFavorite}
+        >
+          <IconStar size={16} filled={isFavorite} />
+        </IconButton>
+      </Tooltip>
 
       <ExportDialog
         open={exportOpen}
