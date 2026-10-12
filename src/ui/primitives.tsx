@@ -223,9 +223,10 @@ export function ToggleIconButton({
 /**
  * 分段控件（互斥选项，如主题、取色策略）。
  *
- * ⭐ Kumo `concentric-border-radius`：外圈 rounded-sm(6px) + p-0.5(2px)
- * → 内圈必须是 4px（6 − 2）。若内外都写 rounded-sm，圆角不同心，
- * 视觉上会出现左上贴齐、右下脱开的「歪」感。
+ * ⭐ 外观对齐 kumo `Tabs` 的 segmented 变体（同一视觉语言，保留 radiogroup 语义）：
+ *   轨道 bg-surface-3 + 细 ring，选中段 = 白底 + shadow-sm + ring-line。
+ * ⭐ Kumo `concentric-border-radius`：外圈 rounded-md(8px) + p-0.5(2px)
+ * → 内圈必须是 6px（rounded-sm）。
  *
  * ⭐ 高度与 `CONTROL_H` 对齐（32px），此前 sm 档是 28px ——
  * 与旁边的 32px 按钮并排时，整组控件会显得「矮一截、显轻」。
@@ -247,7 +248,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex shrink-0 rounded-sm bg-surface-3 p-0.5 ring-1 ring-line"
+      className="inline-flex shrink-0 rounded-md bg-surface-3 p-0.5 ring-1 ring-line"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -261,11 +262,12 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             className={[
               // 同Kumo `content-text-size`：sm 只缩高度，字号固定 14px
-              'inline-flex items-center justify-center gap-1.5 rounded-xs font-medium',
-              size === 'sm' ? `${CONTROL_H} px-2.5 text-base` : `${CONTROL_H_LG} px-3 text-base`,
+              'inline-flex items-center justify-center gap-1.5 rounded-sm font-medium',
+              // 轨道含 p-0.5，内段高度 = 轨道档位 − 4px，整体仍落在 32 / 36 两档
+              size === 'sm' ? 'h-7 px-2.5 text-base' : 'h-8 px-3 text-base',
               active
-                ? 'bg-surface text-fg shadow-sm'
-                : 'text-fg-soft hover:bg-surface-2 hover:text-fg',
+                ? 'bg-surface text-fg shadow-sm ring-1 ring-line'
+                : 'text-fg-soft hover:text-fg',
             ].join(' ')}
           >
             {o.icon}
@@ -346,7 +348,10 @@ const INPUT_BASE =
  *
  * 调用方需自行覆盖宽度（如 `w-28`），因为 select / number 都按内容定宽。
  */
-export const inputClass = (extra = '') => [INPUT_BASE, 'h-8 px-2', extra].filter(Boolean).join(' ');
+// ⚠️ 去掉 INPUT_BASE 里的 w-full：select / number 按内容定宽，w-full 会与调用方的 w-[4.5rem]
+// 同为工具类、谁赢取决于产物顺序 —— 实测 number 框被 flex 压成 16px、select 撑满整行。
+export const inputClass = (extra = '') =>
+  [INPUT_BASE.replace('w-full ', ''), 'h-8 px-2', extra].filter(Boolean).join(' ');
 
 export function TextInput({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`h-8 px-2.5 ${INPUT_BASE} ${className}`} {...rest} />;

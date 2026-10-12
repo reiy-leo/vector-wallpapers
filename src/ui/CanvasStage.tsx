@@ -288,7 +288,7 @@ function SizeSelect({
 
   return (
     <div className="flex items-center gap-1.5">
-      <label htmlFor="vw-size" className="text-base text-fg-soft">
+      <label htmlFor="vw-size" className="shrink-0 whitespace-nowrap text-base text-fg-soft">
         尺寸
       </label>
       <select
@@ -339,7 +339,7 @@ function CustomSizeInput({
             onChange(clamp(Math.round(v), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION), cfg.height);
           }
         }}
-        className={inputClass('vw-number w-[4.5rem] tabular-nums')}
+        className={inputClass('vw-number w-[4.5rem] shrink-0 tabular-nums')}
       />
       <span className="text-sm text-fg-mute" aria-hidden="true">
         ×
@@ -356,7 +356,7 @@ function CustomSizeInput({
             onChange(cfg.width, clamp(Math.round(v), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION));
           }
         }}
-        className={inputClass('vw-number w-[4.5rem] tabular-nums')}
+        className={inputClass('vw-number w-[4.5rem] shrink-0 tabular-nums')}
       />
     </>
   );

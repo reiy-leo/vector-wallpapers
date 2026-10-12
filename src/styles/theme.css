@@ -16,6 +16,16 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
+/**
+ * Kumo 组件库（@cloudflare/kumo）。
+ * 官方要求：@source 扫描其编译产物 + 样式先于 tailwind 导入，让 kumo 的 @theme token 先注册。
+ * kumo 的颜色 token 在文件末尾「Kumo token 桥接」里映射回本项目的 --vw-*，保证深浅主题一致。
+ */
+@layer theme, base, components, utilities;
+
+@source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx}";
+@import "@cloudflare/kumo/styles";
+
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
@@ -212,98 +222,113 @@
  * 缺任何一条都会出现「按钮字体不继承 / 列表有默认项目符号」这类脏样式。
  * ───────────────────────────────────────────────────────────────────────── */
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  background: var(--vw-canvas);
-  color: var(--vw-text);
-  font-family: var(--font-sans);
-  font-size: 14px; /* Kumo content-text-size：正文统一 14px */
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/**
- * `[hidden]` 必须显式复原为 `display: none`。
- *
- * ⚠️ 这条是被真实截图抓出来的 bug：因为本项目**跳过了 preflight**，
- * 浏览器默认样式表里的 `[hidden] { display: none }` 在我们自己的
- * author stylesheet 面前优先级不足 —— 只要元素上带了 `display:flex`
- * 之类的工具类，`hidden` 属性就完全失效，弹窗会常驻在页面上。
- *
- * 用 `!important` 是因为 Tailwind 工具类的特异性同样压过浏览器默认值，
- * 常规声明赢不了它。这与「Kumo 不条件渲染弹窗」的规则直接相关：
- * 我们靠 `hidden` 控制显隐，这条一失效，整个弹窗动画策略就散了。
+/*
+ * ⚠️ 必须放进 @layer base：Tailwind 工具类在 layer(utilities) 里，
+ * 而**未分层的规则永远压过任何分层规则**（与特异性无关）。
+ * 之前这些重置是未分层的 → `button { background:none; padding:0 }` 把所有按钮/Chip/Tab
+ * 的 bg-* / px-* 工具类全部吃掉，界面看起来像「没有样式的纯文字」。
  */
-[hidden] {
-  display: none !important;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 
-/**
- * 表单元素字体继承。
- *
- * ⚠️ 浏览器给button / input / select / textarea 的默认 font 是系统 UI 字体，
- * 且**不继承** body —— 不写这条，按钮文字会与旁边的正文对不上字号与字重，
- * 这是 preflight 最常被依赖的一条规则，务必保留。
- */
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-  letter-spacing: inherit;
-}
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
 
-button {
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
+  body {
+    background: var(--vw-canvas);
+    color: var(--vw-text);
+    font-family: var(--font-sans);
+    font-size: 14px; /* Kumo content-text-size：正文统一 14px */
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-button:disabled {
-  cursor: not-allowed;
-}
+  /**
+   * `[hidden]` 必须显式复原为 `display: none`。
+   *
+   * ⚠️ 这条是被真实截图抓出来的 bug：因为本项目**跳过了 preflight**，
+   * 浏览器默认样式表里的 `[hidden] { display: none }` 在我们自己的
+   * author stylesheet 面前优先级不足 —— 只要元素上带了 `display:flex`
+   * 之类的工具类，`hidden` 属性就完全失效，弹窗会常驻在页面上。
+   *
+   * 用 `!important` 是因为 Tailwind 工具类的特异性同样压过浏览器默认值，
+   * 常规声明赢不了它。这与「Kumo 不条件渲染弹窗」的规则直接相关：
+   * 我们靠 `hidden` 控制显隐，这条一失效，整个弹窗动画策略就散了。
+   */
+  [hidden] {
+    display: none !important;
+  }
 
-ul,
-ol {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+  /**
+   * 表单元素字体继承。
+   *
+   * ⚠️ 浏览器给button / input / select / textarea 的默认 font 是系统 UI 字体，
+   * 且**不继承** body —— 不写这条，按钮文字会与旁边的正文对不上字号与字重，
+   * 这是 preflight 最常被依赖的一条规则，务必保留。
+   */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
 
-h1,
-h2,
-h3,
-h4,
-p {
-  margin: 0;
-}
+  input,
+  select,
+  textarea {
+    border: 0 solid;
+    background-color: transparent;
+  }
 
-img {
-  display: block;
-  max-width: 100%;
-}
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
 
-/**
- * 焦点态必须可见（PRD P0-9 可访问性 · WCAG 2.4.7）。
- * 用 outline 而非 box-shadow —— 前者在 Windows 高对比度模式下依然存在。
- */
-:focus-visible {
-  outline: 2px solid var(--vw-brand);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+
+  /**
+   * 焦点态必须可见（PRD P0-9 可访问性 · WCAG 2.4.7）。
+   * 用 outline 而非 box-shadow —— 前者在 Windows 高对比度模式下依然存在。
+   */
+  :focus-visible {
+    outline: 2px solid var(--vw-brand);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
 }
 
 /** 仅供读屏软件（Kumo：图标必须有无障碍名称）。 */
@@ -346,148 +371,151 @@ img {
  * 在 Tailwind 工具类里没有对应物。
  * ───────────────────────────────────────────────────────────────────────── */
 
-/**
- * 滑块。
- *
- * Kumo 规则`hover-color-transitions`：hover 的颜色变化必须瞬时完成。
- * 这里只对滑块「位置」加过渡，轨道与拇指的颜色一律瞬时切换 ——
- * 拖动时拇指跟手的观感来自位置过渡，颜色若也跟着渐变就会显得黏。
- */
-.vw-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 20px;
-  background: transparent;
-  cursor: pointer;
-}
+/* 放进 @layer components：组件类（如 .vw-slider 的 width:100%）必须能被工具类（w-24）覆盖。 */
+@layer components {
+  /**
+   * 滑块。
+   *
+   * Kumo 规则`hover-color-transitions`：hover 的颜色变化必须瞬时完成。
+   * 这里只对滑块「位置」加过渡，轨道与拇指的颜色一律瞬时切换 ——
+   * 拖动时拇指跟手的观感来自位置过渡，颜色若也跟着渐变就会显得黏。
+   */
+  .vw-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+  }
 
-.vw-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--vw-surface-3);
-}
+  .vw-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--vw-surface-3);
+  }
 
-.vw-slider::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--vw-surface-3);
-}
+  .vw-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--vw-surface-3);
+  }
 
-.vw-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px; /* (4 - 14) / 2，让拇指与 4px 轨道垂直居中 */
-  border-radius: 999px;
-  background: var(--vw-brand);
-  border: 0;
-  transition: transform 120ms ease;
-}
+  .vw-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px; /* (4 - 14) / 2，让拇指与 4px 轨道垂直居中 */
+    border-radius: 999px;
+    background: var(--vw-brand);
+    border: 0;
+    transition: transform 120ms ease;
+  }
 
-.vw-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--vw-brand);
-  border: 0;
-  box-sizing: border-box;
-}
+  .vw-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--vw-brand);
+    border: 0;
+    box-sizing: border-box;
+  }
 
-.vw-slider:hover::-webkit-slider-thumb {
-  background: var(--vw-brand-hover);
-}
+  .vw-slider:hover::-webkit-slider-thumb {
+    background: var(--vw-brand-hover);
+  }
 
-.vw-slider:hover::-moz-range-thumb {
-  background: var(--vw-brand-hover);
-}
+  .vw-slider:hover::-moz-range-thumb {
+    background: var(--vw-brand-hover);
+  }
 
-.vw-slider:active::-webkit-slider-thumb {
-  background: var(--vw-brand-active);
-  transform: scale(1.15);
-}
+  .vw-slider:active::-webkit-slider-thumb {
+    background: var(--vw-brand-active);
+    transform: scale(1.15);
+  }
 
-.vw-slider:active::-moz-range-thumb {
-  background: var(--vw-brand-active);
-}
+  .vw-slider:active::-moz-range-thumb {
+    background: var(--vw-brand-active);
+  }
 
-.vw-slider:focus-visible {
-  outline-offset: -2px;
-}
+  .vw-slider:focus-visible {
+    outline-offset: -2px;
+  }
 
-/** 数值输入框：去掉数字输入框的上下箭头，避免与「拖动调值」语义冲突。 */
-.vw-number {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
+  /** 数值输入框：去掉数字输入框的上下箭头，避免与「拖动调值」语义冲突。 */
+  .vw-number {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 
-.vw-number::-webkit-outer-spin-button,
-.vw-number::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+  .vw-number::-webkit-outer-spin-button,
+  .vw-number::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
-/**
- * 原生取色器。
- * 缩到 1px 并用绝对定位外框承接点击 —— 保留系统取色器（含无障碍与
- * 键盘操作），同时让视觉呈现完全由外层样式控制。
- */
-.vw-color-native {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  cursor: pointer;
-}
+  /**
+   * 原生取色器。
+   * 缩到 1px 并用绝对定位外框承接点击 —— 保留系统取色器（含无障碍与
+   * 键盘操作），同时让视觉呈现完全由外层样式控制。
+   */
+  .vw-color-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
 
-/** 滚动条：细、低对比，不与内容抢注意力。 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--vw-line-strong) transparent;
-}
+  /** 滚动条：细、低对比，不与内容抢注意力。 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vw-line-strong) transparent;
+  }
 
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-*::-webkit-scrollbar-thumb {
-  background: var(--vw-line-strong);
-  border: 3px solid transparent;
-  background-clip: content-box;
-  border-radius: 999px;
-}
+  *::-webkit-scrollbar-thumb {
+    background: var(--vw-line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
 
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--vw-text-mute);
-  background-clip: content-box;
-}
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--vw-text-mute);
+    background-clip: content-box;
+  }
 
-/**
- * 画布背板。
- * 极淡的棋盘格 —— 只为让**浅色**壁纸也有清晰边界，几乎不可见但有效。
- */
-.vw-stage {
-  background-color: var(--vw-surface);
-  background-image:
-    linear-gradient(45deg, var(--vw-surface-2) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--vw-surface-2) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--vw-surface-2) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--vw-surface-2) 75%);
-  background-size: 16px 16px;
-  background-position:
-    0 0,
-    0 8px,
-    8px -8px,
-    -8px 0;
+  /**
+   * 画布背板。
+   * 极淡的棋盘格 —— 只为让**浅色**壁纸也有清晰边界，几乎不可见但有效。
+   */
+  .vw-stage {
+    background-color: var(--vw-surface);
+    background-image:
+      linear-gradient(45deg, var(--vw-surface-2) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--vw-surface-2) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--vw-surface-2) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--vw-surface-2) 75%);
+    background-size: 16px 16px;
+    background-position:
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0;
+  }
 }
 
 /**
@@ -504,4 +532,41 @@ img {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Kumo token 桥接
+ * ---------------------------------------------------------------------
+ * kumo 组件（Tabs 等）使用 bg-kumo-* / text-kumo-* 语义 token，默认值走 light-dark()，
+ * 依赖 color-scheme；本项目主题由 [data-theme] 驱动。这里把 kumo token 直接指到 --vw-*，
+ * 一处切换，两套组件同步，不必再维护 [data-mode]。
+ * --------------------------------------------------------------------- */
+:root {
+  color-scheme: light dark;
+
+  --color-kumo-base: var(--vw-surface);
+  --color-kumo-elevated: var(--vw-surface);
+  --color-kumo-recessed: var(--vw-surface-3);
+  --color-kumo-tint: var(--vw-surface-2);
+  --color-kumo-control: var(--vw-surface);
+  --color-kumo-line: var(--vw-line);
+  --color-kumo-hairline: var(--vw-line);
+  --color-kumo-brand: var(--vw-brand);
+  --color-kumo-brand-hover: var(--vw-brand-hover);
+  --color-kumo-focus: var(--vw-brand);
+
+  --text-color-kumo-default: var(--vw-text);
+  --text-color-kumo-strong: var(--vw-text);
+  --text-color-kumo-subtle: var(--vw-text-soft);
+  --text-color-kumo-inactive: var(--vw-text-mute);
+  --text-color-kumo-placeholder: var(--vw-text-mute);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }

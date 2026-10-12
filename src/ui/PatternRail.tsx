@@ -10,7 +10,8 @@ import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { useWorkbenchSelector, selectPattern, setCategory, setSearch } from './store';
-import { CountBadge, Chip, SearchInput } from './primitives';
+import { Tabs } from '@cloudflare/kumo/components/tabs';
+import { CountBadge, SearchInput } from './primitives';
 import { IconStar } from './icons';
 import type { PatternDef } from '../patterns/types';
 
@@ -88,23 +89,22 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
           placeholder="搜索母题"
         />
         {/*
-         * 分类 Tab 用 flex-wrap 而不是横向滚动。
-         *
-         * ⚠️ 5 个分类（「全部」+4）在 280px 栏里横向排不下，
-         * 用 overflow-x-auto 会让「像素复古」被裁掉一半且**没有任何可见的
-         * 滚动提示** —— 用户根本不知道右边还有内容。换成换行后
-         * 5 个标签占两行，全部可见，且不依赖任何交互就能发现。
+         * 分类筛选用 kumo `Tabs`（segmented）：与右栏面板 Tabs 同一套组件与动画指示器。
+         * 标签用短名（线条/波点/流体/像素），5 段在 256px 内一行放下 ——
+         * 放不下时 kumo 会出横向滚动 + 渐隐箭头，但「像素」被藏起来的问题依旧，所以宁可用短名。
          */}
-        <nav aria-label="母题分类" className="flex flex-wrap gap-1">
-          <Chip active={category === ALL} onClick={() => setCategory(ALL)}>
-            全部
-          </Chip>
-          {CATEGORY_META.map((c) => (
-            <Chip key={c.id} active={category === c.id} onClick={() => setCategory(c.id)}>
-              {c.label}
-            </Chip>
-          ))}
-        </nav>
+        <Tabs
+          variant="segmented"
+          className="w-full rounded-md"
+          listClassName="rounded-md"
+          indicatorClassName="rounded-sm"
+          value={category}
+          onValueChange={setCategory}
+          tabs={[
+            { value: ALL, label: '全部', className: 'flex-1 justify-center' },
+            ...CATEGORY_META.map((c) => ({ value: c.id, label: c.short, className: 'flex-1 justify-center' })),
+          ]}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">

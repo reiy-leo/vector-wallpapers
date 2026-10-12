@@ -96,12 +96,14 @@ export const PRESERVE_ASPECT_RATIO = 'xMidYMid slice';
 export const CATEGORY_META: ReadonlyArray<{
   id: 'A-lines' | 'B-repeat' | 'C-organic' | 'D-pixel';
   label: string;
+  /** 分类 Tabs 用的短名：5 个分段在 280px 栏里一行放下，不触发 kumo Tabs 的横向滚动。 */
+  short: string;
   hint: string;
 }> = [
-  { id: 'A-lines', label: '极简线条', hint: '克制、几何、单色块面' },
-  { id: 'B-repeat', label: '波点网格', hint: '高密度重复构成秩序感' },
-  { id: 'C-organic', label: '渐变流体', hint: '柔和过渡与有机形态' },
-  { id: 'D-pixel', label: '像素复古', hint: '游戏厅、霓虹、复古印刷' },
+  { id: 'A-lines', label: '极简线条', short: '线条', hint: '克制、几何、单色块面' },
+  { id: 'B-repeat', label: '波点网格', short: '波点', hint: '高密度重复构成秩序感' },
+  { id: 'C-organic', label: '渐变流体', short: '流体', hint: '柔和过渡与有机形态' },
+  { id: 'D-pixel', label: '像素复古', short: '像素', hint: '游戏厅、霓虹、复古印刷' },
 ];
 
 /** URL 写入防抖（PRD P0-6：拖动滑块不应刷历史记录）。 */

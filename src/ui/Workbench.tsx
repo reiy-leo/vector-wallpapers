@@ -11,6 +11,7 @@
  * 而 CSS 断点在首帧就是最终布局。
  */
 import { useCallback, useEffect, useState } from 'react';
+import { Tabs } from '@cloudflare/kumo/components/tabs';
 import type { ColorStrategy } from '../engine/colors';
 import { detectPlatform } from '../shared/guards';
 import { CanvasStage } from './CanvasStage';
@@ -200,35 +201,17 @@ function PanelBody({
 }
 
 function TabBar({ tab, onTab }: { tab: PanelTab; onTab: (t: PanelTab) => void }) {
+  /*
+   * kumo `Tabs`（underline）：自带 border-b 分隔（Kumo `sticky-borders`）、
+   * 滑动指示器与 roving tabindex / 方向键导航（Base UI Tabs）。
+   */
   return (
-    /*
-     * ⭐ Kumo `sticky-borders`：粘性 Tab 栏用 border 与内容分隔。
-     * 4 个中文标签在 360px 栏里约 240px，加上 4×24px 内边距仍在预算内，
-     * 因此不需要横向滚动 —— 滚动会把「合集」藏起来，得不偿失。
-     */
-    <nav
-      aria-label="面板分组"
-      className="-mb-1 flex gap-1 border-b border-line"
-    >
-      {TABS.map((t) => {
-        const active = t.id === tab;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            aria-current={active ? 'page' : undefined}
-            onClick={() => onTab(t.id)}
-            className={[
-              '-mb-px shrink-0 border-b-2 px-2.5 py-2 text-base',
-              active
-                ? 'border-brand font-medium text-fg'
-                : 'border-transparent text-fg-soft hover:text-fg',
-            ].join(' ')}
-          >
-            {t.label}
-          </button>
-        );
-      })}
-    </nav>
+    <Tabs
+      variant="underline"
+      className="-mb-1"
+      value={tab}
+      onValueChange={(v) => onTab(v as PanelTab)}
+      tabs={TABS.map((t) => ({ value: t.id, label: t.label }))}
+    />
   );
 }
