@@ -90,7 +90,7 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
         />
         {/*
          * 分类筛选用 kumo `Tabs`（segmented）：与右栏面板 Tabs 同一套组件与动画指示器。
-         * 标签用短名（线条/波点/流体/像素），5 段在 256px 内一行放下 ——
+         * 标签用短名（线条/几何/流体/风景/像素），6 段在 256px 内一行放下 ——
          * 放不下时 kumo 会出横向滚动 + 渐隐箭头，但「像素」被藏起来的问题依旧，所以宁可用短名。
          */}
         <Tabs

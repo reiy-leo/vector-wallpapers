@@ -18,7 +18,8 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const def: PatternDef = {
   id: 'halftone',
   name: '递变网点',
-  category: 'B-repeat',
+  category: 'D-pixel',
+  crispEdges: false, // 分类重组前的渲染结果保持不变
   description: '45° 网屏上网点由大到小平滑递变，可双色交叉分色，模拟印刷半色调。',
   seedable: true,
   animatable: true,

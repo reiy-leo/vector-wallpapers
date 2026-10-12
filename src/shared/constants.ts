@@ -94,15 +94,16 @@ export const PRESERVE_ASPECT_RATIO = 'xMidYMid slice';
 
 /** 分类展示名与顺序 —— UI 的分类 Tab 由此生成。 */
 export const CATEGORY_META: ReadonlyArray<{
-  id: 'A-lines' | 'B-repeat' | 'C-organic' | 'D-pixel';
+  id: 'A-lines' | 'B-repeat' | 'C-organic' | 'E-scene' | 'D-pixel';
   label: string;
-  /** 分类 Tabs 用的短名：5 个分段在 280px 栏里一行放下，不触发 kumo Tabs 的横向滚动。 */
+  /** 分类 Tabs 用的短名：「全部」+ 5 类共 6 个分段，两字短名才能在栏宽内一行放下，不触发 kumo Tabs 的横向滚动。 */
   short: string;
   hint: string;
 }> = [
-  { id: 'A-lines', label: '极简线条', short: '线条', hint: '克制、几何、单色块面' },
-  { id: 'B-repeat', label: '波点网格', short: '波点', hint: '高密度重复构成秩序感' },
+  { id: 'A-lines', label: '极简线条', short: '线条', hint: '线束、等高线、条纹与放射' },
+  { id: 'B-repeat', label: '几何构成', short: '几何', hint: '几何块面与重复平铺纹样' },
   { id: 'C-organic', label: '渐变流体', short: '流体', hint: '柔和过渡与有机形态' },
+  { id: 'E-scene', label: '风景意境', short: '风景', hint: '山峦、云霞、极光、森林' },
   { id: 'D-pixel', label: '像素复古', short: '像素', hint: '游戏厅、霓虹、复古印刷' },
 ];
 

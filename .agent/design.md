@@ -177,7 +177,7 @@ clamp 上限防 7680 超宽屏线细成发丝，下限防缩略图粗成色块�
 
 - `theme.css` 顶部：`@layer theme, base, components, utilities;` → `@source` kumo dist → `@import "@cloudflare/kumo/styles"` → tailwind theme/utilities。
 - kumo 颜色 token（`--color-kumo-*` / `--text-color-kumo-*`）在 `theme.css` 末尾「Kumo token 桥接」映射到 `--vw-*`，深浅主题仍只由 `[data-theme]` 驱动。
-- Tabs 一律用 kumo `Tabs`（`@cloudflare/kumo/components/tabs`）：右栏面板 = `underline`，母题分类 = `segmented`（短名 线条/波点/流体/像素，一行放下）。
+- Tabs 一律用 kumo `Tabs`（`@cloudflare/kumo/components/tabs`）：右栏面板 = `underline`，母题分类 = `segmented`（全部 + 短名 线条/几何/流体/风景/像素，一行放下；来源 `CATEGORY_META`）。
 - `Segmented`（radiogroup 语义）外观对齐 kumo segmented：轨道 `rounded-md p-0.5 bg-surface-3`，选中段 `rounded-sm bg-surface shadow-sm ring-1 ring-line`。
 - ⚠️ **preflight 替代品必须在 `@layer base`、原生控件组件类必须在 `@layer components`**：未分层规则永远压过分层的工具类。此前 `button { background:none; padding:0 }` 未分层，导致所有按钮 / Chip 的 `bg-*` `px-*` 失效（界面像纯文字）；`.vw-slider { width:100% }` 压过 `w-24` 导致滑块与标签重叠。
 - `inputClass()` 不含 `w-full`（select / number 按内容定宽）。

@@ -118,7 +118,8 @@ export function renderSVG(
   const defsMarkup = defs.serialize();
 
   // D-pixel 类必须锐化边缘，否则缩放时像素会被插值糊掉（架构 §9.3 坑 1）
-  const crisp = def.category === 'D-pixel';
+  //    分类重组后个别 pattern 用 `crispEdges` 显式覆盖，保证渲染结果不随分类变动。
+  const crisp = def.crispEdges ?? def.category === 'D-pixel';
 
   const svg =
     el(

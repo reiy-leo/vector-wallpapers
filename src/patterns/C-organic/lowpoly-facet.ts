@@ -25,7 +25,7 @@ const MAX_CELLS = 150;
 const def: PatternDef = {
   id: 'lowpoly-facet',
   name: '低多边形',
-  category: 'C-organic',
+  category: 'B-repeat',
   description: '整幅抖动网格三角剖分，颜色沿光源方向在多个色标间渐变，折纸般的几何质感。',
   seedable: true,
   animatable: false,

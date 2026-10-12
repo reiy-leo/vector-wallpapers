@@ -17,7 +17,7 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const def: PatternDef = {
   id: 'bauhaus-blocks',
   name: '包豪斯块面',
-  category: 'A-lines',
+  category: 'B-repeat',
   description: '圆、半圆、四分之一圆、三角与方块在大模块格中错落留白，安静的包豪斯构成。',
   seedable: true,
   animatable: false,

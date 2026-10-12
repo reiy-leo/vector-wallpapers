@@ -19,7 +19,7 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const def: PatternDef = {
   id: 'arc-composition',
   name: '弧光构成',
-  category: 'A-lines',
+  category: 'B-repeat',
   description: '三组大尺度同心弧错落构成，缀以节点圆点，大面积留白的包豪斯式构图。',
   seedable: true,
   animatable: false,

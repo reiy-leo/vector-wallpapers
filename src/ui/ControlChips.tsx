@@ -14,9 +14,10 @@
  */
 import { useMemo } from 'react';
 import { Popover } from '@cloudflare/kumo/components/popover';
+import { Switch } from '@cloudflare/kumo/components/switch';
 import { IconChevron, IconSliders } from './icons';
 import { setParam, usePatternDef, useWorkbenchSelector } from './store';
-import { Button, Chip, SliderChip, inputClass } from './primitives';
+import { Button, SliderChip, inputClass } from './primitives';
 import type { ControlDef, ParamValue } from '../patterns/types';
 import type { PatternConfig } from '../engine/types';
 
@@ -76,9 +77,15 @@ export function ControlChips() {
   );
 }
 
-/** 只展示 range / angle：它们是工具条唯一「拧一下就有反馈」的形态。 */
+/**
+ * 上拉列表里展示 range / angle 滑块，以及 toggle 开关（kumo Switch）。
+ * toggle 收进这里，工具条不再出现「隔条换色」这类外置按钮（Rei 2026-10-12）。
+ * 滑块在前、开关在后，保持「连续调节 → 开关」的阅读顺序。
+ */
 function visibleControls(controls: readonly ControlDef[]): readonly ControlDef[] {
-  return controls.filter((c) => c.type === 'range' || c.type === 'angle');
+  const sliders = controls.filter((c) => c.type === 'range' || c.type === 'angle');
+  const switches = controls.filter((c) => c.type === 'toggle');
+  return [...sliders, ...switches];
 }
 
 function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig }) {
@@ -94,6 +101,19 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
         step={1}
         format={(v) => `${v}°`}
         onChange={(v) => setParam(control.key, v)}
+      />
+    );
+  }
+
+  if (control.type === 'toggle') {
+    return (
+      <Switch
+        label={control.label}
+        controlFirst={false}
+        size="sm"
+        checked={value === true}
+        onCheckedChange={(v) => setParam(control.key, v)}
+        className="justify-between"
       />
     );
   }
@@ -125,7 +145,7 @@ export function DiscreteChips() {
   const cfg = useWorkbenchSelector((s) => s.cfg);
 
   const controls = useMemo(
-    () => def.controls.filter((c) => c.type === 'toggle' || c.type === 'select'),
+    () => def.controls.filter((c) => c.type === 'select'),
     [def.controls],
   );
 
@@ -147,14 +167,6 @@ export function DiscreteChips() {
 function DiscreteChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig }) {
   const value = cfg.params[control.key];
   const set = (v: ParamValue) => setParam(control.key, v);
-
-  if (control.type === 'toggle') {
-    return (
-      <Chip active={value === true} onClick={() => set(value !== true)}>
-        {control.label}
-      </Chip>
-    );
-  }
 
   if (control.type !== 'select') return null;
 

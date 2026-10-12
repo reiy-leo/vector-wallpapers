@@ -37,7 +37,7 @@
 | 3 | 元件数据结构 | `elements: Array<{id, paint, opacity, visible, locked}>` 有序数组 | `Record<string, ElementStyle>` 映射 | ✅ 改为有序数组（顺序即 z 轴） |
 | 4 | 颜色模型 | `PaintSpec` 支持 **linear / radial 渐变** + 多色标 | 仅单色 `color: string` | ✅ 新增 PaintSpec 联合类型 + 渐变 defs 生成 |
 | 5 | URL 格式 | `?p=&w=&h=&seed=&cols=&params=&ui=`，含面板与主题 | 自创 `?v=&p=&s=&d=&t=&c=` | ✅ 完全改用 PRD 格式，主题/面板进 URL |
-| 6 | 分类枚举 | `'A-lines' \| 'B-repeat' \| 'C-organic' \| 'D-pixel'` | `'minimal' \| 'dots' \| 'fluid' \| 'pixel'` | ✅ 采用 PRD 枚举值 |
+| 6 | 分类枚举 | `'A-lines' \| 'B-repeat' \| 'C-organic' \| 'D-pixel'` | `'minimal' \| 'dots' \| 'fluid' \| 'pixel'` | ✅ 采用 PRD 枚举值；2026-10-12 重组新增 `'E-scene'`（风景），B-repeat 展示名改「几何」，Tab 顺序 全部/线条/几何/流体/风景/像素，以 `category` 字段为准（文件夹不变） |
 | 7 | 体积红线 | 单 Pattern SVG **< 20KB** | SVG ≤ 800KB | ✅ 收紧至 20KB，并升级为开发期 `throw` 级断言 |
 
 > 保留自 v1.0 且经验证仍成立的技术结论：Workers 限额已放宽（§1.4）、PNG 导出的五个坑（§9.3）、`<pattern>` 平铺性能铁律（§4.4）、`<text>` 禁用约定（§9.3 坑 5）。
@@ -243,7 +243,7 @@ graph TB
 // ────────────────────────────────────────────────────────────
 
 /** PRD 锁定的四个分类，值不可变更 */
-export type PatternCategory = 'A-lines' | 'B-repeat' | 'C-organic' | 'D-pixel';
+export type PatternCategory = 'A-lines' | 'B-repeat' | 'C-organic' | 'E-scene' | 'D-pixel'; // E-scene 于 2026-10-12 新增
 
 /** PRD 定义的元件角色 */
 export type ElementRole = 'bg' | 'primary' | 'secondary' | 'accent' | 'detail';

@@ -20,7 +20,8 @@ import type { PaintSpec, PatternDef, ResolvedConfig, RenderApi, RenderResult } f
 const def: PatternDef = {
   id: 'new-wave-sunset',
   name: '新浪潮落日',
-  category: 'D-pixel',
+  category: 'E-scene',
+  crispEdges: true, // 分类重组前的渲染结果保持不变
   description: '条纹落日沉向远山，透视网格地面与柔和地平线，安静的复古新浪潮。',
   seedable: true,
   animatable: false,

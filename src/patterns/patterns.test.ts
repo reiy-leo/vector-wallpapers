@@ -16,8 +16,8 @@ import type { PatternConfig } from '../engine/types';
 
 const ALL = registry.list();
 
-/** PRD 锁定的四个分类。 */
-const CATEGORIES = ['A-lines', 'B-repeat', 'C-organic', 'D-pixel'] as const;
+/** 五个分类（2026-10-12 重组：新增 E-scene 风景）。 */
+const CATEGORIES = ['A-lines', 'B-repeat', 'C-organic', 'E-scene', 'D-pixel'] as const;
 
 /** 把某 pattern 的全部控件推到最大值 —— 体积红线的真实考验场景。 */
 function maxConfig(patternId: string) {
@@ -55,12 +55,13 @@ function maxConfig(patternId: string) {
  */
 const TOTAL_EXPECTED = 49;
 
-/** 分类分布：B 类增量最多（4 个新母题都落在重复纹样）。 */
+/** 分类分布（2026-10-12 重组后：线条 / 几何 / 流体 / 风景 / 像素）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
-  'A-lines': 13,
-  'B-repeat': 15,
-  'C-organic': 14,
-  'D-pixel': 7,
+  'A-lines': 9,
+  'B-repeat': 21,
+  'C-organic': 7,
+  'E-scene': 6,
+  'D-pixel': 6,
 };
 
 describe('实现数量与 id 契约', () => {
@@ -242,8 +243,20 @@ describe('<pattern> 平铺覆盖', () => {
     }
   });
 
-  it('B-repeat 类全部使用平铺（架构 §3.3 标注 ⭐必须 tile）', () => {
-    for (const def of registry.listByCategory('B-repeat')) {
+  /**
+   * 重复纹样必须平铺（架构 §3.3 标注 ⭐必须 tile）。
+   * 2026-10-12 分类重组后 B-repeat 展示为「几何」，并入了非平铺的构成类母题
+   * （offset-grid / bauhaus-blocks / arc-composition 等），故改为锁定原重复纹样清单，
+   * 而不是整个分类；halftone 已移入像素类，但平铺要求不变。
+   */
+  const MUST_TILE = [
+    'polka-dots', 'triangle-tiling', 'checker-mesh', 'hex-grid', 'diamond-lattice',
+    'girih-star', 'halftone', 'papercut', 'art-deco-fan', 'chevron', 'fish-scales',
+    'square-rings', 'raised-tiles', 'tortoise-grid', 'arrow-repeat',
+  ] as const;
+
+  it('重复纹样全部使用平铺（架构 §3.3 标注 ⭐必须 tile）', () => {
+    for (const def of MUST_TILE.map((id) => registry.get(id)!)) {
       expect(renderSVG(def, createDefaultConfig(def)).svg, `${def.id} 未使用平铺`).toContain('<pattern');
     }
   });

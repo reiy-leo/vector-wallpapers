@@ -34,7 +34,7 @@ function shapePoints(shape: Shape, cx: number, cy: number, r: number, rot: numbe
 const def: PatternDef = {
   id: 'nested-shapes',
   name: '嵌套几何',
-  category: 'A-lines',
+  category: 'B-repeat',
   description: '同心嵌套的方形、菱形或三角，两色交替层层内缩，可平铺或单幅居中。',
   seedable: false,
   animatable: false,

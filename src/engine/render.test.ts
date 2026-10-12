@@ -92,8 +92,8 @@ describe('根标签不变量（Safari drawImage 坑 1）', () => {
     }
   });
 
-  it('D-pixel 类自动带 shape-rendering="crispEdges"', () => {
-    for (const def of ALL.filter((d) => d.category === 'D-pixel')) {
+  it('D-pixel 类（及显式 crispEdges: true 者）自动带 shape-rendering="crispEdges"', () => {
+    for (const def of ALL.filter((d) => d.crispEdges ?? d.category === 'D-pixel')) {
       const svg = renderSVG(def, createDefaultConfig(def)).svg;
       expect(svg, `${def.id} 缺 crispEdges`).toContain('shape-rendering="crispEdges"');
     }
@@ -102,6 +102,12 @@ describe('根标签不变量（Safari drawImage 坑 1）', () => {
   it('非 D-pixel 类不带 crispEdges', () => {
     const svg = renderSVG(registry.get('polka-dots')!, createDefaultConfig(registry.get('polka-dots')!)).svg;
     expect(svg).not.toContain('crispEdges');
+  });
+
+  it('显式 crispEdges: false 覆盖分类默认（halftone 归入像素后渲染不变）', () => {
+    const def = registry.get('halftone')!;
+    expect(def.category).toBe('D-pixel');
+    expect(renderSVG(def, createDefaultConfig(def)).svg).not.toContain('shape-rendering="crispEdges"');
   });
 });
 

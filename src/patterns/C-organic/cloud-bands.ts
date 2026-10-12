@@ -83,7 +83,7 @@ function cloudPath(cx: number, baseY: number, halfW: number, height: number, rng
 const def: PatternDef = {
   id: 'cloud-bands',
   name: '云层带',
-  category: 'C-organic',
+  category: 'E-scene',
   description: '天顶渐变与光晕之上，三条云带横向铺陈，柔和安静。',
   seedable: true,
   animatable: false,

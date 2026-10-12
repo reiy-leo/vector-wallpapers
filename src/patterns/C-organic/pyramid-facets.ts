@@ -21,7 +21,7 @@ const FACE_IDS = ['face_hi', 'face_mh', 'face_md', 'face_lo'] as const;
 const def: PatternDef = {
   id: 'pyramid-facets',
   name: '金字塔锥面',
-  category: 'C-organic',
+  category: 'B-repeat',
   description: '俯视四棱锥阵列，四个三角面按光照方向分出明暗，规则网格的浮雕立体感。',
   seedable: false,
   animatable: false,

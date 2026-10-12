@@ -14,7 +14,7 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const def: PatternDef = {
   id: 'offset-grid',
   name: '错位方格',
-  category: 'A-lines',
+  category: 'B-repeat',
   description: '淡网格行线 + 按行错位的竖线（砌砖式），强调块在三分点附近聚成主次分明的阶梯簇。',
   seedable: true,
   animatable: false,

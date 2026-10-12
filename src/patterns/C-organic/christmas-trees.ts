@@ -47,7 +47,7 @@ interface Tree {
 const def: PatternDef = {
   id: 'christmas-trees',
   name: '圣诞树林',
-  category: 'C-organic',
+  category: 'E-scene',
   description: '深蓝夜空下层层交叠的扁平圣诞树，每棵由数层双色三角树冠叠成，白色雪点洒满画面。',
   seedable: true,
   animatable: true,

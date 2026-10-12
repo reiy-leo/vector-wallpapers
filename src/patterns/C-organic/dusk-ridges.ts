@@ -51,7 +51,7 @@ function ridgePath(
 const def: PatternDef = {
   id: 'dusk-ridges',
   name: '山峦日落',
-  category: 'C-organic',
+  category: 'E-scene',
   description: '渐变天空、径向光晕太阳与多层山脊剪影，构图的经典壁纸母题。',
   seedable: true,
   animatable: false,

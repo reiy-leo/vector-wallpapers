@@ -27,7 +27,7 @@ const TOP_PTS = 21;
 const def: PatternDef = {
   id: 'aurora-wave',
   name: '极光波浪',
-  category: 'C-organic',
+  category: 'E-scene',
   description: '深蓝夜空中几层柔和的极光帘幕，下缘微亮、向上化作光雾，星点稀疏。',
   seedable: true,
   animatable: true,

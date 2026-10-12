@@ -114,7 +114,7 @@ function treePath(t: Tree, tiers: number, teeth: number, jag: number, floorY: nu
 const def: PatternDef = {
   id: 'pine-forest',
   name: '松林飘雪',
-  category: 'C-organic',
+  category: 'E-scene',
   description: '单色系多层云杉剪影由远及近叠压铺满画面，锯齿下垂的枝条，远浅近深，点缀大小不一的雪花。',
   seedable: true,
   animatable: true,

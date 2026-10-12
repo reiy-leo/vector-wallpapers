@@ -3,6 +3,9 @@
  *
  * PRD 的 19 个 id 已全部落地（A/B/C 各 5个、D 类 4 个）。
  * 注册顺序 = 库中展示顺序。
+ *
+ * ⚠️ 下方按文件夹分组的注释是历史分组；2026-10-12 分类重组后，
+ * 展示分类以各 PatternDef 的 `category` 字段为准（文件未搬家）。
  */
 import { createRegistry, IMPLEMENTED_PATTERN_IDS } from './registry';
 import type { PatternDef } from './types';

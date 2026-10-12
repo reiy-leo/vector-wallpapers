@@ -6,8 +6,11 @@
  * 形式出现，编译后完全擦除 → 运行时无环。
  */
 
-/** PRD 锁定的四个分类，值不可变更。 */
-export type PatternCategory = 'A-lines' | 'B-repeat' | 'C-organic' | 'D-pixel';
+/**
+ * 分类 id（值一经上线不可变更）。2026-10-12 重组：B-repeat 改名展示为「几何」，新增 E-scene「风景」。
+ * ⚠️ 分类与源码文件夹无强绑定 —— 部分 pattern 的文件仍留在旧文件夹，以 `category` 字段为准。
+ */
+export type PatternCategory = 'A-lines' | 'B-repeat' | 'C-organic' | 'E-scene' | 'D-pixel';
 
 /** PRD 定义的元件角色。 */
 export type ElementRole = 'bg' | 'primary' | 'secondary' | 'accent' | 'detail';
@@ -110,6 +113,11 @@ export interface PatternDef {
   id: PatternId;
   name: string;
   category: PatternCategory;
+  /**
+   * 是否给根 <svg> 加 `shape-rendering="crispEdges"`。
+   * 缺省 = `category === 'D-pixel'`。分类重组后仍需保持原渲染结果的 pattern 显式覆盖。
+   */
+  crispEdges?: boolean;
   description: string;
   /** 顺序 = 绘制顺序 = z 轴 */
   elements: ElementSpec[];

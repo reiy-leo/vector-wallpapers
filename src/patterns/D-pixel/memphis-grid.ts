@@ -6,7 +6,7 @@
  *
  * ⚠️ 像素风铁律：禁止 <text>（字体依赖破坏导出纯净度），
  * 一切图形用 <rect>/<path>/<circle>/<polygon> 拼。
- * 根 <svg> 的 shape-rendering="crispEdges" 由引擎按 category 自动注入。
+ * 根 <svg> 的 shape-rendering="crispEdges" 由引擎注入（分类重组后改由 `crispEdges: true` 显式开启）。
  *
  * 2026-10-12 审美返修：旧版每个小单元塞 5~9 个形 → 密密麻麻的小贴纸网格。
  * 现在一个 <pattern> 超级单元 = 6×6 个大落位格，只有约一半格子放一个形，
@@ -20,7 +20,8 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 const def: PatternDef = {
   id: 'memphis-grid',
   name: '孟菲斯网格',
-  category: 'D-pixel',
+  category: 'B-repeat',
+  crispEdges: true, // 分类重组前的渲染结果保持不变
   description: '80 年代孟菲斯风：波浪线、锯齿、圆点、三角与方块疏朗散落、随机旋转，大面积留白。',
   seedable: true,
   animatable: false,
