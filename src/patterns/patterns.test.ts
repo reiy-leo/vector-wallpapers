@@ -53,7 +53,7 @@ function maxConfig(patternId: string) {
  * 若将来再加批次，只需改这一处，且 diff 能立刻看出总数变了 ——
  * 写死字面量会让人下意识以为是测试写错了。
  */
-const TOTAL_EXPECTED = 93;
+const TOTAL_EXPECTED = 98;
 
 /** 分类分布（2026-10-12 重组后：线条 / 几何 / 流体 / 风景 / 像素）。 */
 const CATEGORY_EXPECTED: Record<string, number> = {
@@ -63,7 +63,7 @@ const CATEGORY_EXPECTED: Record<string, number> = {
   'E-scene': 16,
   'D-pixel': 6,
   'F-ornament': 4,
-  'G-botanical': 4,
+  'G-botanical': 9,
   'H-cosmos': 4,
   'I-optical': 4,
   'J-generative': 4,

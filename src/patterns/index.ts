@@ -85,6 +85,11 @@ import leafChain from './G-botanical/leaf-chain';
 import petalScatter from './G-botanical/petal-scatter';
 import palmFronds from './G-botanical/palm-fronds';
 import ginkgoFans from './G-botanical/ginkgo-fans';
+import dandelionWind from './G-botanical/dandelion-wind';
+import fernFronds from './G-botanical/fern-fronds';
+import lotusPond from './G-botanical/lotus-pond';
+import wisteria from './G-botanical/wisteria';
+import monstera from './G-botanical/monstera';
 import constellations from './H-cosmos/constellations';
 import planetOrbits from './H-cosmos/planet-orbits';
 import nebulaDust from './H-cosmos/nebula-dust';
@@ -185,6 +190,11 @@ const ALL: PatternDef[] = [
   petalScatter,
   palmFronds,
   ginkgoFans,
+  dandelionWind,
+  fernFronds,
+  lotusPond,
+  wisteria,
+  monstera,
   constellations,
   planetOrbits,
   nebulaDust,
