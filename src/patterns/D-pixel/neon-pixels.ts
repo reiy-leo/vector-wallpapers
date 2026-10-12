@@ -12,6 +12,7 @@ import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../typ
 
 const def: PatternDef = {
   id: 'neon-pixels',
+  tones: ['dark'],
   name: '霓虹像素',
   category: 'D-pixel',
   description: '暗底稀疏霓虹像素点缀，三档亮度错落，带可选呼吸闪烁，街机与赛博的质感。',

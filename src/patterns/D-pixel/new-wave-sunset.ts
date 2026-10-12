@@ -54,6 +54,7 @@ const ZODIAC_OPTIONS = [
 
 const def: PatternDef = {
   id: 'new-wave-sunset',
+  tones: ['dark'],
   name: '新浪潮落日',
   category: 'E-scene',
   crispEdges: true, // 分类重组前的渲染结果保持不变

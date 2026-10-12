@@ -118,6 +118,12 @@ export interface PatternDef {
    * 缺省 = `category === 'D-pixel'`。分类重组后仍需保持原渲染结果的 pattern 显式覆盖。
    */
   crispEdges?: boolean;
+  /**
+   * 这张图允许的壁纸底色（浅底 / 深底）。缺省 = 两种都可以。
+   * 只给一种时，画布右上角的浅底/深底切换隐藏（Rei 2026-10-12：
+   * 夜景如星空、月夜不该有浅底；水墨、晴空类不该有深底）。
+   */
+  tones?: readonly ('light' | 'dark')[];
   description: string;
   /** 顺序 = 绘制顺序 = z 轴 */
   elements: ElementSpec[];

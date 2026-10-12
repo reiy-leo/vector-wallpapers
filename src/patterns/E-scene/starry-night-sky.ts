@@ -26,6 +26,7 @@ const RIDGE_CAP = 4200;
 
 const def: PatternDef = {
   id: 'starry-night-sky',
+  tones: ['dark'],
   name: '星空银河',
   category: 'E-scene',
   description: '深蓝夜空中斜贯的银河光带，大小不一的星星，地平线上层叠的山峦剪影。',

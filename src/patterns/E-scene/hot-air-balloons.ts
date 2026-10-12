@@ -79,6 +79,7 @@ const band = (y0: number, y1: number): string => gore(-1, 1, y0, y1);
 
 const def: PatternDef = {
   id: 'hot-air-balloons',
+  tones: ['light'],
   name: '热气球',
   category: 'E-scene',
   description: '柔和天空里大小不一的条纹热气球，远小近大，远处被薄雾淡化，配平底软云与远山。',

@@ -46,6 +46,7 @@ interface Culm {
 
 const def: PatternDef = {
   id: 'bamboo-mist',
+  tones: ['light'],
   name: '竹林',
   category: 'E-scene',
   description: '雾中竹林：四层竹竿由远及近、由浅到深，竹节分明，披针形竹叶成簇下垂，层间薄雾营造纵深。',

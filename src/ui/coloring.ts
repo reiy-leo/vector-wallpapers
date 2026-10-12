@@ -517,6 +517,11 @@ export type { ElementConfig };
 
 export type BgTone = 'light' | 'dark';
 
+/** 母题允许的底色；缺省两种都行。 */
+export function allowedTones(def: PatternDef): readonly BgTone[] {
+  return def.tones && def.tones.length > 0 ? def.tones : (['light', 'dark'] as const);
+}
+
 function paintLightness(paint: PaintSpec): number | null {
   if (paint.type === 'solid') return hexToHsl(paint.color).l;
   if (paint.type === 'linear' || paint.type === 'radial') {

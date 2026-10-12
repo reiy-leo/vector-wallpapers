@@ -4,7 +4,7 @@ import { createDefaultConfig } from '../engine/render';
 import { contrastRatio, hexToHsl } from '../engine/colors';
 import type { PatternConfig } from '../engine/types';
 import type { PaintSpec } from '../patterns/types';
-import { applyTone, bgTone, isScenic, nextSeed, randomizeColors, VIVID_MIN_CONTRAST, vividColors } from './coloring';
+import { allowedTones, applyTone, bgTone, isScenic, nextSeed, randomizeColors, VIVID_MIN_CONTRAST, vividColors } from './coloring';
 
 function firstHex(cfg: PatternConfig, id: string): string | null {
   const p = cfg.elements.find((e) => e.id === id)?.paint;
@@ -185,6 +185,18 @@ describe('换一版：配色要大胆鲜艳（「换一版的颜色都太保守�
             expect(new Set(fgFirst).size, tag).toBe(fgFirst.length);
           }
         }
+      }
+    });
+  }
+});
+
+describe('单一底色母题：默认配色就落在允许的底色上', () => {
+  for (const def of registry.list().filter((d) => allowedTones(d).length === 1)) {
+    it(`${def.id}：默认 ${allowedTones(def)[0]}`, () => {
+      expect(bgTone(createDefaultConfig(def), def)).toBe(allowedTones(def)[0]);
+      for (let s = 1; s <= 4; s++) {
+        const out = randomizeColors(createDefaultConfig(def), def, 'palette', s * 977);
+        expect(bgTone(out, def)).toBe(allowedTones(def)[0]);
       }
     });
   }

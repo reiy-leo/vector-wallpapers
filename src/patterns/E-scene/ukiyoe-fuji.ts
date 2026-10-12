@@ -56,6 +56,7 @@ function enc(pts: Pt[]): string {
 
 const def: PatternDef = {
   id: 'ukiyoe-fuji',
+  tones: ['light'],
   name: '浮世绘山',
   category: 'E-scene',
   description: '扁平浮世绘风的富士山：平顶雪冠、半面山影、大日轮与横过山腰的霞状云带，和纸底色配天顶靛蓝色带。',

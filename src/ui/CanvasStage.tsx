@@ -16,7 +16,7 @@ import { renderStandaloneSVG, createDefaultConfig } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
-import { applyTone, bgTone, type BgTone } from './coloring';
+import { applyTone, allowedTones, bgTone, type BgTone } from './coloring';
 import { IconButton, Segmented, Tooltip, inputClass } from './primitives';
 import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
@@ -278,7 +278,8 @@ function ThemeSwitchOverlay({ target }: { target: React.RefObject<HTMLImageEleme
   const cfg = useWorkbenchSelector((s) => s.cfg);
   const box = useImageBox(target);
 
-  if (box.w === 0 || !def) return null;
+  // 只允许一种底色的母题（夜景 / 水墨等）不显示切换
+  if (box.w === 0 || !def || allowedTones(def).length < 2) return null;
   const tone = bgTone(cfg, def);
 
   return (

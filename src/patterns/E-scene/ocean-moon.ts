@@ -23,6 +23,7 @@ const GLINT_CAP = 3600;
 
 const def: PatternDef = {
   id: 'ocean-moon',
+  tones: ['dark'],
   name: '海浪月夜',
   category: 'E-scene',
   description: '夜空中的月亮与月晕，多层平滑海浪由远及近，月光在浪间碎成一条闪烁的光带。',

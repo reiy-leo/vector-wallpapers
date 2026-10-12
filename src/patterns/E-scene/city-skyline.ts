@@ -74,6 +74,7 @@ function enc(pts: Array<[number, number]>): string {
 
 const def: PatternDef = {
   id: 'city-skyline',
+  tones: ['dark'],
   name: '城市天际线',
   category: 'E-scene',
   description: '暮色中的城市剪影：三层楼群由远及近、由浅到深，地平线余晖与一轮月亮，楼体上散落点亮的窗。',
@@ -367,7 +368,9 @@ const def: PatternDef = {
       let rainMk = '';
       const fall = api.keyframes(`vw-csrain-${dxT}-${Math.round(Hv)}`, `to{transform:translate(${dxT}px,${Math.round(Hv)}px)}`);
       RL.forEach((R, ri) => {
-        const cnt = Math.round(total * R.n);
+        // ⚠️ 点按 x 排序后若靠 RAIN_CAP 截断，右半边天空就没雨了（Rei 2026-10-12）。
+        // 先按字节预算压低数量（每段约 16 字符），让雨点均匀铺满整片天空，截断只做兜底。
+        const cnt = Math.min(Math.round(total * R.n), Math.floor((RAIN_CAP * R.n) / 16));
         const ldx = Math.round(R.len * slant);
         let d = '';
         const pts: Array<[number, number]> = [];
