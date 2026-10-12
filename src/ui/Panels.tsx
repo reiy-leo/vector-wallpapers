@@ -10,7 +10,7 @@
  * 「选一套色」/「拿一个成品」/「微调一处」。
  */
 import { useMemo } from 'react';
-import { PALETTES } from '../patterns/palettes';
+import { PALETTES, PALETTE_GROUPS } from '../patterns/palettes';
 import { CURATED_SETS, type SetItem } from '../patterns/sets';
 import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
@@ -23,7 +23,7 @@ import {
   usePatternDef,
   useWorkbenchSelector,
 } from './store';
-import { Button, Collapsible, CountBadge, Section, Segmented, inputClass } from './primitives';
+import { Button, Collapsible, CountBadge, Section, inputClass } from './primitives';
 import { IconDice } from './icons';
 import type { ColorStrategy } from '../engine/colors';
 import type { ElementRole, PatternDef } from '../patterns/types';
@@ -33,13 +33,7 @@ import type { PatternConfig } from '../engine/types';
  * 配色方案
  * ───────────────────────────────────────────────────────────────── */
 
-export function PalettePanel({
-  strategy,
-  onStrategyChange,
-}: {
-  strategy: ColorStrategy;
-  onStrategyChange: (s: ColorStrategy) => void;
-}) {
+export function PalettePanel() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
 
@@ -49,55 +43,45 @@ export function PalettePanel({
       hint="内置预设，一键套用到全部元件"
       action={<CountBadge>{PALETTES.length}</CountBadge>}
     >
-      <ul className="grid gap-1.5">
-        {PALETTES.map((p) => (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => setConfig(applyPaletteSlots(cfg, def, p.slots))}
-              title={p.description}
-              className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left ring-1 ring-line hover:bg-surface-2"
-            >
-              {/* ⭐ 同心圆角：外层 rounded-md(8px)，内部色条 rounded-xs(4px)，
-                  左右 padding 2px + 视觉间距使圆角关系成立，不出现「内外同半径」的歪斜感 */}
-              <span className="flex shrink-0 overflow-hidden rounded-xs ring-1 ring-line-input">
-                {ROLE_ORDER.map((slot) => (
-                  <span key={slot} className="h-6 w-4" style={{ background: p.slots[slot] }} />
+      <div className="grid gap-2">
+        {PALETTE_GROUPS.map((g) => {
+          const list = PALETTES.filter((p) => (p.group ?? '基础') === g);
+          if (list.length === 0) return null;
+          return (
+            <Collapsible key={g} title={g} count={list.length} defaultOpen={g === '基础'}>
+              <ul className="grid gap-1.5">
+                {list.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => setConfig(applyPaletteSlots(cfg, def, p.slots))}
+                    title={p.description}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left ring-1 ring-line hover:bg-surface-2"
+                  >
+                    {/* ⭐ 同心圆角：外层 rounded-md(8px)，内部色条 rounded-xs(4px)，
+                        左右 padding 2px + 视觉间距使圆角关系成立，不出现「内外同半径」的歪斜感 */}
+                    <span className="flex shrink-0 overflow-hidden rounded-xs ring-1 ring-line-input">
+                      {ROLE_ORDER.map((slot) => (
+                        <span key={slot} className="h-6 w-4" style={{ background: p.slots[slot] }} />
+                      ))}
+                    </span>
+                    <span className="grid min-w-0 flex-1 gap-0.5">
+                      <span className="truncate text-base text-fg">{p.label}</span>
+                      <span className="truncate text-2xs text-fg-mute">{p.description}</span>
+                    </span>
+                  </button>
+                </li>
                 ))}
-              </span>
-              <span className="grid min-w-0 flex-1 gap-0.5">
-                <span className="truncate text-base text-fg">{p.label}</span>
-                <span className="truncate text-2xs text-fg-mute">{p.description}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="grid gap-2 border-t border-line pt-3">
-        <span className="text-base font-medium text-fg-soft">随机换色策略</span>
-        <Segmented
-          label="随机换色策略"
-          size="sm"
-          value={strategy}
-          onChange={onStrategyChange}
-          options={STRATEGY_OPTIONS}
-        />
-        <p className="text-2xs text-fg-mute">
-          决定「换一版」的取色范围。已锁定的元件不会被改动。
-        </p>
+              </ul>
+            </Collapsible>
+          );
+        })}
       </div>
     </Section>
   );
 }
 
 const ROLE_ORDER: readonly ElementRole[] = ['bg', 'primary', 'secondary', 'accent', 'detail'];
-
-const STRATEGY_OPTIONS = [
-  { value: 'analogous', label: '邻近色', title: '沿用作者配色的明暗层次，整体换一组色相（默认）' },
-  { value: 'palette', label: '当前色板', title: '随机套用一套内置色板' },
-  { value: 'full', label: '全色域', title: '每个元件各自换色相，明暗层次不变' },
-] as const satisfies ReadonlyArray<{ value: ColorStrategy; label: string; title: string }>;
 
 /* ─────────────────────────────────────────────────────────────────
  * 预置合集

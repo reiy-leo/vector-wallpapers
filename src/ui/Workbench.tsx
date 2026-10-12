@@ -45,7 +45,8 @@ const TABS: ReadonlyArray<{ id: PanelTab; label: string }> = [
 
 export function Workbench() {
   const state = useWorkbench();
-  const [strategy, setStrategy] = useState<ColorStrategy>('analogous');
+  // 「换一版」只从色板列表取色（Rei 2026-10-12：色板最稳妥，去掉邻近色/全色域策略）
+  const strategy: ColorStrategy = 'palette';
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
   const [platform, setPlatform] = useState<'ios' | 'desktop'>('desktop');
   const [tab, setTab] = useState<PanelTab>('colors');
@@ -138,8 +139,6 @@ export function Workbench() {
               <PanelBody
                 tab={tab}
                 onTab={setTab}
-                strategy={strategy}
-                onStrategy={setStrategy}
                 onIOS={onIOS}
               />
             </aside>
@@ -168,14 +167,10 @@ export function Workbench() {
 function PanelBody({
   tab,
   onTab,
-  strategy,
-  onStrategy,
   onIOS,
 }: {
   tab: PanelTab;
   onTab: (t: PanelTab) => void;
-  strategy: ColorStrategy;
-  onStrategy: (s: ColorStrategy) => void;
   onIOS: boolean;
 }) {
   return (
@@ -184,7 +179,7 @@ function PanelBody({
 
       {tab === 'colors' && <ElementPanel />}
       {tab === 'params' && <ParamPanel />}
-      {tab === 'palettes' && <PalettePanel strategy={strategy} onStrategyChange={onStrategy} />}
+      {tab === 'palettes' && <PalettePanel />}
       {tab === 'sets' && <CuratedSetsPanel />}
 
       {onIOS && (

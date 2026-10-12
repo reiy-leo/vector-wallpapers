@@ -196,8 +196,8 @@ describe('guardCanvasSize() ⭐ PRD Q8', () => {
 });
 
 describe('预置色板 ⭐ PRD Q4（只内置，不做自建）', () => {
-  it('恰好 10 套，且包含 PRD 点名的全部 10 个', () => {
-    expect(PALETTES).toHaveLength(10);
+  it('至少 40 套，且包含 PRD 点名的全部 10 个', () => {
+    expect(PALETTES.length).toBeGreaterThanOrEqual(40);
     const labels = PALETTES.map((p) => p.label);
     for (const required of ['极地', '灰调', '莫兰地', '落日', '苔原', '霓虹', '孟菲斯', '复古印刷', '夜航', '单色']) {
       expect(labels, `缺少色板 ${required}`).toContain(required);
