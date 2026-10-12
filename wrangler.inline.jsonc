@@ -7,6 +7,8 @@
   "compatibility_date": "2026-10-10",
   "workers_dev": true,
   "preview_urls": false,
+  // 部署时保留控制台里加的变量（GOOGLE_CLIENT_ID 等），不被这里的 vars 覆盖
+  "keep_vars": true,
   "vars": {
     "ALLOWED_EMAIL_DOMAINS": "*"
   },

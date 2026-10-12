@@ -15,6 +15,8 @@
     "run_worker_first": ["/api/*", "/auth/*"]
   },
 
+  // 部署时保留控制台里加的变量（GOOGLE_CLIENT_ID 等），不被这里的 vars 覆盖
+  "keep_vars": true,
   "vars": {
     // 允许登录的邮箱域名，逗号分隔；"*" = 任意已验证的 Google 账号
     "ALLOWED_EMAIL_DOMAINS": "*"
