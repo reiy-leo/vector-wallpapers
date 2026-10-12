@@ -5,7 +5,7 @@
  * 用 <pattern> 平铺满屏，读起来是密密麻麻的贴纸。
  *
  * 新版是**单幅大尺度构成**（包豪斯 / 瑞士海报式）：
- *   - 三组同心弧，各自一个圆心，按「大 · 中 · 小」三档尺度错落布局：
+ *   - 默认三组同心弧（「弧组数」可加到 12 组），各自一个圆心，按「大 · 中 · 小」三档尺度错落布局：
  *     大组压在画面一角、只露出一部分，中组居于对角，小组作点睛；
  *   - 同组内的弧依次旋转错开起点、张角渐收，形成节奏；大组线最粗、小组最细；
  *   - 节点圆点落在部分弧的端点与圆心上，一组 1~2 个，克制；
@@ -20,7 +20,7 @@ const def: PatternDef = {
   id: 'arc-composition',
   name: '弧光构成',
   category: 'B-repeat',
-  description: '三组大尺度同心弧错落构成，缀以节点圆点，大面积留白的包豪斯式构图。',
+  description: '多组大尺度同心弧错落构成，缀以节点圆点，大面积留白的包豪斯式构图。',
   seedable: true,
   animatable: false,
 
@@ -34,6 +34,7 @@ const def: PatternDef = {
 
   controls: [
     { key: 'size', label: '构图尺度', type: 'range', min: 70, max: 400, step: 10, default: 180, heavy: true },
+    { key: 'groups', label: '弧组数', type: 'range', min: 1, max: 12, step: 1, default: 3, heavy: true },
     { key: 'arcs', label: '每组弧数', type: 'range', min: 1, max: 5, step: 1, default: 4 },
     { key: 'weight', label: '线宽', type: 'range', min: 0.6, max: 8, step: 0.1, default: 3, unit: 'px' },
     { key: 'sweep', label: '弧张角', type: 'angle', default: 200 },
@@ -93,6 +94,7 @@ const def: PatternDef = {
     const weight = Math.max(0.4, Number(params.weight)) * unit;
     const sweepDeg = Math.max(20, Math.min(340, Number(params.sweep)));
     const showNodes = params.nodes === true;
+    const groupCount = Math.max(1, Math.min(12, Math.round(Number(params.groups ?? 3))));
     const n = api.n;
 
     const bg = elements.get('bg')!;
@@ -168,6 +170,40 @@ const def: PatternDef = {
         w: weight * 0.85,
       },
     ];
+
+    // 第 4 组起（Rei 2026-10-12：弧组数可调）：在已有圆心之外随机落点，尺度在中/小之间，
+    // 颜色轮换 中 → 小 → 大，开口朝向最近的已有组，保持彼此呼应。
+    // 额外随机数在前三组之后才抽，默认 3 组时构图与旧版完全一致。
+    const tiers = [aMid, aSmall, aBig];
+    for (let gi = 3; gi < groupCount; gi++) {
+      let best: [number, number] = [W / 2, H / 2];
+      let bestD = -1;
+      for (let t = 0; t < 8; t++) {
+        const x = W * (0.06 + rng() * 0.88);
+        const y = H * (0.06 + rng() * 0.88);
+        const dmin = Math.min(...groups.map((G) => Math.hypot(G.cx - x, G.cy - y) - G.r0 * 0.5));
+        if (dmin > bestD) {
+          bestD = dmin;
+          best = [x, y];
+        }
+      }
+      const [x, y] = best;
+      const near = groups.reduce((a, G) => (Math.hypot(G.cx - x, G.cy - y) < Math.hypot(a.cx - x, a.cy - y) ? G : a));
+      const k = 0.06 + rng() * 0.12; // 半径占短边比例：介于小组与中组之间
+      const e = tiers[(gi - 3) % tiers.length];
+      groups.push({
+        e,
+        cx: x,
+        cy: y,
+        r0: S * k * scale,
+        gap: S * k * 0.16 * scale,
+        facing: deg(near.cx - x, near.cy - y) + (rng() - 0.5) * 40,
+        step: (rng() < 0.5 ? -1 : 1) * (12 + rng() * 16),
+        sweep: Math.min(340, sweepDeg * (0.7 + rng() * 0.3)),
+        w: weight * (e === aBig ? 1.2 : e === aMid ? 1 : 0.85),
+      });
+    }
+    groups.splice(groupCount); // 少于 3 组时从小组开始去掉
 
     const parts: string[] = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
     const dots: string[] = [];

@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "vector-wallpapers",
+  "workers_dev": false,
+  "routes": [{ "pattern": "vector-wallpapers.rei8t.dev", "custom_domain": true }],
 
   // Worker 只接管 /api/* 与 /auth/*（Google 登录）；其余请求由静态资源在边缘直接返回，
   // 不计 Worker 请求数与 CPU。SPA 回退由 assets.not_found_handling 负责。

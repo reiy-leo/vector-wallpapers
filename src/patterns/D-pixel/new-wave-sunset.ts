@@ -12,10 +12,45 @@
  *   - 远山两层：远层半透明融进天空、近层压实，轮廓用平滑贝塞尔；
  *   - 地面透视网格线条稀疏、低不透明度，地平线处再压一道柔和的反光。
  *
- * 落日的「条纹」用 clipPath 裁切一组横条实现 —— 缝隙是真透明，透出天空渐变。
+ * 2026-10-12（Rei）：去掉太阳条纹，太阳改为整圆；可在参数里把太阳换成 12 星座符号
+ * （描边路径绘制，不用 <text>/字体，见 ZODIAC）。
  */
 import { circle, g, path, rect } from '../../engine/svg';
 import type { PaintSpec, PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
+
+/**
+ * 12 星座符号，单位坐标 [-1,1]（y 向下），只用 M/L/H/V/C/Q/a 指令的绝对/相对坐标；
+ * 渲染时按太阳半径缩放平移。手绘几何，不依赖字体。
+ */
+const ZODIAC: Record<string, string> = {
+  aries: 'M0 0.85L0 -0.15C0 -0.8 -0.85 -0.95 -0.85 -0.35C-0.85 -0.05 -0.55 0.05 -0.4 -0.1M0 -0.15C0 -0.8 0.85 -0.95 0.85 -0.35C0.85 -0.05 0.55 0.05 0.4 -0.1',
+  taurus: `${o(0, 0.3, 0.5)}M-0.85 -0.85Q0 0.05 0.85 -0.85`,
+  gemini: 'M-0.85 -0.85Q0 -0.55 0.85 -0.85M-0.85 0.85Q0 0.55 0.85 0.85M-0.4 -0.7V0.7M0.4 -0.7V0.7',
+  cancer: `${o(-0.45, -0.25, 0.25)}M-0.45 -0.5C0 -0.75 0.6 -0.65 0.85 -0.35${o(0.45, 0.25, 0.25)}M0.45 0.5C0 0.75 -0.6 0.65 -0.85 0.35`,
+  leo: `${o(-0.5, 0.35, 0.27)}M-0.24 0.3C-0.45 -0.3 -0.2 -0.85 0.2 -0.85C0.6 -0.85 0.72 -0.4 0.5 -0.1C0.3 0.2 0.28 0.6 0.55 0.75C0.7 0.85 0.85 0.75 0.9 0.6`,
+  virgo: 'M-0.9 -0.5C-0.8 -0.62 -0.7 -0.6 -0.7 -0.4V0.65M-0.7 -0.3C-0.7 -0.7 -0.25 -0.7 -0.25 -0.3V0.65M-0.25 -0.3C-0.25 -0.7 0.2 -0.7 0.2 -0.3V0.45C0.2 0.75 0.35 0.9 0.45 0.9M0.2 0.15C0.45 -0.2 0.9 0 0.75 0.35C0.65 0.6 0.4 0.75 0.05 0.9',
+  libra: 'M-0.85 0.6H0.85M-0.85 0.2H-0.32C-0.6 -0.15 -0.45 -0.72 0 -0.72C0.45 -0.72 0.6 -0.15 0.32 0.2H0.85',
+  scorpio: 'M-0.9 -0.5C-0.8 -0.62 -0.7 -0.6 -0.7 -0.4V0.65M-0.7 -0.3C-0.7 -0.7 -0.25 -0.7 -0.25 -0.3V0.65M-0.25 -0.3C-0.25 -0.7 0.2 -0.7 0.2 -0.3V0.45C0.2 0.7 0.4 0.75 0.75 0.75M0.55 0.55L0.8 0.75L0.55 0.95',
+  sagittarius: 'M-0.8 0.8L0.8 -0.8M0.05 -0.8H0.8V-0.05M-0.6 -0.1L0.1 0.6',
+  capricorn: 'M-0.9 -0.65C-0.72 -0.65 -0.6 -0.45 -0.52 -0.1L-0.38 0.55L-0.15 -0.35C-0.05 -0.7 0.3 -0.72 0.32 -0.3V0.35C0.32 0.6 0.5 0.72 0.66 0.6C0.88 0.42 0.78 0.08 0.55 0.12C0.32 0.16 0.35 0.7 0.1 0.9',
+  aquarius: 'M-0.9 -0.12L-0.55 -0.42L-0.2 -0.12L0.15 -0.42L0.5 -0.12L0.85 -0.42M-0.9 0.48L-0.55 0.18L-0.2 0.48L0.15 0.18L0.5 0.48L0.85 0.18',
+  pisces: 'M-0.7 -0.85C-0.15 -0.4 -0.15 0.4 -0.7 0.85M0.7 -0.85C0.15 -0.4 0.15 0.4 0.7 0.85M-0.55 0H0.55',
+};
+
+const ZODIAC_OPTIONS = [
+  { value: 'aries', label: '白羊' },
+  { value: 'taurus', label: '金牛' },
+  { value: 'gemini', label: '双子' },
+  { value: 'cancer', label: '巨蟹' },
+  { value: 'leo', label: '狮子' },
+  { value: 'virgo', label: '处女' },
+  { value: 'libra', label: '天秤' },
+  { value: 'scorpio', label: '天蝎' },
+  { value: 'sagittarius', label: '射手' },
+  { value: 'capricorn', label: '摩羯' },
+  { value: 'aquarius', label: '水瓶' },
+  { value: 'pisces', label: '双鱼' },
+];
 
 const def: PatternDef = {
   id: 'new-wave-sunset',
@@ -45,7 +80,7 @@ const def: PatternDef = {
       visible: true,
       configurable: true,
     },
-    { id: 'sun', label: '太阳条纹', role: 'accent', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#ffe2b8' }, { offset: 1, color: '#ef9a86' }] }, opacity: 1, visible: true, configurable: true },
+    { id: 'sun', label: '太阳', role: 'accent', paint: { type: 'linear', angle: 90, stops: [{ offset: 0, color: '#ffe2b8' }, { offset: 1, color: '#ef9a86' }] }, opacity: 1, visible: true, configurable: true },
     { id: 'horizon', label: '地面', role: 'secondary', paint: { type: 'solid', color: '#211d3a' }, opacity: 1, visible: true, configurable: true },
     { id: 'silhouette', label: '远山', role: 'primary', paint: { type: 'solid', color: '#352c55' }, opacity: 1, visible: true, configurable: true },
     { id: 'glare', label: '辉光', role: 'detail', paint: { type: 'solid', color: '#f4b394' }, opacity: 0.55, visible: true, configurable: true },
@@ -55,7 +90,13 @@ const def: PatternDef = {
   controls: [
     { key: 'sunY', label: '太阳位置', type: 'range', min: 0.2, max: 0.8, step: 0.01, default: 0.5 },
     { key: 'sunR', label: '太阳半径', type: 'range', min: 0.08, max: 0.4, step: 0.01, default: 0.22 },
-    { key: 'stripes', label: '条纹数', type: 'range', min: 3, max: 24, step: 1, default: 5, heavy: true },
+    {
+      key: 'sign',
+      label: '太阳',
+      type: 'select',
+      default: 'sun',
+      options: [{ value: 'sun', label: '太阳' }, ...ZODIAC_OPTIONS],
+    },
     { key: 'horizonH', label: '地平线高度', type: 'range', min: 0.3, max: 0.9, step: 0.01, default: 0.66 },
     { key: 'gridLines', label: '网格密度', type: 'range', min: 4, max: 20, step: 1, default: 9 },
   ],
@@ -130,7 +171,7 @@ const def: PatternDef = {
     const { width: W, height: H, params, elements, rng } = cfg;
     const sunY = Number(params.sunY);
     const sunR = Number(params.sunR);
-    const stripeCount = Math.max(3, Math.round(Number(params.stripes)));
+    const sign = String(params.sign ?? 'sun');
     const horizonH = Number(params.horizonH);
     const gridLines = Math.max(2, Math.round(Number(params.gridLines)));
     const S = Math.min(W, H);
@@ -169,24 +210,24 @@ const def: PatternDef = {
       parts.push(circle(cx, cy, r * 2.6, { fill: halo, 'fill-opacity': glare.opacity }));
     }
 
-    // 落日条纹：只在下半部切缝，缝宽自上而下渐宽（经典但克制）
+    // 太阳：整圆；选了星座则换成该星座符号（圆头描边，大小与太阳半径一致）
     if (sun.visible) {
-      const bars: string[] = [];
-      const top = cy - r;
-      const solidH = r * 1.0; // 上半部完整
-      bars.push(rect(cx - r * 1.05, top, r * 2.1, solidH + r * 0.02, { fill: sun.paintValue }));
-      const zone = r * 2 - solidH; // 下半部条纹区
-      const pitch = zone / stripeCount;
-      for (let i = 0; i < stripeCount; i++) {
-        const t = (i + 1) / stripeCount;
-        const gap = pitch * (0.12 + t * 0.38);
-        const y = top + solidH + i * pitch + gap;
-        const h = pitch - gap;
-        if (h <= 0) continue;
-        bars.push(rect(cx - r * 1.05, y, r * 2.1, h, { fill: sun.paintValue }));
+      const glyph = ZODIAC[sign];
+      if (glyph) {
+        const d = scaleGlyph(glyph, cx, cy, r * 0.92, api);
+        parts.push(
+          path(d, {
+            fill: 'none',
+            stroke: sun.paintValue,
+            'stroke-width': r * 0.17,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+            'stroke-opacity': sun.opacity,
+          }),
+        );
+      } else {
+        parts.push(circle(cx, cy, r, { fill: sun.paintValue, 'fill-opacity': sun.opacity }));
       }
-      const clipRef = api.clip(`nws-${api.n(r)}-${api.n(cy)}`, circle(cx, cy, r));
-      parts.push(g({ 'clip-path': clipRef, 'fill-opacity': sun.opacity }, bars.join('')));
     }
 
     // 远山：两层平滑轮廓。远层半透明融进天空，近层压实。
@@ -271,6 +312,35 @@ const def: PatternDef = {
     return { body: g({ 'shape-rendering': 'geometricPrecision' }, parts.join('')) };
   },
 };
+
+/** 圆（单位坐标）→ 两段弧的 path 片段。 */
+function o(x: number, y: number, r: number): string {
+  return `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+}
+
+/** 把单位坐标的符号路径缩放到 (cx, cy, s)。绝对指令平移+缩放，相对 a 指令只缩放半径/位移。 */
+function scaleGlyph(d: string, cx: number, cy: number, s: number, api: RenderApi): string {
+  const n = api.n;
+  const out: string[] = [];
+  const re = /([MLHVCQa])([^MLHVCQa]*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(d))) {
+    const cmd = m[1];
+    const nums = (m[2].match(/-?\d*\.?\d+/g) ?? []).map(Number);
+    if (cmd === 'H') out.push(`H${nums.map((x) => n(cx + x * s)).join(' ')}`);
+    else if (cmd === 'V') out.push(`V${nums.map((y) => n(cy + y * s)).join(' ')}`);
+    else if (cmd === 'a') {
+      // rx ry rot large sweep dx dy
+      const [rx, ry, rot, la, sw, dx, dy] = nums;
+      out.push(`a${n(rx * s)} ${n(ry * s)} ${rot} ${la} ${sw} ${n(dx * s)} ${n(dy * s)}`);
+    } else {
+      const pts: string[] = [];
+      for (let k = 0; k + 1 < nums.length; k += 2) pts.push(`${n(cx + nums[k] * s)} ${n(cy + nums[k + 1] * s)}`);
+      out.push(cmd + pts.join(' '));
+    }
+  }
+  return out.join('');
+}
 
 /** 过点序列 → 平滑三次贝塞尔（Catmull-Rom）。 */
 function smooth(pts: Array<[number, number]>, api: RenderApi): string {
