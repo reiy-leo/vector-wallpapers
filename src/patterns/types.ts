@@ -251,4 +251,14 @@ export type PatternId =
   | 'wave-stripes'
   | 'tv-static'
   | 'christmas-trees'
-  | 'pine-forest';
+  | 'pine-forest'
+  | 'starry-night-sky'
+  | 'ocean-moon'
+  | 'mountain-lake'
+  | 'sand-dunes'
+  | 'rice-terraces'
+  | 'city-skyline'
+  | 'sakura-fall'
+  | 'ukiyoe-fuji'
+  | 'hot-air-balloons'
+  | 'bamboo-mist';

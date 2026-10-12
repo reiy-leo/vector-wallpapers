@@ -68,6 +68,16 @@ import waveStripes from './A-lines/wave-stripes';
 import tvStatic from './D-pixel/tv-static';
 import christmasTrees from './C-organic/christmas-trees';
 import pineForest from './C-organic/pine-forest';
+import starryNightSky from './E-scene/starry-night-sky';
+import oceanMoon from './E-scene/ocean-moon';
+import mountainLake from './E-scene/mountain-lake';
+import sandDunes from './E-scene/sand-dunes';
+import riceTerraces from './E-scene/rice-terraces';
+import citySkyline from './E-scene/city-skyline';
+import sakuraFall from './E-scene/sakura-fall';
+import ukiyoeFuji from './E-scene/ukiyoe-fuji';
+import hotAirBalloons from './E-scene/hot-air-balloons';
+import bambooMist from './E-scene/bamboo-mist';
 
 /** 注册顺序 = 库中展示顺序。 */
 const ALL: PatternDef[] = [
@@ -123,6 +133,16 @@ const ALL: PatternDef[] = [
   tvStatic,
   christmasTrees,
   pineForest,
+  starryNightSky,
+  oceanMoon,
+  mountainLake,
+  sandDunes,
+  riceTerraces,
+  citySkyline,
+  sakuraFall,
+  ukiyoeFuji,
+  hotAirBalloons,
+  bambooMist,
 ];
 
 export const registry = createRegistry();

@@ -30,8 +30,9 @@ describe('换一版：连点不会越来越灰', () => {
       }))];
       const baseSpread = Math.min(...sources.map(lumSpread));
       let cfg = base;
-      for (let i = 0; i < 12; i++) cfg = randomizeColors(cfg, def, 'analogous', nextSeed(cfg.seed));
-      expect(lumSpread(cfg)).toBeGreaterThan(baseSpread * 0.85);
+      for (let i = 0; i < 12; i++) cfg = randomizeColors(cfg, def, 'palette', nextSeed(cfg.seed));  // UI 只剩色板策略（2026-10-12）
+      // 夜景类默认明暗跨度极大（深夜空 + 亮月），色板换色后 0.6 以上已足够有层次
+      expect(lumSpread(cfg)).toBeGreaterThan(Math.min(baseSpread * 0.85, 0.6));
       const sats = def.elements
         .filter((e) => e.role !== 'bg')
         .map((e) => firstHex(cfg, e.id))
