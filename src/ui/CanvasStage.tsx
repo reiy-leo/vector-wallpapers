@@ -21,6 +21,7 @@ import { ControlChips, DiscreteChips } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
   IconAuto,
+  IconClose,
   IconFocus,
   IconGrid,
   IconInfo,
@@ -109,17 +110,8 @@ export function CanvasStage({
             误读成「整个应用」。容器角在图片未铺满时离图很远。 */}
         {!focus && <ThemeSwitchOverlay target={imgRef} />}
 
-        {/* 聚焦模式下浮在画布上的退出按钮 */}
-        {focus && (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="absolute right-5 top-5 shadow-pop"
-            onClick={() => setUI({ focus: false })}
-          >
-            退出聚焦
-          </Button>
-        )}
+        {/* 聚焦模式：整张 SVG 按窗口尺寸重新渲染并撑满视口，右上角关闭 */}
+        {focus && <FocusOverlay onClose={() => setUI({ focus: false })} />}
       </div>
 
       {/* ───────────────────────────────────────────────────────────
@@ -211,6 +203,64 @@ export function CanvasStage({
       </div>
     </div>
   );
+}
+
+/**
+ * 聚焦预览 —— 全视口浮层。
+ *
+ * ⭐ 不是把画布图片放大（那会裁切或留黑边），而是**按当前窗口宽高重新渲染整张 SVG**：
+ * 母题的所有尺寸都按 W/H 比例计算，所以得到的就是「这张壁纸铺在这块屏幕上」的真实样子，
+ * 无裁切、无留边。只影响预览，不改动用户选的导出尺寸（cfg 不变）。
+ * Esc 或右上角按钮关闭。
+ */
+function FocusOverlay({ onClose }: { onClose: () => void }) {
+  const def = usePatternDef();
+  const cfg = useWorkbenchSelector((s) => s.cfg);
+  const [view, setView] = useState(() => viewportSize());
+
+  useEffect(() => {
+    const onResize = () => setView(viewportSize());
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const uri = useMemo(() => {
+    const svg = renderStandaloneSVG(def, { ...cfg, width: view.w, height: view.h }, { skipBudget: true });
+    return svgToDataUri(svg);
+  }, [def, cfg, view]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${def.name} 聚焦预览`}
+      className="fixed inset-0 z-[100] bg-canvas"
+    >
+      <img src={uri} alt={`${def.name} 全屏预览`} className="block h-full w-full" />
+      <IconButton
+        autoFocus
+        label="关闭聚焦预览（Esc）"
+        className="absolute right-4 top-4 rounded-full bg-surface/80 text-fg shadow-pop backdrop-blur hover:bg-surface"
+        onClick={onClose}
+      >
+        <IconClose size={18} />
+      </IconButton>
+    </div>
+  );
+}
+
+function viewportSize() {
+  return {
+    w: clamp(Math.round(window.innerWidth), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION),
+    h: clamp(Math.round(window.innerHeight), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION),
+  };
 }
 
 /**

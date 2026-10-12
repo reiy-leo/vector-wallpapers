@@ -17,3 +17,4 @@ _c.mjs
 
 # 内联部署生成物
 worker-inline/assets.generated.ts
+src/__verify__/_preview.local.test.ts
