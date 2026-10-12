@@ -40,7 +40,7 @@ const def: PatternDef = {
     { id: 'snow_lo', label: '雪花 · 暗', role: 'detail', paint: { type: 'solid', color: '#575757' }, opacity: 1, visible: true, configurable: true },
     { id: 'snow_mid', label: '雪花 · 中', role: 'secondary', paint: { type: 'solid', color: '#9a9a9a' }, opacity: 1, visible: true, configurable: true },
     { id: 'snow_hi', label: '雪花 · 亮', role: 'primary', paint: { type: 'solid', color: '#ececec' }, opacity: 1, visible: true, configurable: true },
-    { id: 'scanline', label: '扫描线', role: 'detail', paint: { type: 'solid', color: '#000000' }, opacity: 0.32, visible: true, configurable: true },
+    { id: 'scanline', label: '扫描线', role: 'detail', paint: { type: 'solid', color: '#000000' }, opacity: 0.5, visible: true, configurable: true },
     { id: 'band', label: '干扰带', role: 'accent', paint: { type: 'solid', color: '#ffffff' }, opacity: 0.4, visible: true, configurable: true },
   ],
 
@@ -49,6 +49,7 @@ const def: PatternDef = {
     { key: 'grain', label: '颗粒大小', type: 'range', min: 1, max: 8, step: 0.5, default: 2.5, heavy: true },
     { key: 'density', label: '噪点密度', type: 'range', min: 0.2, max: 1, step: 0.05, default: 0.7, heavy: true },
     { key: 'scanlines', label: '扫描线', type: 'toggle', default: true },
+    { key: 'scanGap', label: '扫描线距', type: 'range', min: 0.5, max: 3, step: 0.1, default: 1 },
     { key: 'bands', label: '干扰带数', type: 'range', min: 0, max: 3, step: 1, default: 1 },
   ],
 
@@ -216,10 +217,11 @@ const def: PatternDef = {
       parts.push(rect(0, 0, W, H, { fill: ref, 'fill-opacity': LAYER_ALPHA[li] }));
     });
 
-    // ── 扫描线：周期 = 2 颗粒，暗线占一半 ─────────────────────
+    // ── 扫描线：周期按短边缩放（1080 短边 ≈ 9px），缩略图里也能看出条纹；暗线占 ~45% ──
     if (scan && scanEl.visible) {
-      const period = Math.max(2, px * 2);
-      const lineH = Math.max(1, Math.round(period / 2));
+      const gap = Math.max(0.5, Math.min(3, Number(params.scanGap) || 1));
+      const period = Math.max(3, Math.round(9 * unit * gap));
+      const lineH = Math.max(1, Math.round(period * 0.45));
       const ref = api.tile({
         key: `tvs-scan-${period}-${lineH}`,
         w: 8,
