@@ -35,10 +35,10 @@ const def: PatternDef = {
   animatable: false,
 
   elements: [
-    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#e4e9ed' }, opacity: 1, visible: true, configurable: true },
-    { id: 'arrow', label: '箭头 · 主', role: 'primary', paint: { type: 'solid', color: '#ffffff' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'arrow_alt', label: '箭头 · 错位行', role: 'secondary', paint: { type: 'solid', color: '#cbd5dd' }, opacity: 0.9, visible: true, configurable: true },
-    { id: 'dot', label: '间隙圆点', role: 'detail', paint: { type: 'solid', color: '#c2ccd4' }, opacity: 0.5, visible: true, configurable: true },
+    { id: 'bg', label: '底色', role: 'bg', paint: { type: 'solid', color: '#2346e8' }, opacity: 1, visible: true, configurable: true },
+    { id: 'arrow', label: '箭头 · 主', role: 'primary', paint: { type: 'solid', color: '#ffd23f' }, opacity: 1, visible: true, configurable: true },
+    { id: 'arrow_alt', label: '箭头 · 错位行', role: 'secondary', paint: { type: 'solid', color: '#ff6b9a' }, opacity: 1, visible: true, configurable: true },
+    { id: 'dot', label: '间隙圆点', role: 'detail', paint: { type: 'solid', color: '#ffffff' }, opacity: 0.8, visible: true, configurable: true },
   ],
 
   controls: [
@@ -63,47 +63,57 @@ const def: PatternDef = {
 
   presets: [
     {
-      id: 'mist',
-      label: '晨雾',
+      id: 'cobalt',
+      label: '钴蓝',
       elements: {
-        bg: { paint: { type: 'solid', color: '#e4e9ed' } },
-        arrow: { paint: { type: 'solid', color: '#ffffff' }, opacity: 0.9 },
-        arrow_alt: { paint: { type: 'solid', color: '#cbd5dd' }, opacity: 0.9 },
-        dot: { paint: { type: 'solid', color: '#c2ccd4' }, opacity: 0.5 },
+        bg: { paint: { type: 'solid', color: '#2346e8' } },
+        arrow: { paint: { type: 'solid', color: '#ffd23f' }, opacity: 1 },
+        arrow_alt: { paint: { type: 'solid', color: '#ff6b9a' }, opacity: 1 },
+        dot: { paint: { type: 'solid', color: '#ffffff' }, opacity: 0.8 },
       },
     },
     {
-      id: 'sand',
-      label: '细沙',
+      id: 'coral',
+      label: '珊瑚',
       elements: {
-        bg: { paint: { type: 'solid', color: '#eee5d7' } },
-        arrow: { paint: { type: 'solid', color: '#fbf7f0' }, opacity: 0.95 },
-        arrow_alt: { paint: { type: 'solid', color: '#d9c7ab' }, opacity: 0.85 },
-        dot: { paint: { type: 'solid', color: '#c99a7a' }, opacity: 0.5 },
+        bg: { paint: { type: 'solid', color: '#ff6f59' } },
+        arrow: { paint: { type: 'solid', color: '#fff1d0' }, opacity: 1 },
+        arrow_alt: { paint: { type: 'solid', color: '#ffc23d' }, opacity: 1 },
+        dot: { paint: { type: 'solid', color: '#2a1e5c' }, opacity: 0.6 },
       },
       params: { style: 'solid', size: 0.55, angle: 0, cols: 16, rowGap: 1.2 },
     },
     {
-      id: 'navy',
-      label: '深海',
+      id: 'neon',
+      label: '霓虹夜',
       elements: {
-        bg: { paint: { type: 'solid', color: '#1b2533' } },
-        arrow: { paint: { type: 'solid', color: '#2f3d52' }, opacity: 1 },
-        arrow_alt: { paint: { type: 'solid', color: '#263243' }, opacity: 1 },
-        dot: { paint: { type: 'solid', color: '#c6a46b' }, opacity: 0.55 },
+        bg: { paint: { type: 'solid', color: '#15123a' } },
+        arrow: { paint: { type: 'solid', color: '#ff3d7f' }, opacity: 1 },
+        arrow_alt: { paint: { type: 'solid', color: '#00d1c1' }, opacity: 1 },
+        dot: { paint: { type: 'solid', color: '#ffd23f' }, opacity: 0.85 },
       },
       params: { style: 'line', weight: 0.05, size: 0.6, angle: 90 },
     },
     {
-      id: 'sage',
-      label: '青苔',
+      id: 'lemon',
+      label: '柠檬',
       elements: {
-        bg: { paint: { type: 'solid', color: '#dfe6dc' } },
-        arrow: { paint: { type: 'solid', color: '#f5f8f2' }, opacity: 0.95 },
-        arrow_alt: { paint: { type: 'solid', color: '#a9bca7' }, opacity: 0.8 },
-        dot: { paint: { type: 'solid', color: '#ffffff' }, opacity: 0.6 },
+        bg: { paint: { type: 'solid', color: '#fff2b8' } },
+        arrow: { paint: { type: 'solid', color: '#ff4f2e' }, opacity: 1 },
+        arrow_alt: { paint: { type: 'solid', color: '#2f6bff' }, opacity: 1 },
+        dot: { paint: { type: 'solid', color: '#ff4f2e' }, opacity: 0.45 },
       },
       params: { style: 'chevron', cols: 12, angle: 90, rowGap: 1.1 },
+    },
+    {
+      id: 'mint',
+      label: '薄荷',
+      elements: {
+        bg: { paint: { type: 'solid', color: '#bff0dc' } },
+        arrow: { paint: { type: 'solid', color: '#00a37a' }, opacity: 1 },
+        arrow_alt: { paint: { type: 'solid', color: '#ff7a45' }, opacity: 1 },
+        dot: { paint: { type: 'solid', color: '#ffffff' }, opacity: 0.9 },
+      },
     },
   ],
 
