@@ -1,49 +1,34 @@
 /**
- * 顶栏 —— 全局动作的唯一入口。
+ * 顶栏 —— 只承载「跨面板」的身份与偏好。
  *
- * 信息层级（从左到右对应「身份 → 全局视图 → 全局操作」）：
- *   品牌 → 面板开关 → 收藏 → 主题 → 分享 → 导出
+ *信息层级（从左到右对应「身份 → 视图偏好 → 账户」）：
+ *   品牌 │ 面板·收藏 │ 账户
  *
- * 导出做成「主动作 + 菜单」而不是两个并排按钮：SVG 与 PNG 是同一意图的
- * 两种格式，并排会让顶栏被两个同类按钮占满，且用户每次都要先做一次选择。
+ *⭐ **产物动作（分享/导出）与形态参数已迁到画布工具条**：
+ * 它们描述的是「当前这张图」，不是「整个应用」。放在顶栏会让用户
+ * 以为分享的是整个应用，而实际上分享的是当前母题 + 当前配色。
+ * 「与当前画面绑定的操作，紧贴当前画面」是布局的基本原则。
+ *
+ * ⭐ 组间用**竖分隔线**断开，而不是靠加大间距：间距只是「更空」，
+ * 分隔线才是「这里换了语义类别」。图标连续排列时眼睛会把它们读成一串
+ * 同类按钮，用户找不到「哪个是全局动作」。
+ *
+ * ⭐ 主题切换也移到了画布（图片右上角）：主题改变的正是「这张图看起来
+ * 是亮是暗」，把它留在顶栏等于让用户「改完设置再回去看效果」。
  */
 import { useEffect, useState } from 'react';
-import { registry } from '../patterns';
 import { LIMITS } from '../shared/constants';
-import { detectPlatform, guardCanvasSize, type ExportScale } from '../shared/guards';
-import { copySVGSource, exportPNG, exportSVG } from './exporters';
-import {
-  getConfig,
-  readFavorites,
-  setUI,
-  usePatternDef,
-  useWorkbenchSelector,
-  writeFavorites,
-} from './store';
-import { shareUrl } from './share';
-import { Button, Dialog, IconButton, Segmented, Tooltip } from './primitives';
-import {
-  IconAuto,
-  IconCode,
-  IconDownload,
-  IconMoon,
-  IconPanel,
-  IconShare,
-  IconStar,
-  IconSun,
-} from './icons';
-import type { UIState } from '../engine/types';
+import { readFavorites, setUI, usePatternDef, useWorkbenchSelector, writeFavorites } from './store';
+import { Button, IconButton, Tooltip } from './primitives';
+import { IconGoogle, IconPanel, IconStar } from './icons';
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
 export type NoticeFn = (message: string, tone?: NoticeTone) => void;
 
 export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const def = usePatternDef();
-  const theme = useWorkbenchSelector((s) => s.ui.theme);
   const panel = useWorkbenchSelector((s) => s.ui.panel);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [sourceOpen, setSourceOpen] = useState(false);
 
   // 收藏只在挂载时读一次：它是持久化数据，不参与渲染高频变化
   useEffect(() => {
@@ -61,28 +46,15 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
     onNotice(isFavorite ? '已取消收藏' : `已收藏「${def.name}」`, 'success');
   };
 
-  const copyLink = async () => {
-    const url = shareUrl(getConfig(), {
-      theme: theme === 'system' ? 'system' : theme,
-      panel,
-    });
-    try {
-      await navigator.clipboard.writeText(url);
-      onNotice('分享链接已复制', 'success');
-    } catch {
-      // 剪贴板在非 https / 无权限时不可用，退回展示让用户手动复制
-      window.prompt('复制此链接分享当前壁纸：', url);
-    }
-  };
-
   return (
     <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2">
-      <h1 className="mr-1 flex items-center gap-2 text-md font-semibold text-fg">
+      <h1 className="mr-auto flex items-center gap-2 text-md font-semibold text-fg">
         <LogoMark />
-        <span>Vector Wallpapers</span>
+        <span className="hidden sm:inline">Vector Wallpapers</span>
       </h1>
 
-      <div className="ml-auto flex items-center gap-1">
+      {/* ── 视图偏好：面板位置 / 收藏 ── */}
+      <div className="flex items-center gap-1">
         <Tooltip content={panel === 'right' ? '把面板移到左侧' : '把面板移到右侧'}>
           <IconButton
             label="切换面板位置"
@@ -104,45 +76,35 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
             <IconStar size={16} filled={isFavorite} />
           </IconButton>
         </Tooltip>
-
-        <Tooltip content="查看 SVG 源码">
-          <IconButton label="查看源码" onClick={() => setSourceOpen(true)}>
-            <IconCode size={16} />
-          </IconButton>
-        </Tooltip>
-
-        <Segmented
-          label="主题"
-          size="sm"
-          value={theme}
-          onChange={(t) => setUI({ theme: t as UIState['theme'] })}
-          options={[
-            { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅色' },
-            { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深色' },
-            { value: 'system', label: '', icon: <IconAuto size={14} />, title: '跟随系统' },
-          ]}
-        />
-
-        <Button variant="secondary" size="sm" onClick={() => void copyLink()}>
-          <IconShare size={15} />
-          分享
-        </Button>
-
-        {/* 导出：单个主动作，对话框里再选格式 */}
-        <Button variant="primary" size="sm" onClick={() => setExportOpen(true)}>
-          <IconDownload size={15} />
-          导出
-        </Button>
       </div>
 
-      <ExportDialog
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        onNotice={onNotice}
-      />
-      <SourceDialog open={sourceOpen} onClose={() => setSourceOpen(false)} onNotice={onNotice} />
+      <BarDivider />
+
+      {/* ── 账户：Google 登录 / 用户头像 ──
+          产品当前是纯静态、无后端（PRD Q9/部署决策），因此这里只放**占位**：
+          视觉上把账户位坐实，将来接 OAuth 时不需要再动顶栏布局。 */}
+      <Tooltip content="账号同步功能开发中">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onNotice('账号与云端同步尚未上线，当前配置仅存在本机浏览器中。', 'info')}
+        >
+          <IconGoogle size={15} />
+          登录
+        </Button>
+      </Tooltip>
     </header>
   );
+}
+
+/**
+ * 顶栏竖分隔线。
+ *
+ * ⭐ 用 `bg-line` 而非 `border-l`：分隔线不是内容的边界（Kumo
+ * `shadow-borders` 反对用 border 表达装饰），它只是类别切换的信号。
+ */
+function BarDivider() {
+  return <div aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />;
 }
 
 /** 品牌标记：由两个偏移的圆角方块暗示「pattern 可叠加」的抽象图形。 */
@@ -160,194 +122,5 @@ function LogoMark() {
         opacity="0.45"
       />
     </svg>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
- * 导出对话框
- * ───────────────────────────────────────────────────────────────── */
-
-/**
- * ⭐ Kumo `dialog-rendering`：**绝不条件渲染**。
- * 本组件始终挂载，由 `open` prop 决定可见性 —— 这样开合动画才有意义，
- * 否则每次都是「突然出现」（hidden 属性让不可见时不进无障碍树）。
- */
-function ExportDialog({
-  open,
-  onClose,
-  onNotice,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onNotice: NoticeFn;
-}) {
-  const def = usePatternDef();
-  const cfg = useWorkbenchSelector((s) => s.cfg);
-  const [scale, setScale] = useState<ExportScale>(2);
-  const [busy, setBusy] = useState(false);
-
-  const platform = detectPlatform();
-  const guard = guardCanvasSize(cfg.width, cfg.height, scale);
-  const finalPixels = (guard.width * guard.height / 1_000_000).toFixed(1);
-
-  const onSVG = () => {
-    exportSVG(def, cfg);
-    onNotice(`已导出 ${cfg.width}×${cfg.height} 的 SVG`, 'success');
-    onClose();
-  };
-
-  const onPNG = async () => {
-    setBusy(true);
-    const result = await exportPNG(def, cfg, scale);
-    setBusy(false);
-    // 降级 / 不支持都要说出来 —— 静默降级会被当成 bug
-    if (result.ok) onNotice(`已导出 ${guard.width}×${guard.height} 的 PNG`, 'success');
-    else if (result.notice) onNotice(result.notice, 'warning');
-    if (result.ok || !result.notice?.includes('iOS')) onClose();
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="导出壁纸"
-      description="导出为静态图像，动画只在预览中呈现。"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            取消
-          </Button>
-          <Button variant="secondary" onClick={onSVG}>
-            导出 SVG
-          </Button>
-          {platform === 'ios' ? (
-            // ⭐ 刻意不用原生 disabled：disabled 的按钮不派发 click，
-            //   点了毫无反应，用户会以为按钮坏了。用 aria-disabled 表达
-            //   不可用语义，视觉照常灰化，点击给出明确替代路径。
-            <Button
-              variant="danger"
-              aria-disabled={platform === 'ios'}
-              className={platform === 'ios' ? 'cursor-not-allowed opacity-45' : ''}
-              onClick={() =>
-                onNotice(
-                  'iOS 设备暂不支持 PNG 导出。SVG 是矢量、体积更小，建议直接用 SVG；' +
-                    '若确实需要 PNG，可在桌面浏览器打开本站再导出。',
-                  'warning',
-                )
-              }
-            >
-              导出 PNG（iOS 不支持）
-            </Button>
-          ) : (
-            <Button variant="primary" disabled={busy} onClick={() => void onPNG()}>
-              {busy ? '导出中…' : `导出 PNG @${scale}x`}
-            </Button>
-          )}
-        </>
-      }
-    >
-      <div className="grid gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-base text-fg-soft">输出尺寸</span>
-          <code className="font-mono text-[0.9em] text-fg">
-            {guard.width} × {guard.height}
-          </code>
-        </div>
-
-        {platform !== 'ios' && (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-base text-fg-soft">倍率</span>
-            <Segmented
-              label="导出倍率"
-              size="sm"
-              value={String(scale) as '1' | '2' | '3'}
-              onChange={(v) => setScale(Number(v) as ExportScale)}
-              options={[
-                { value: '1', label: '@1x' },
-                { value: '2', label: '@2x' },
-                { value: '3', label: '@3x' },
-              ]}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-base text-fg-soft">像素总量</span>
-          <span className="text-sm text-fg-mute">{finalPixels} M px</span>
-        </div>
-
-        {/* 守卫提示：降级必须明示（PRD Q8：不可静默失败） */}
-        {guard.notice && (
-          <p className="rounded-md bg-warning-tint px-3 py-2 text-sm text-warning">{guard.notice}</p>
-        )}
-
-        {platform === 'ios' && (
-          <p className="rounded-md bg-warning-tint px-3 py-2 text-sm text-warning">
-            iOS 设备暂不支持 PNG 导出。SVG 是矢量、体积更小，建议直接用 SVG；
-            若确实需要 PNG，可在桌面浏览器打开本站再导出。
-          </p>
-        )}
-      </div>
-    </Dialog>
-  );
-}
-
-/** 源码对话框 —— 供开发者查看与复制产物（PRD 验收项之一）。 */
-function SourceDialog({
-  open,
-  onClose,
-  onNotice,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onNotice: NoticeFn;
-}) {
-  const def = usePatternDef();
-  const [copied, setCopied] = useState(false);
-
-  // 只在打开时生成，避免每次父组件重渲染都重新渲染一遍 SVG
-  const [svg, setSvg] = useState('');
-  useEffect(() => {
-    if (!open) return;
-    void import('../engine/render').then(({ renderStandaloneSVG }) => {
-      setSvg(renderStandaloneSVG(def, getConfig(), { skipBudget: true }));
-    });
-  }, [open, def]);
-
-  const copy = async () => {
-    const ok = await copySVGSource(def, getConfig());
-    if (ok) {
-      setCopied(true);
-      onNotice('源码已复制到剪贴板', 'success');
-      window.setTimeout(() => setCopied(false), 2000);
-    } else {
-      onNotice('复制失败，请手动选择文本复制', 'warning');
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="SVG 源码"
-      description="与预览、导出完全同一份产物，可直接粘贴到任意支持 SVG 的地方。"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            关闭
-          </Button>
-          <Button variant="primary" onClick={() => void copy()}>
-            {copied ? '已复制' : '复制源码'}
-          </Button>
-        </>
-      }
-    >
-      <pre className="vw-scroll max-h-80 overflow-auto rounded-md bg-surface-3 p-3 font-mono text-[0.9em] leading-relaxed text-fg-soft">
-        {svg}
-      </pre>
-      <p className="text-2xs text-fg-mute">
-        共 {(new TextEncoder().encode(svg).length / 1024).toFixed(1)} KB · 母题库共 {registry.size} 个
-      </p>
-    </Dialog>
   );
 }

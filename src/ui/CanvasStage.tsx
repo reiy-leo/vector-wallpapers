@@ -1,11 +1,13 @@
 /**
  * ② 预览画布（中栏）—— 工作台的视觉主角。
  *
- * 两条关键设计：
- *  1. **画布优先于控件**。控件区在下方且可折叠，用户第一眼看到的是作品本身，
- *     而不是一堆参数 —— 这是「壁纸生成器」而不是「图形编辑器」的区别。
+ * 三条关键设计：
+ *  1. **画布优先于控件**。用户第一眼看到的是作品本身，而不是一堆参数 ——
+ *     这是「壁纸生成器」而不是「图形编辑器」的区别。
  *  2. **预览与导出共用同一份 `renderStandaloneSVG` 产物**。
  *     缩略图、大图、下载、PNG 全部走这一条路径，不可能出现不一致。
+ *  3. **形态参数紧贴画布**。调线宽/密度这类操作必须「边看边拧」，
+ *     所以参数行贴在画布正下方（见ControlChips），而不是甩到右栏。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LIMITS, SIZE_PRESETS } from '../shared/constants';
@@ -14,17 +16,29 @@ import { renderStandaloneSVG, createDefaultConfig } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
-import { Button, IconButton, Tooltip, inputClass } from './primitives';
-import { IconFocus, IconGrid, IconInfo, IconReset, IconShuffle } from './icons';
+import { Button, IconButton, Segmented, Tooltip, inputClass } from './primitives';
+import { ControlChips, DiscreteChips } from './ControlChips';
+import { ProductActions } from './ProductActions';
+import {
+  IconAuto,
+  IconFocus,
+  IconGrid,
+  IconInfo,
+  IconMoon,
+  IconReset,
+  IconShuffle,
+  IconSun,
+} from './icons';
 import type { ColorStrategy } from '../engine/colors';
-import type { PatternConfig } from '../engine/types';
+import type { PatternConfig, UIState } from '../engine/types';
+import type { NoticeFn } from './TopBar';
 
 export function CanvasStage({
   strategy,
   onNotice,
 }: {
   strategy: ColorStrategy;
-  onNotice: (msg: string, tone: 'info' | 'warning' | 'danger') => void;
+  onNotice: NoticeFn;
 }) {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
@@ -73,7 +87,7 @@ export function CanvasStage({
       {/* 画布区 */}
       <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-5">
         {uri === '' ? (
-          <p className="text-sm text-fg-mute">渲染中…</p>
+          <p className="text-base text-fg-mute">渲染中…</p>
         ) : (
           <img
             ref={imgRef}
@@ -90,6 +104,11 @@ export function CanvasStage({
             否则用户看到的参考线会与壁纸边缘错位，失去参考价值 */}
         {grid && <GridOverlay target={imgRef} />}
 
+        {/* 主题切换：贴在**图片**右上角而非容器右上角 —— 主题改变的是
+            「这张图看起来多亮」，把它放在舞台角上会让用户把作用域
+            误读成「整个应用」。容器角在图片未铺满时离图很远。 */}
+        {!focus && <ThemeSwitchOverlay target={imgRef} />}
+
         {/* 聚焦模式下浮在画布上的退出按钮 */}
         {focus && (
           <Button
@@ -103,70 +122,151 @@ export function CanvasStage({
         )}
       </div>
 
-      {/* 工具条 */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line px-5 py-3">
-        <SizeSelect cfg={cfg} onChange={setSize} />
+      {/* ───────────────────────────────────────────────────────────
+          工具条：三行结构，靠分组而不是靠加大间距区分语义。
+            行① 尺寸 + 形态参数  ← 「这张图长什么样」
+            行② 离散形态选项
+            行③ 视图/产物动作    ← 「对这张图做什么」
+          滑块与产物动作必须**同一视觉带**：调形状和拿走产物是
+          同一个连续行为链的两端，中间隔一行会让手感断开。
+          ─────────────────────────────────────────────────────────── */}
+      <div className="grid shrink-0 gap-2.5 border-t border-line px-5 py-3">
+        {/* 行① 尺寸 + 形态参数 */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+          <SizeSelect cfg={cfg} onChange={setSize} />
 
-        <Tooltip content={grid ? '隐藏栅格' : '显示栅格'}>
-          <IconButton
-            label={grid ? '隐藏栅格' : '显示栅格'}
-            aria-pressed={grid}
-            className={grid ? 'bg-brand-tint text-brand' : ''}
-            onClick={() => setUI({ grid: !grid })}
-          >
-            <IconGrid size={16} />
-          </IconButton>
-        </Tooltip>
+          {/* 竖分隔线：尺寸是「画布」，参数是「内容」，两者作用对象不同 */}
+          <div aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-line sm:block" />
 
-        <Tooltip content={focus ? '退出聚焦' : '聚焦预览'}>
-          <IconButton
-            label={focus ? '退出聚焦' : '聚焦预览'}
-            aria-pressed={focus}
-            className={focus ? 'bg-brand-tint text-brand' : ''}
-            onClick={() => setUI({ focus: !focus })}
-          >
-            <IconFocus size={16} />
-          </IconButton>
-        </Tooltip>
-
-        <Tooltip content="换一版（同 seed 可复现）">
-          <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
-            <IconShuffle size={15} />
-            换一版
-          </Button>
-        </Tooltip>
-
-        <Tooltip content="恢复当前母题的默认配置">
-          <IconButton
-            label="恢复默认"
-            onClick={() => {
-              const base = createDefaultConfig(def, {
-                width: cfg.width,
-                height: cfg.height,
-                seed: cfg.seed,
-              });
-              setConfig(base);
-              onNotice('已恢复默认配置', 'info');
-            }}
-          >
-            <IconReset size={16} />
-          </IconButton>
-        </Tooltip>
-
-        <div className="ml-auto flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 font-mono text-[0.9em] ${
-              overBudget ? 'text-danger' : 'text-fg-mute'
-            }`}
-          >
-            <IconInfo size={13} />
-            {(metrics.bytes / 1024).toFixed(1)} KB / {(LIMITS.MAX_SVG_BYTES / 1024).toFixed(0)} KB
-            <span className="text-fg-mute">· {metrics.nodes} 节点</span>
-          </span>
+          <ControlChips />
         </div>
+
+        {/* 行② 离散形态选项 + 产物动作 */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+          <DiscreteChips />
+
+          <div className="ml-auto flex items-center gap-2">
+            <Tooltip content={grid ? '隐藏栅格' : '显示栅格'}>
+              <IconButton
+                label={grid ? '隐藏栅格' : '显示栅格'}
+                aria-pressed={grid}
+                className={grid ? 'bg-brand-tint text-brand' : ''}
+                onClick={() => setUI({ grid: !grid })}
+              >
+                <IconGrid size={16} />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip content={focus ? '退出聚焦' : '聚焦预览'}>
+              <IconButton
+                label={focus ? '退出聚焦' : '聚焦预览'}
+                aria-pressed={focus}
+                className={focus ? 'bg-brand-tint text-brand' : ''}
+                onClick={() => setUI({ focus: !focus })}
+              >
+                <IconFocus size={16} />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip content="恢复当前母题的默认配置">
+              <IconButton
+                label="恢复默认"
+                onClick={() => {
+                  const base = createDefaultConfig(def, {
+                    width: cfg.width,
+                    height: cfg.height,
+                    seed: cfg.seed,
+                  });
+                  setConfig(base);
+                  onNotice('已恢复默认配置', 'info');
+                }}
+              >
+                <IconReset size={16} />
+              </IconButton>
+            </Tooltip>
+
+            <div aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-line" />
+
+            <Tooltip content="换 seed + 按当前策略重排配色">
+              <Button variant="secondary" size="sm" onClick={() => shuffleCurrent(strategy)}>
+                <IconShuffle size={15} />
+                换一版
+              </Button>
+            </Tooltip>
+
+            <ProductActions onNotice={onNotice} />
+          </div>
+        </div>
+
+        {/* 体积/节点：纯诊断信息，与可点物严格分开 */}
+        <p
+          className={`flex items-center gap-1 font-mono text-[0.9em] ${
+            overBudget ? 'text-danger' : 'text-fg-mute'
+          }`}
+        >
+          <IconInfo size={13} />
+          {(metrics.bytes / 1024).toFixed(1)} KB / {(LIMITS.MAX_SVG_BYTES / 1024).toFixed(0)} KB
+          <span>· {metrics.nodes} 节点</span>
+        </p>
       </div>
     </div>
   );
+}
+
+/**
+ * 主题切换浮层 —— 贴图片右上角内侧。
+ *
+ * ⭐ 必须**跟随图片盒子**而非舞台容器：容器 `items-center` + 图片
+ * `max-h-full` 意味着图片常常不铺满容器（比例不同时尤其明显），
+ * 挂在容器右上角会飘在图片外面，用户看不出它管的是哪张图。
+ *
+ * 与栅格叠加共用同一套 ResizeObserver 定位逻辑 —— 两者的锚点必须一致，
+ * 否则会出现「栅格对得上、按钮对不上」的错位。
+ */
+function ThemeSwitchOverlay({ target }: { target: React.RefObject<HTMLImageElement | null> }) {
+  const theme = useWorkbenchSelector((s) => s.ui.theme);
+  const box = useImageBox(target);
+
+  if (box.w === 0) return null;
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 flex items-start justify-end p-3"
+      aria-hidden="false"
+    >
+      <div className="pointer-events-auto shadow-pop">
+        <Segmented
+          label="界面主题"
+          size="sm"
+          value={theme}
+          onChange={(t) => setUI({ theme: t as UIState['theme'] })}
+          options={[
+            { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅色' },
+            { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深色' },
+            { value: 'system', label: '', icon: <IconAuto size={14} />, title: '跟随系统' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** 跟踪图片盒子尺寸 —— 栅格与主题浮层共用，保证两者锚点一致。 */
+function useImageBox(target: React.RefObject<HTMLElement | null>) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = target.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const r = entry.contentRect;
+      setBox({ w: r.width, h: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [target]);
+
+  return box;
 }
 
 /**
@@ -188,7 +288,7 @@ function SizeSelect({
 
   return (
     <div className="flex items-center gap-1.5">
-      <label htmlFor="vw-size" className="text-sm text-fg-soft">
+      <label htmlFor="vw-size" className="text-base text-fg-soft">
         尺寸
       </label>
       <select
@@ -286,18 +386,7 @@ function groupByDevice(
  * 一旦图片因比例不同而没有铺满容器，参考线就会明显偏位。
  */
 function GridOverlay({ target }: { target: React.RefObject<HTMLImageElement | null> }) {
-  const [box, setBox] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = target.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const r = entry.contentRect;
-      setBox({ w: r.width, h: r.height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [target]);
+  const box = useImageBox(target);
 
   if (box.w === 0 || box.h === 0) return null;
 

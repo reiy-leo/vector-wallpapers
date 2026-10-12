@@ -8,6 +8,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -80,11 +81,29 @@ export function Section({
  * 按钮
  * ───────────────────────────────────────────────────────────────── */
 
+/**
+ * ⭐ 控件高度阶梯 —— 全站只有三档，写在token 层而不是散落在各组件。
+ *
+ * 背景：本项目一度同时存在 26 / 28 / 30 / 32 / 36 / 38px 六种控件高度
+ * （Segmented sm=28、Button sm=32、Button md=36、CategoryTab≈26、
+ * 色板按钮≈28、合集缩略图 40…），肉眼能看出「有的控件比旁边的重」。
+ * Kumo 的 `shadow-borders` 讲描边，但**高度不一致造成的视觉重量差**
+ * 同属一类问题，且规范里没有对应条目 —— 只能自己定死。
+ *
+ * 三档的语义边界：
+ *  - `CONTROL_H` (32px)：**正文控件层**。工具条、面板、卡片内的一切可点物。
+ *  - `CHIP_H`   (28px)：**标签层**。分类筛选 pill 这类「比按钮轻一档」的筛选器。
+ *  - `CONTROL_H_LG` (36px)：**浮层内主动作**。对话框底部，横跨更宽的点击面。
+ */
+export const CONTROL_H = 'h-8';
+export const CHIP_H = 'h-7';
+export const CONTROL_H_LG = 'h-9';
+
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md';
 
 const BUTTON_BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-sm font-medium ' +
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-sm font-medium ' +
   // ⭐ Kumo `hover-color-transitions`：绝不加 transition-colors。
   // 快速交互上的颜色渐变会让界面显「黏」，颜色必须瞬时切换。
   // 只保留一个极短的 transform 过渡（按下反馈），不影响颜色。
@@ -93,15 +112,34 @@ const BUTTON_BASE =
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-brand text-on-brand hover:bg-brand-hover',
-  secondary: 'bg-surface-2 text-fg ring-1 ring-line-input hover:bg-surface-3',
+  // ⭐ secondary 用 `ring-line` 而非 `ring-line-input`：描边的深浅是**层级信号**，
+  //   3:1 的 line-input 只留给表单输入框（WCAG 1.4.11 的对比度义务）。
+  //   按钮的边界靠填充色差（surface-2 / surface）就足够，深描边会显脏。
+  secondary: 'bg-surface-2 text-fg hover:bg-surface-3',
   ghost: 'text-fg-soft hover:bg-surface-2 hover:text-fg',
   danger: 'bg-danger text-on-brand hover:brightness-110',
 };
 
 const BUTTON_SIZE: Record<ButtonSize, string> = {
-  // ⭐ Kumo `content-text-size`：按钮文字 14px，不用 13px
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-9 px-4 text-base',
+  // ⭐ Kumo `content-text-size`：按钮文字一律 14px（text-base），
+  // sm 与 md 的区别只在**高度与内边距**，不在字号。
+  //
+  // ⚠️ 此前 sm 写的是 text-sm(13px)，而它上方的注释恰好写着「按钮文字 14px，
+  // 不用 13px」—— 注释与代码自相矛盾。而既有门禁只拦 ≥16px，
+  // 13px 这一侧完全无人看守，于是错误长期存活。
+  sm: `${CONTROL_H} px-3 text-base`,
+  md: `${CONTROL_H_LG} px-4 text-base`,
+};
+
+/**
+ * 图标按钮的方盒尺寸。
+ *
+ * ⭐ 用**正方形**而非「h-8 w-9」这类不等值：icon-alignment 要求图标与文字
+ * 首行对齐，而方盒是「图标独占一行」的情况——此时两轴不等会让图标视觉重心偏移。
+ */
+const ICON_BOX: Record<ButtonSize, string> = {
+  sm: 'h-8 w-8',
+  md: 'h-9 w-9',
 };
 
 export function Button({
@@ -130,12 +168,12 @@ export function Button({
  */
 export function IconButton({
   label,
-  size = 'md',
+  size = 'sm',
   className = '',
   children,
   ...rest
 }: { label: string; size?: ButtonSize; className?: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const box = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9';
+  const box = ICON_BOX[size];
   return (
     <button
       type="button"
@@ -188,6 +226,9 @@ export function ToggleIconButton({
  * ⭐ Kumo `concentric-border-radius`：外圈 rounded-sm(6px) + p-0.5(2px)
  * → 内圈必须是 4px（6 − 2）。若内外都写 rounded-sm，圆角不同心，
  * 视觉上会出现左上贴齐、右下脱开的「歪」感。
+ *
+ * ⭐ 高度与 `CONTROL_H` 对齐（32px），此前 sm 档是 28px ——
+ * 与旁边的 32px 按钮并排时，整组控件会显得「矮一截、显轻」。
  */
 export function Segmented<T extends string>({
   value,
@@ -206,7 +247,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-sm bg-surface-3 p-0.5 ring-1 ring-line"
+      className="inline-flex shrink-0 rounded-sm bg-surface-3 p-0.5 ring-1 ring-line"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -219,8 +260,9 @@ export function Segmented<T extends string>({
             title={o.title ?? o.label}
             onClick={() => onChange(o.value)}
             className={[
+              // 同Kumo `content-text-size`：sm 只缩高度，字号固定 14px
               'inline-flex items-center justify-center gap-1.5 rounded-xs font-medium',
-              size === 'sm' ? 'h-7 px-2.5 text-sm' : 'h-8 px-3 text-base',
+              size === 'sm' ? `${CONTROL_H} px-2.5 text-base` : `${CONTROL_H_LG} px-3 text-base`,
               active
                 ? 'bg-surface text-fg shadow-sm'
                 : 'text-fg-soft hover:bg-surface-2 hover:text-fg',
@@ -232,6 +274,45 @@ export function Segmented<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * 筛选 chip
+ * ───────────────────────────────────────────────────────────────── */
+
+/**
+ * 筛选 chip（分类 tab 这类「二选一/多选一」的标签）。
+ *
+ * ⭐ 与 `Button` 的区别是**语义层级**而非外观：chip 表示「筛选当前列表」，
+ * 不产生新内容也不离开当前位置，所以用 ghost 变体 + 圆角胶囊；
+ * 而 Button 表示「执行动作」。两者并排时，chip 应当更轻。
+ *
+ * 高度用 `CHIP_H`(28px) 而非 `CONTROL_H`(32px)—— 与按钮并排时
+ * 一档之差刚好表达层级，不必靠颜色区分。
+ */
+export function Chip({
+  active,
+  className = '',
+  children,
+  ...rest
+}: { active?: boolean } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={[
+        'shrink-0 whitespace-nowrap rounded-full px-2.5 font-medium',
+        CHIP_H,
+        'text-base',
+        // ⭐ Kumo hover-color-transitions：颜色瞬时切换，绝不加 transition
+        active ? 'bg-brand text-on-brand' : 'text-fg-soft hover:bg-surface-2 hover:text-fg',
+        className,
+      ].join(' ')}
+      {...rest}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -362,7 +443,7 @@ export function SliderField({
   return (
     <div className="grid gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-sm text-fg-soft">
+        <label htmlFor={id} className="text-base text-fg-soft">
           {label}
         </label>
         <code className="font-mono text-[0.9em] text-fg-mute">{format ? format(value) : String(value)}</code>
@@ -378,6 +459,58 @@ export function SliderField({
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+    </div>
+  );
+}
+
+/**
+ * 横向滑块 chip —— 工具条专用的紧凑形态。
+ *
+ * 与 `SliderField`（竖排：标签在上、条在下）是**同一语义控件的两种摆放**，
+ * 不是两个组件：竖排用于面板（有整列宽度），横排用于工具条（宽度紧张）。
+ * 数值永远可见 —— 拖动时没有数字等于没在调。
+ *
+ * ⭐ Kumo `icon-alignment` / `inline-monospace-size`：数值用等宽并缩到 0.9em，
+ * 否则滑块右端会随数字位数变化而抖动（1→10 时列宽跳动）。
+ */
+export function SliderChip({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  format,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+  format?: (v: number) => string;
+}) {
+  const id = useId();
+  const text = format ? format(value) : String(value);
+  // ⭐ tabular-nums：数字等宽，否则滑块拖动时右侧数值列会左右抖动
+  return (
+    <div className="flex items-center gap-2">
+      <label htmlFor={id} className="shrink-0 text-base text-fg-soft">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="range"
+        className="vw-slider w-24 shrink-0"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <code className="w-11 shrink-0 text-right font-mono text-[0.9em] tabular-nums text-fg-mute">
+        {text}
+      </code>
     </div>
   );
 }
@@ -431,20 +564,23 @@ export function Switch({
 /**
  * ⭐ Kumo `collapse-content-size`：折叠时内层容器保持 `w-full`，
  * 让内容尺寸在动画过程中保持稳定，不会出现「收起时文字被压扁」的抖动。
+ *
+ * `defaultOpen` 而非 `open` + `onToggle`：折叠面板的开关状态是
+ * **组件内部的事务**（每次展开都想从头看），不属于页面的全局状态 ——
+ * 让调用方托管只会催生一堆 `const [x, setX] = useState(false)` 样板。
  */
 export function Collapsible({
   title,
-  open,
-  onToggle,
+  defaultOpen = false,
   count,
   children,
 }: {
   title: string;
-  open: boolean;
-  onToggle: () => void;
+  defaultOpen?: boolean;
   count?: number;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   const id = useId();
   return (
     <div>
@@ -452,11 +588,11 @@ export function Collapsible({
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        onClick={onToggle}
+        onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-1.5 rounded-sm py-1 text-left text-fg-mute hover:text-fg"
       >
         <IconChevron dir={open ? 'down' : 'right'} size={14} />
-        <span className="text-sm font-medium text-fg-soft">{title}</span>
+        <span className="text-base font-medium text-fg-soft">{title}</span>
         {count !== undefined && <span className="text-2xs text-fg-mute">{count}</span>}
       </button>
       {open && (

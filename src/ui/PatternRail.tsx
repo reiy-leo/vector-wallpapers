@@ -10,7 +10,7 @@ import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { useWorkbenchSelector, selectPattern, setCategory, setSearch } from './store';
-import { CountBadge, SearchInput } from './primitives';
+import { CountBadge, Chip, SearchInput } from './primitives';
 import { IconStar } from './icons';
 import type { PatternDef } from '../patterns/types';
 
@@ -96,18 +96,13 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
          * 5 个标签占两行，全部可见，且不依赖任何交互就能发现。
          */}
         <nav aria-label="母题分类" className="flex flex-wrap gap-1">
-          <CategoryTab
-            label="全部"
-            active={category === ALL}
-            onClick={() => setCategory(ALL)}
-          />
+          <Chip active={category === ALL} onClick={() => setCategory(ALL)}>
+            全部
+          </Chip>
           {CATEGORY_META.map((c) => (
-            <CategoryTab
-              key={c.id}
-              label={c.label}
-              active={category === c.id}
-              onClick={() => setCategory(c.id)}
-            />
+            <Chip key={c.id} active={category === c.id} onClick={() => setCategory(c.id)}>
+              {c.label}
+            </Chip>
           ))}
         </nav>
       </div>
@@ -132,31 +127,6 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
         )}
       </div>
     </div>
-  );
-}
-
-function CategoryTab({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={[
-        'shrink-0 rounded-full px-2.5 py-1 text-sm whitespace-nowrap',
-        // ⭐ Kumo hover-color-transitions：颜色瞬时切换
-        active ? 'bg-brand text-on-brand' : 'text-fg-soft hover:bg-surface-2 hover:text-fg',
-      ].join(' ')}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -206,7 +176,7 @@ function ThumbCard({
       <span className="grid gap-0.5 px-0.5">
         <span className="flex items-baseline gap-1">
           {/* Kumo inline-monospace-size：id 是等宽字体且与中文名混排 → 缩到 0.9em */}
-          <span className="truncate text-sm font-medium text-fg">{def.name}</span>
+          <span className="truncate text-base font-medium text-fg">{def.name}</span>
         </span>
         <code className="truncate font-mono text-[0.9em] text-fg-mute">{def.id}</code>
       </span>

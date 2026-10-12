@@ -139,40 +139,31 @@ function ElementRow({
       ].join(' ')}
     >
       <div className="flex items-center gap-1.5 p-1.5">
-        {/* 显隐 */}
+        {/* 显隐 —— 走 IconButton 统一规格（32px 方盒 + ghost 变体），
+            不再手写 <button>：手写一次就漂移一次，这是本项目反复出现的问题。 */}
         <Tooltip content={cfgEl.visible ? '隐藏该元件' : '显示该元件'}>
-          <button
-            type="button"
-            aria-label={`${cfgEl.visible ? '隐藏' : '显示'} ${label}`}
+          <IconButton
+            label={`${cfgEl.visible ? '隐藏' : '显示'} ${label}`}
             aria-pressed={!cfgEl.visible}
+            className={cfgEl.visible ? 'text-fg-mute' : 'text-fg-mute'}
             onClick={() => patchElement(cfgEl.id, { visible: !cfgEl.visible })}
-            className={[
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm',
-              cfgEl.visible ? 'text-fg-mute hover:bg-surface-3 hover:text-fg' : 'text-fg-mute',
-            ].join(' ')}
           >
             <IconEye off={!cfgEl.visible} size={16} />
-          </button>
+          </IconButton>
         </Tooltip>
 
-        {/* 锁定：随机配色时跳过该元件 */}
+        {/* 锁定：随机配色时跳过该元件
+            ⭐ 刻意用中性色而非品牌色表达「锁定」——
+              锁定是保护性状态，不是需要被强调的特性 */}
         <Tooltip content={cfgEl.locked ? '解锁（参与「换一版」）' : '锁定（「换一版」时保持不变）'}>
-          <button
-            type="button"
-            aria-label={`${cfgEl.locked ? '解锁' : '锁定'} ${label}`}
+          <IconButton
+            label={`${cfgEl.locked ? '解锁' : '锁定'} ${label}`}
             aria-pressed={cfgEl.locked}
+            className={cfgEl.locked ? 'bg-surface-3 text-fg-soft' : 'text-fg-mute'}
             onClick={() => patchElement(cfgEl.id, { locked: !cfgEl.locked })}
-            className={[
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm',
-              // ⭐ 刻意用中性色而非品牌色表达「锁定」——
-              //   锁定是保护性状态，不是需要被强调的特性
-              cfgEl.locked
-                ? 'bg-surface-3 text-fg-soft'
-                : 'text-fg-mute hover:bg-surface-3 hover:text-fg',
-            ].join(' ')}
           >
             <IconLock open={!cfgEl.locked} size={16} />
-          </button>
+          </IconButton>
         </Tooltip>
 
         {/* 色块 —— 本面板视觉主角，44px 点击区满足 WCAG 2.5.5 目标尺寸 */}
@@ -304,7 +295,7 @@ function HexField({
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-sm text-fg-soft">色值</label>
+      <label className="text-base text-fg-soft">色值</label>
       <input
         type="text"
         value={draft}
@@ -346,7 +337,7 @@ function GradientStops({
   return (
     <div className="grid gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm text-fg-soft">色标</span>
+        <span className="text-base text-fg-soft">色标</span>
         <span className="text-2xs text-fg-mute">
           {paint.type === 'linear' ? '线性渐变' : '径向渐变'} · {paint.stops.length} 站
         </span>
@@ -418,7 +409,7 @@ function RoleRow({
   return (
     <li className="flex items-center gap-2 rounded-md bg-surface px-2 py-1.5 ring-1 ring-line">
       <ColorSwatch colors={colors.length > 0 ? colors : ['#888888']} size={26} onPick={onPick} />
-      <span className="min-w-0 flex-1 truncate text-sm text-fg-soft">{ROLE_LABEL[role]}</span>
+      <span className="min-w-0 flex-1 truncate text-base text-fg-soft">{ROLE_LABEL[role]}</span>
       <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">×{count}</code>
       <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">{label}</code>
     </li>

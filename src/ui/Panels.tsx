@@ -19,15 +19,14 @@ import { applyPaletteSlots, nextSeed, randomizeColors } from './coloring';
 import {
   getConfig,
   setConfig,
-  setParam,
   setSeed,
   usePatternDef,
   useWorkbenchSelector,
 } from './store';
-import { Button, CountBadge, Section, Segmented, SliderField, inputClass } from './primitives';
+import { Button, Collapsible, CountBadge, Section, Segmented, inputClass } from './primitives';
 import { IconDice } from './icons';
 import type { ColorStrategy } from '../engine/colors';
-import type { ControlDef, ElementRole, ParamValue, PatternDef } from '../patterns/types';
+import type { ElementRole, PatternDef } from '../patterns/types';
 import type { PatternConfig } from '../engine/types';
 
 /* ─────────────────────────────────────────────────────────────────
@@ -76,7 +75,7 @@ export function PalettePanel({
       </ul>
 
       <div className="grid gap-2 border-t border-line pt-3">
-        <span className="text-sm font-medium text-fg-soft">随机换色策略</span>
+        <span className="text-base font-medium text-fg-soft">随机换色策略</span>
         <Segmented
           label="随机换色策略"
           size="sm"
@@ -204,149 +203,66 @@ function useSetThumbs() {
  * ───────────────────────────────────────────────────────────────── */
 
 /**
- * 参数控件 —— 100% 由 `PatternDef.controls` 生成（架构铁律 10）。
+ * 参数面板 —— **只剩随机种子**。
  *
- * 本文件里**没有**任何母题 id 或参数 key 字面量；
- * 新增母题或新增控件，这里不需要改动。
+ * ⭐ 形态参数（线宽、密度、起伏…）已迁到画布工具条（见 ControlChips）：
+ * 调形状是「边看边拧」的行为，甩到 360px 外的右栏会让眼睛反复横跳。
+ *
+ * 种子之所以**留在右栏**而不是跟着搬走：它服务的是「复现 / 分享」
+ * （相同种子 + 相同配色 = 同一张壁纸），属于配置而非形态 ——
+ * 混进工具条的形态滑块里，用户会误以为拧它会改变形状。
  */
 export function ParamPanel() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
-  const groups = useMemo(() => groupControls(def.controls), [def.controls]);
 
   return (
-    <Section title="形态参数" hint="每个母题自定义，切母题时自动换成它自己的参数">
-      {groups.map(([group, controls]) => (
-        <fieldset key={group} className="grid gap-3">
-          {group !== '' && (
-            <legend className="text-sm font-medium text-fg-soft">{group}</legend>
-          )}
-          {controls.map((c) => (
-            <ControlRow key={c.key} control={c} cfg={cfg} onChange={setParam} />
-          ))}
-        </fieldset>
-      ))}
-
-      <div className="grid gap-2 border-t border-line pt-3">
-        <span className="text-sm font-medium text-fg-soft">随机种子</span>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            value={cfg.seed}
-            min={0}
-            max={999999}
-            aria-label="随机种子"
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v) && v >= 0) setSeed(v);
-            }}
-            className={inputClass('vw-number w-28 font-mono text-[0.9em] tabular-nums')}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            title="换一个随机种子（不改变当前配色）"
-            onClick={() => setSeed(nextSeed(cfg.seed))}
-          >
-            <IconDice size={15} />
-            换种子
-          </Button>
-        </div>
-        <p className="text-2xs text-fg-mute">
-          相同种子 + 相同配色 = 完全相同的壁纸，分享链接靠它复现画面。
-        </p>
-      </div>
-    </Section>
-  );
-}
-
-/** 按 `group` 字段分组；无 group 的控件归入首组。 */
-function groupControls(controls: readonly ControlDef[]): Array<[string, ControlDef[]]> {
-  const map = new Map<string, ControlDef[]>();
-  for (const c of controls) {
-    const key = c.group ?? '';
-    const list = map.get(key);
-    if (list) list.push(c);
-    else map.set(key, [c]);
-  }
-  return [...map.entries()];
-}
-
-function ControlRow({
-  control,
-  cfg,
-  onChange,
-}: {
-  control: ControlDef;
-  cfg: PatternConfig;
-  onChange: (key: string, value: ParamValue) => void;
-}) {
-  const value = cfg.params[control.key];
-
-  if (control.type === 'range') {
-    return (
-      <SliderField
-        label={control.label}
-        value={Number(value)}
-        min={control.min}
-        max={control.max}
-        step={control.step}
-        format={(v) => (control.unit ? `${v}${control.unit}` : String(v))}
-        onChange={(v) => onChange(control.key, v)}
-      />
-    );
-  }
-
-  if (control.type === 'angle') {
-    return (
-      <SliderField
-        label={control.label}
-        value={Number(value)}
-        min={0}
-        max={359}
-        step={1}
-        format={(v) => `${v}°`}
-        onChange={(v) => onChange(control.key, v)}
-      />
-    );
-  }
-
-  if (control.type === 'toggle') {
-    return (
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor={`c-${control.key}`} className="text-base text-fg-soft">
-          {control.label}
-        </label>
+    <Section title="随机种子" hint="决定图案的随机细节分布">
+      <div className="flex items-center gap-2">
         <input
-          id={`c-${control.key}`}
-          type="checkbox"
-          checked={value === true}
-          onChange={(e) => onChange(control.key, e.target.checked)}
-          className="h-4 w-4 shrink-0 accent-[var(--vw-brand)]"
+          type="number"
+          value={cfg.seed}
+          min={0}
+          max={999999}
+          aria-label="随机种子"
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v) && v >= 0) setSeed(v);
+          }}
+          className={inputClass('vw-number w-28 font-mono text-[0.9em] tabular-nums')}
         />
+        <Button
+          variant="secondary"
+          size="sm"
+          title="换一个随机种子（不改变当前配色）"
+          onClick={() => setSeed(nextSeed(cfg.seed))}
+        >
+          <IconDice size={15} />
+          换种子
+        </Button>
       </div>
-    );
-  }
+      <p className="text-2xs text-fg-mute">
+        相同种子 + 相同配色 = 完全相同的壁纸，分享链接靠它复现画面。
+      </p>
 
-  // select：原生控件在移动端会调起系统选择器，且天然支持键盘与读屏
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <label htmlFor={`c-${control.key}`} className="text-base text-fg-soft">
-        {control.label}
-      </label>
-      <select
-        id={`c-${control.key}`}
-        value={String(value)}
-        onChange={(e) => onChange(control.key, e.target.value)}
-        className={inputClass('shrink-0')}
-      >
-        {control.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
+      {/* 形态参数的完整说明留在右栏：工具条上一排滑块没有空间解释每个参数，
+          而「参数是这个母题自己定义的」这条信息对用户理解产品很关键。 */}
+      <Collapsible title="当前母题可调项" count={def.controls.length}>
+        <ul className="grid gap-1">
+          {def.controls.map((c) => (
+            <li key={c.key} className="flex items-baseline justify-between gap-3">
+              <span className="text-base text-fg-soft">{c.label}</span>
+              <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">
+                {String(cfg.params[c.key])}
+              </code>
+            </li>
+          ))}
+        </ul>
+        <p className="text-2xs text-fg-mute">
+          这些调节项由母题自身定义，已放在画布下方的工具条上。
+        </p>
+      </Collapsible>
+    </Section>
   );
 }
 

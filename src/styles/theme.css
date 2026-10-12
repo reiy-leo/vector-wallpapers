@@ -319,21 +319,8 @@ img {
   border: 0;
 }
 
-/**
- * `h-lh`：一个行高的快捷写法。
- *
- * ⭐ Kumo `icon-alignment` 要求图标与文字**首行**垂直居中，
- * 正确做法是给图标包一层「恰好等于行高」的高度容器，
- * 而不是 `items-center`（多行文本时它会把图标居中到整块，视觉错位）。
- *
- * ⚠️ 这个类此前被SearchInput / icons.tsx 的注释反复引用，但**从未定义**——
- * Tailwind 遇到未知类不报错，只是静默不生效，所以 icon-alignment 规则
- * 实际上一直是「注释里遵守、代码里没生效」。这类沉默失效最危险，
- * 因此这里显式定义，并在 kumo.guard.test.ts 里加断言防止再删。
- */
-.h-lh {
-  height: 1.5em;
-}
+/** ⛔ 禁止在此自定义 .h-lh —— Tailwind v4.3 已内置（height:1lh），
+    无层级的author 规则会覆盖它并把 1lh 降级成 1.5em。见 kumo.guard.test.ts。 */
 
 /** 跳到主内容（键盘用户的第一个 Tab 停靠点）。 */
 .vw-skip-link {
