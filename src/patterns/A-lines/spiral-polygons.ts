@@ -1,18 +1,20 @@
 /**
- * 螺旋多边形 —— A 极简几何线条（单幅居中构图）。
+ * 螺旋多边形 —— A 极简几何线条（连续平铺）。
  *
  * 经典「旋转内接」：每一层多边形旋转 θ 后恰好内接于上一层，
- * 缩放比 s = cos(π/n) / cos(π/n − θ)。层层叠加后，顶点连线自然形成对数螺旋臂。
+ * 缩放比 s = cos(π/n) / cos(π/n − θ)，层层叠加后顶点连成对数螺旋臂。
  *
- * 三种模式：
- *  - 线框：只描边，层色由外到内渐变（外层色 → 内层色）。
- *  - 填充：奇偶层交替填色，形成旋转的色块阶梯。
- *  - 旋线：绕中心旋转的线段环（弦），弦的包络是一个内圆 —— 像弦线编织。
+ * 2026-10-12 Rei：「只有一个单一元件，让螺旋线连续多方向，不要只针对一个核心」→
+ * 改为平铺：画面铺满正方形或正三角形格子，每格一个旋转内接螺旋，
+ * **相邻格子手性相反**（顺/逆时针交替）。反向螺旋恰是正向螺旋沿公共边的镜像，
+ * 所以内接顶点在公共边上两两重合，螺旋臂跨格连续，整面形成多中心、多方向的涡旋网。
+ *  - 方形：棋盘手性，tile = 2×2 格。
+ *  - 三角：正/倒三角天然交替手性，tile = 宽 1 格 × 高 2 行（6 个三角）。
  *
- * 单幅构图不走 <pattern>（只有一组图形），层数上限 60，体积可控。
+ * 走 <pattern>，DOM 与画面尺寸无关。
  */
 import { isHexColor, mixHex } from '../../engine/colors';
-import { circle, g, path, polygon, rect } from '../../engine/svg';
+import { circle, g, polygon, rect } from '../../engine/svg';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult, ResolvedElement } from '../types';
 
 function unitOf(w: number, h: number): number {
@@ -24,14 +26,23 @@ function blend(a: ResolvedElement, b: ResolvedElement, t: number): string {
   return t < 0.5 ? a.paintValue : b.paintValue;
 }
 
-/** 坐标取整到 0.1，单幅大构图下肉眼无差，体积再省一截。 */
+/** 坐标取整到 0.1，肉眼无差，体积再省一截。 */
 const r1 = (v: number): number => Math.round(v * 10) / 10;
+
+/** 一个格子：中心、外接圆半径、起始顶点角、手性（+1 顺时针 / −1 逆时针）。 */
+interface Cell {
+  cx: number;
+  cy: number;
+  R: number;
+  a0: number;
+  dir: 1 | -1;
+}
 
 const def: PatternDef = {
   id: 'spiral-polygons',
   name: '螺旋多边形',
   category: 'A-lines',
-  description: '多边形逐层旋转内接，顶点连成螺旋臂；另有绕中心旋转的线段环「旋线」模式。',
+  description: '方形或三角格子铺满画面，每格多边形逐层旋转内接、相邻格顺逆交替，螺旋臂跨格连成多中心涡旋网。',
   seedable: false,
   animatable: false,
 
@@ -51,14 +62,22 @@ const def: PatternDef = {
       options: [
         { value: 'outline', label: '线框' },
         { value: 'filled', label: '填充' },
-        { value: 'twist', label: '旋线' },
       ],
     },
-    { key: 'sides', label: '边数', type: 'range', min: 3, max: 8, step: 1, default: 4 },
-    { key: 'layers', label: '层数', type: 'range', min: 4, max: 60, step: 1, default: 28 },
-    { key: 'twist', label: '每层旋转', type: 'range', min: 1, max: 30, step: 0.5, default: 6, unit: '°' },
-    { key: 'size', label: '尺寸', type: 'range', min: 0.3, max: 1.4, step: 0.01, default: 0.86 },
-    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 6, step: 0.1, default: 1.5, unit: 'px' },
+    {
+      key: 'shape',
+      label: '格子',
+      type: 'select',
+      default: 'square',
+      options: [
+        { value: 'square', label: '方形' },
+        { value: 'triangle', label: '三角' },
+      ],
+    },
+    { key: 'cell', label: '格子大小', type: 'range', min: 80, max: 600, step: 10, default: 240, unit: 'px' },
+    { key: 'layers', label: '层数', type: 'range', min: 4, max: 30, step: 1, default: 16 },
+    { key: 'twist', label: '每层旋转', type: 'range', min: 2, max: 25, step: 0.5, default: 9, unit: '°' },
+    { key: 'weight', label: '线宽', type: 'range', min: 0.4, max: 4, step: 0.1, default: 1.2, unit: 'px' },
     { key: 'rotate', label: '整体旋转', type: 'angle', default: 0 },
   ],
 
@@ -82,7 +101,7 @@ const def: PatternDef = {
         line_inner: { paint: { type: 'solid', color: '#a7b4c2' }, opacity: 0.85 },
         center: { paint: { type: 'solid', color: '#d6b27a' } },
       },
-      params: { sides: 6, twist: 4, layers: 40 },
+      params: { shape: 'triangle', twist: 7, layers: 18 },
     },
     {
       id: 'terrace',
@@ -93,44 +112,40 @@ const def: PatternDef = {
         line_inner: { paint: { type: 'solid', color: '#7f917a' } },
         center: { paint: { type: 'solid', color: '#5d6b58' } },
       },
-      params: { mode: 'filled', sides: 3, twist: 7, layers: 22 },
+      params: { mode: 'filled', shape: 'square', twist: 8, layers: 14 },
     },
     {
       id: 'thread',
-      label: '弦线',
+      label: '夜涡',
       elements: {
         bg: { paint: { type: 'solid', color: '#1d2230' } },
         line_outer: { paint: { type: 'solid', color: '#5e6a8a' }, opacity: 0.7 },
         line_inner: { paint: { type: 'solid', color: '#c9b8d4' }, opacity: 0.7 },
         center: { paint: { type: 'solid', color: '#e2b98f' } },
       },
-      params: { mode: 'twist', layers: 40, twist: 10, weight: 1.1 },
+      params: { shape: 'triangle', mode: 'filled', layers: 16, twist: 6 },
     },
   ],
 
   paletteSlots: { bg: ['bg'], primary: ['line_outer'], secondary: ['line_inner'], accent: ['center'] },
 
-  render(_def, cfg: ResolvedConfig, _api: RenderApi): RenderResult {
+  render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements } = cfg;
     const u = unitOf(W, H);
-    const mode = String(params.mode);
-    const sides = Math.min(8, Math.max(3, Math.round(Number(params.sides))));
+    const n = api.n;
+    const filled = String(params.mode) === 'filled';
+    const tri = String(params.shape) === 'triangle';
+    const sides = tri ? 3 : 4;
     const layers = Math.max(2, Math.round(Number(params.layers)));
     const twistDeg = Math.max(0.1, Number(params.twist));
-    const size = Math.max(0.05, Number(params.size));
+    const L = Math.max(24, Number(params.cell) * u);
     const sw = Math.max(0.3, Number(params.weight) * u);
-    const rot0 = (Number(params.rotate) * Math.PI) / 180;
+    const rotDeg = Number(params.rotate) || 0;
 
     const bg = elements.get('bg')!;
     const outer = elements.get('line_outer')!;
     const inner = elements.get('line_inner')!;
     const center = elements.get('center')!;
-
-    const R0 = (Math.min(W, H) / 2) * size;
-    const cx = W / 2;
-    // 奇数边多边形顶点朝上时包围盒偏上，下移半个「顶-底差」让外形视觉居中（旋线模式无需）
-    const cy = H / 2 + (mode !== 'twist' && sides % 2 === 1 ? (R0 * (1 - Math.cos(Math.PI / sides))) / 2 : 0);
-    const body = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
 
     /** 第 i 层的颜色 / 不透明度：外层 → 内层线性过渡；任一层元件隐藏则对应半程不画。 */
     const layerPaint = (t: number): { fill: string; op: number } | null => {
@@ -141,70 +156,88 @@ const def: PatternDef = {
       return { fill: src.paintValue, op: src.opacity };
     };
 
-    const parts: string[] = [];
-
-    if (mode === 'twist') {
-      // 旋线：K 条等长弦绕中心均布、各跨 span 角；弦的包络是一个安静的内圆。
-      // 颜色沿环一周由外层色过渡到内层色再回来（ping-pong），首尾无接缝。
-      // 体积：颜色量化成 BUCKETS 档，每档的全部弦合并成一条 <path>，节点数与层数无关。
-      const K = layers * 3;
-      const BUCKETS = 8;
-      const span = Math.PI * (0.5 + Math.min(0.45, twistDeg / 40));
-      const ds: string[] = new Array<string>(BUCKETS).fill('');
-      for (let i = 0; i < K; i++) {
-        const t = 1 - Math.abs((i / K) * 2 - 1);
-        const b = Math.min(BUCKETS - 1, Math.floor(t * BUCKETS));
-        const a = rot0 + (i / K) * Math.PI * 2;
-        const a2 = a + span;
-        ds[b] += `M${r1(cx + Math.cos(a) * R0)} ${r1(cy + Math.sin(a) * R0)}L${r1(cx + Math.cos(a2) * R0)} ${r1(cy + Math.sin(a2) * R0)}`;
+    // —— 格子布局（tile 内坐标）——
+    const cells: Cell[] = [];
+    let tileW: number;
+    let tileH: number;
+    if (tri) {
+      const h = (L * Math.sqrt(3)) / 2;
+      const R = L / Math.sqrt(3);
+      tileW = L;
+      tileH = 2 * h;
+      // 第 0 行：正三角 x∈[0,L]，倒三角 x∈[-L/2,L/2]、[L/2,3L/2]；第 1 行整体右移 L/2。
+      for (let row = 0; row < 2; row++) {
+        const y = row * h;
+        const ox = row === 0 ? 0 : -L / 2;
+        const ups = row === 0 ? [0] : [0, L];
+        const downs = row === 0 ? [-L, 0] : [0];
+        for (const k of ups) cells.push({ cx: ox + k + L / 2, cy: y + (2 * h) / 3, R, a0: -Math.PI / 2, dir: 1 });
+        for (const k of downs) cells.push({ cx: ox + k + L, cy: y + h / 3, R, a0: Math.PI / 2, dir: -1 });
       }
-      ds.forEach((d, b) => {
-        const p = layerPaint((b + 0.5) / BUCKETS);
-        if (d && p) parts.push(path(d, { stroke: p.fill, 'stroke-opacity': p.op }));
-      });
-      if (parts.length) body.push(g({ fill: 'none', 'stroke-width': sw, 'stroke-linecap': 'round' }, parts.join('')));
     } else {
-      // 旋转内接：θ 必须在 (0, 2π/n) 内；缩放 s = cos(π/n) / cos(π/n − θ)
-      const half = Math.PI / sides;
-      const theta = ((twistDeg * Math.PI) / 180) % (half * 2);
-      const s = Math.cos(half) / Math.cos(half - theta);
-      const filled = mode === 'filled';
-      let R = R0;
-      let a = rot0 - Math.PI / 2;
-      for (let i = 0; i < layers; i++) {
-        const t = layers === 1 ? 0 : i / (layers - 1);
-        const p = layerPaint(t);
-        if (p) {
-          const pts: Array<[number, number]> = [];
-          for (let k = 0; k < sides; k++) {
-            const ak = a + k * half * 2;
-            pts.push([r1(cx + Math.cos(ak) * R), r1(cy + Math.sin(ak) * R)]);
-          }
-          if (filled) {
-            // 填充：外层到内层渐变 + 奇偶层轻微明暗差（opacity），阶梯更清楚
-            parts.push(polygon(pts, { fill: p.fill, 'fill-opacity': p.op * (i % 2 === 0 ? 1 : 0.82) }));
-          } else {
-            parts.push(polygon(pts, { stroke: p.fill, 'stroke-opacity': p.op }));
-          }
+      tileW = 2 * L;
+      tileH = 2 * L;
+      for (let i = 0; i < 2; i++) {
+        for (let j = 0; j < 2; j++) {
+          cells.push({ cx: (i + 0.5) * L, cy: (j + 0.5) * L, R: L / Math.SQRT2, a0: Math.PI / 4, dir: (i + j) % 2 === 0 ? 1 : -1 });
         }
-        R *= s;
-        a += theta;
-        if (R < sw) break;
-      }
-      if (parts.length) {
-        body.push(
-          filled
-            ? g({}, parts.join(''))
-            : g({ fill: 'none', 'stroke-width': sw, 'stroke-linejoin': 'round' }, parts.join('')),
-        );
       }
     }
 
+    // —— 旋转内接：θ ∈ (0, 2π/n)，缩放 s = cos(π/n) / cos(π/n − θ) ——
+    const half = Math.PI / sides;
+    const theta = Math.min((twistDeg * Math.PI) / 180, half * 2 - 0.01);
+    const sc = Math.cos(half) / Math.cos(half - theta);
+
+    // 同一层的所有格子颜色相同 → 按层合并成一个 <g>，属性只写一次
+    const layerGroups: string[] = [];
+    for (let i = 0; i < layers; i++) {
+      const t = layers === 1 ? 0 : i / (layers - 1);
+      const p = layerPaint(t);
+      const r = cells[0].R * Math.pow(sc, i);
+      if (r < sw) break;
+      if (!p) continue;
+      const polys = cells.map((c) => {
+        const a = c.a0 + c.dir * theta * i;
+        const pts: Array<[number, number]> = [];
+        for (let k = 0; k < sides; k++) {
+          const ak = a + k * half * 2;
+          pts.push([r1(c.cx + Math.cos(ak) * r), r1(c.cy + Math.sin(ak) * r)]);
+        }
+        return polygon(pts, {});
+      });
+      layerGroups.push(
+        filled
+          ? g({ fill: p.fill, 'fill-opacity': n(p.op * (i % 2 === 0 ? 1 : 0.82)) }, polys.join(''))
+          : g({ stroke: p.fill, 'stroke-opacity': n(p.op) }, polys.join('')),
+      );
+    }
+
+    let content = filled
+      ? layerGroups.join('')
+      : g({ fill: 'none', 'stroke-width': n(sw), 'stroke-linejoin': 'round' }, layerGroups.join(''));
     if (center.visible) {
-      body.push(circle(cx, cy, Math.max(2 * u, R0 * 0.035), { fill: center.paintValue, 'fill-opacity': center.opacity }));
+      const cr = Math.max(1.5 * u, L * 0.02);
+      content += g(
+        { fill: center.paintValue, 'fill-opacity': center.opacity },
+        cells.map((c) => circle(r1(c.cx), r1(c.cy), r1(cr), {})).join(''),
+      );
     }
 
-    return { body: body.join('') };
+    const tileRef = api.tile({
+      key: `spiral-${tri ? 't' : 's'}-${n(L)}-${layers}-${n(theta)}-${filled ? 1 : 0}-${n(sw)}`,
+      w: tileW,
+      h: tileH,
+      content,
+      transform: rotDeg ? `rotate(${n(rotDeg)})` : undefined,
+    });
+
+    return {
+      body: [
+        rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity }),
+        rect(0, 0, W, H, { fill: tileRef }),
+      ].join(''),
+    };
   },
 };
 
