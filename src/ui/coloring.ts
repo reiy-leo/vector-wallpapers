@@ -43,14 +43,23 @@ function pickSource(def: PatternDef, rng: () => number, tone: BgTone): Map<strin
 /** 作者调过的全部配色：默认配色 + 每个 preset（preset 未覆盖的元件沿用默认）。 */
 function authorSources(def: PatternDef): Map<string, PaintSpec>[] {
   const defaults = new Map<string, PaintSpec>(def.elements.map((e) => [e.id, e.paint]));
+  SOURCE_OPACITY.set(defaults, new Map(def.elements.map((e) => [e.id, e.opacity])));
   const out = [defaults];
   for (const pr of def.presets) {
     const m = new Map(defaults);
-    for (const [id, o] of Object.entries(pr.elements)) m.set(id, o.paint);
+    const op = new Map(def.elements.map((e) => [e.id, e.opacity]));
+    for (const [id, o] of Object.entries(pr.elements)) {
+      if (o.paint) m.set(id, o.paint);
+      if (typeof o.opacity === 'number') op.set(id, o.opacity);
+    }
+    SOURCE_OPACITY.set(m, op);
     out.push(m);
   }
   return out;
 }
+
+/** 每套作者配色对应的不透明度：浅/深底配色常配不同透明度（浅底线条要更实），切换时一起带上。 */
+const SOURCE_OPACITY = new WeakMap<Map<string, PaintSpec>, Map<string, number>>();
 
 /** 对一种颜色做「保明度」的重新着色。 */
 function recolorHex(
@@ -273,10 +282,13 @@ export function applyTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): Pa
       };
       best = [...matching].sort((a, b) => dist(a) - dist(b))[0];
     }
+    const op = SOURCE_OPACITY.get(best);
     for (const e of next.elements) {
       if (e.locked) continue;
       const p = best.get(e.id);
       if (p) e.paint = p;
+      const o = op?.get(e.id);
+      if (typeof o === 'number') e.opacity = o;
     }
     return next;
   }

@@ -50,10 +50,10 @@ const def: PatternDef = {
       id: 'mint',
       label: '薄荷',
       elements: {
-        bg: { paint: { type: 'solid', color: '#f1f5f0' } },
-        line: { paint: { type: 'solid', color: '#c4d6c6' } },
-        fill: { paint: { type: 'solid', color: '#dce9dc' } },
-        dot: { paint: { type: 'solid', color: '#5f8f6f' } },
+        bg: { paint: { type: 'solid', color: '#edf3eb' } },
+        line: { paint: { type: 'solid', color: '#6f927a' } },
+        fill: { paint: { type: 'solid', color: '#a8cbb0' } },
+        dot: { paint: { type: 'solid', color: '#2c6845' } },
       },
     },
     {
