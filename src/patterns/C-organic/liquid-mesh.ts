@@ -168,11 +168,16 @@ const def: PatternDef = {
     if (!animate || !drift) return { body };
 
     // 漂移：整层极缓慢平移，导出时被 stripAnimation 剥离 → 产物仍字节级可复现
+    // 2026-10-12 加大幅度：放大 1.2 倍 + 平移 + 轻旋，边缘不露底
+    const ox = api.n(W / 2);
+    const oy = api.n(H / 2);
     const name = api.keyframes(
       'vw-liquid',
-      `from{transform:translate(0,0)}to{transform:translate(${api.n(W * 0.03)}px,${api.n(-H * 0.02)}px)}`,
+      `from{transform:translate(${api.n(-W * 0.05)}px,${api.n(H * 0.04)}px) scale(1.2) rotate(-4deg)}to{transform:translate(${api.n(W * 0.05)}px,${api.n(-H * 0.04)}px) scale(1.2) rotate(4deg)}`,
     );
-    return { body: g({ style: `animation:${name} 26s ease-in-out infinite alternate` }, body) };
+    return {
+      body: g({ style: `transform-origin:${ox}px ${oy}px;animation:${name} 13s ease-in-out infinite alternate` }, body),
+    };
   },
 };
 

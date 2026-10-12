@@ -290,12 +290,17 @@ const def: PatternDef = {
     const body = parts.join('');
     if (!animate || !sway) return { body };
 
-    // 摆动：光帘整体缓慢横移
+    // 摆动：光帘左右横移 + 轻微斜切，放大 1.18 倍保证摆到边缘也不露底（原 3% 横移几乎看不出，2026-10-12 加大）
+    const ox = api.n(W / 2);
+    const oy = api.n(H / 2);
+    const dx = api.n(W * 0.06);
     const name = api.keyframes(
       'vw-aurora',
-      `from{transform:translateX(0)}to{transform:translateX(${api.n(W * 0.03)}px)}`,
+      `from{transform:translateX(${-dx}px) scale(1.18) skewX(-5deg)}to{transform:translateX(${dx}px) scale(1.18) skewX(5deg)}`,
     );
-    return { body: g({ style: `animation:${name} 24s ease-in-out infinite alternate` }, body) };
+    return {
+      body: g({ style: `transform-origin:${ox}px ${oy}px;animation:${name} 11s ease-in-out infinite alternate` }, body),
+    };
   },
 };
 
