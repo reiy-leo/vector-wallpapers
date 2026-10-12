@@ -24,7 +24,7 @@ import {
   usePatternDef,
   useWorkbenchSelector,
 } from './store';
-import { Button, CountBadge, Section, Segmented, SliderField } from './primitives';
+import { Button, CountBadge, Section, Segmented, SliderField, inputClass } from './primitives';
 import { IconDice } from './icons';
 import type { ColorStrategy } from '../engine/colors';
 import type { ControlDef, ElementRole, ParamValue, PatternDef } from '../patterns/types';
@@ -240,10 +240,7 @@ export function ParamPanel() {
               const v = Number(e.target.value);
               if (Number.isFinite(v) && v >= 0) setSeed(v);
             }}
-            className={[
-              'vw-number h-8 w-28 rounded-sm bg-surface-2 px-2 font-mono text-[0.9em] tabular-nums text-fg',
-              'ring-1 ring-line-input hover:ring-line-strong',
-            ].join(' ')}
+            className={inputClass('vw-number w-28 font-mono text-[0.9em] tabular-nums')}
           />
           <Button
             variant="secondary"
@@ -341,7 +338,7 @@ function ControlRow({
         id={`c-${control.key}`}
         value={String(value)}
         onChange={(e) => onChange(control.key, e.target.value)}
-        className="h-8 shrink-0 rounded-sm bg-surface-2 px-2 text-sm text-fg ring-1 ring-line-input hover:ring-line-strong"
+        className={inputClass('shrink-0')}
       >
         {control.options.map((o) => (
           <option key={o.value} value={o.value}>

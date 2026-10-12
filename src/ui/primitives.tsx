@@ -239,25 +239,46 @@ export function Segmented<T extends string>({
  * 表单控件
  * ───────────────────────────────────────────────────────────────── */
 
+/**
+ * 输入框（通用）。
+ *
+ * ⭐ Kumo `kumo-input`：**白底 + 浅描边 + 聚焦内环**，三段式。
+ * 本项目先前用的是「灰底 + 深描边」（bg-surface-2 + ring-line-input），
+ * 那是为了满足 3:1 对比度而牺牲了 Kumo 的视觉语言 —— 结果输入框在界面里
+ * 变成一个「挖下去的洞」，比按钮重得多。
+ * 解法是**把对比度预算花在交互态而非静态态**：静态只留 ring-line（可分辨
+ * 边界），聚焦时 ring-2 brand 给出 3:1 以上的可见焦点 —— 既满足 WCAG 1.4.11
+ * 的「聚焦态可辨」，又不牺牲静态视觉。
+ */
+const INPUT_BASE =
+  'w-full rounded-sm bg-surface text-sm text-fg ring-1 ring-line ' +
+  'placeholder:text-fg-mute ' +
+  // 聚焦：ring 变粗 + 品牌色（内环，不偏移，不与外层 outline 打架）
+  'focus:ring-2 focus:ring-brand focus:outline-none';
+
+/**
+ * 供散落在各面板里的原生 `<select>` / `<input type=number>` 复用。
+ *
+ * ⚠️ 之所以导出而不是各自写：这些控件分散在CanvasStage / Panels 里，
+ * 各写一遍必然出现「改了搜索框忘了改数字框」的漂移 —— 而输入框视觉
+ * 一旦不统一，整屏就会同时出现两种控件语言。
+ *
+ * 调用方需自行覆盖宽度（如 `w-28`），因为 select / number 都按内容定宽。
+ */
+export const inputClass = (extra = '') => [INPUT_BASE, 'h-8 px-2', extra].filter(Boolean).join(' ');
+
 export function TextInput({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={[
-        'h-9 w-full rounded-sm bg-surface-2 px-2.5 text-base text-fg',
-        'ring-1 ring-line-input placeholder:text-fg-mute',
-        'hover:ring-line-strong',
-        className,
-      ].join(' ')}
-      {...rest}
-    />
-  );
+  return <input className={`h-8 px-2.5 ${INPUT_BASE} ${className}`} {...rest} />;
 }
 
 /**
- * 带前置图标的搜索框。
+ * 搜索框。
  *
- * ⭐ Kumo `icon-alignment`：图标包在 `h-lh` 里与文字**首行**对齐，
- * 而不是用 items-center（多行文本时后者会把图标居中到整块，视觉错位）。
+ * ⭐ Kumo `kumo-input`：白底浅描边、32px 高、14px 文字、6px 圆角；
+ * 聚焦时 ring 加粗为品牌色（见 INPUT_BASE 的说明）。
+ *
+ * ⭐ Kumo `icon-alignment`：图标用 `h-lh` 与文字**首行**对齐。
+ * 搜索框是单行控件，此处 h-lh 等于 21px，与 14px/1.5 的行高一致。
  */
 export function SearchInput({
   value,
@@ -280,8 +301,8 @@ export function SearchInput({
         aria-label={placeholder}
         onChange={(e) => onChange(e.target.value)}
         className={[
-          'h-9 w-full rounded-sm bg-surface-2 pl-8 pr-8 text-base text-fg',
-          'ring-1 ring-line-input placeholder:text-fg-mute hover:ring-line-strong',
+          INPUT_BASE,
+          'h-8 pl-7.5 pr-7',
           // 去掉 Safari search 域自带的清除按钮，我们自己放一个
           '[&::-webkit-search-cancel-button]:appearance-none',
         ].join(' ')}
@@ -291,9 +312,9 @@ export function SearchInput({
           type="button"
           aria-label="清空搜索"
           onClick={() => onChange('')}
-          className="absolute inset-y-0 right-1 flex items-center px-1.5 text-fg-mute hover:text-fg"
+          className="absolute inset-y-0 right-1.5 flex h-lh items-center text-fg-mute hover:text-fg"
         >
-          <IconClose size={14} />
+          <IconClose size={13} />
         </button>
       )}
     </div>

@@ -14,7 +14,7 @@ import { renderStandaloneSVG, createDefaultConfig } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
-import { Button, IconButton, Tooltip } from './primitives';
+import { Button, IconButton, Tooltip, inputClass } from './primitives';
 import { IconFocus, IconGrid, IconInfo, IconReset, IconShuffle } from './icons';
 import type { ColorStrategy } from '../engine/colors';
 import type { PatternConfig } from '../engine/types';
@@ -199,10 +199,7 @@ function SizeSelect({
           const [w, h] = e.target.value.split('x').map(Number);
           onChange(w, h);
         }}
-        className={[
-          'h-8 rounded-sm bg-surface-2 px-2 text-sm text-fg ring-1 ring-line-input',
-          'hover:ring-line-strong',
-        ].join(' ')}
+        className={inputClass('shrink-0')}
       >
         {!known && <option value="custom">自定义 {cfg.width}×{cfg.height}</option>}
         {groupByDevice(SIZE_PRESETS).map(([group, list]) => (
@@ -242,10 +239,7 @@ function CustomSizeInput({
             onChange(clamp(Math.round(v), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION), cfg.height);
           }
         }}
-        className={[
-          'vw-number h-8 w-[4.5rem] rounded-sm bg-surface-2 px-2 text-sm tabular-nums text-fg',
-          'ring-1 ring-line-input hover:ring-line-strong',
-        ].join(' ')}
+        className={inputClass('vw-number w-[4.5rem] tabular-nums')}
       />
       <span className="text-sm text-fg-mute" aria-hidden="true">
         ×
@@ -262,10 +256,7 @@ function CustomSizeInput({
             onChange(cfg.width, clamp(Math.round(v), LIMITS.MIN_DIMENSION, LIMITS.MAX_DIMENSION));
           }
         }}
-        className={[
-          'vw-number h-8 w-[4.5rem] rounded-sm bg-surface-2 px-2 text-sm tabular-nums text-fg',
-          'ring-1 ring-line-input hover:ring-line-strong',
-        ].join(' ')}
+        className={inputClass('vw-number w-[4.5rem] tabular-nums')}
       />
     </>
   );
