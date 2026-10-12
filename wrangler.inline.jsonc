@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // 与 wrangler.jsonc 同一个 Worker，区别只在静态资源：这里把 dist/ 内联进脚本（见 worker-inline/entry.ts）。
+  // 用于 API Token 部署（Static Assets 上传接口不可用的环境）：npm run deploy:inline
+  "name": "vector-wallpapers",
+  "main": "worker-inline/entry.ts",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ALLOWED_EMAIL_DOMAINS": "*"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

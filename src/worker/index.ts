@@ -27,20 +27,30 @@ async function handleMe(req: Request, env: Env): Promise<Response> {
   return json(me);
 }
 
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const { pathname } = new URL(req.url);
-    switch (`${req.method.toUpperCase()} ${pathname}`) {
-      case "GET /api/me":
-        return handleMe(req, env);
-      case "GET /auth/login":
-        return login(req, env);
-      case "GET /auth/callback":
-        return callback(req, env);
-      case "POST /api/auth/logout":
-        return logout(req);
-    }
-    if (pathname.startsWith("/api/") || pathname.startsWith("/auth/")) return json({ error: "Not Found" }, 404);
-    return env.ASSETS.fetch(req);
-  },
-};
+/** 静态资源的提供方式：默认走 ASSETS 绑定；token 部署时由 worker-inline/ 注入内联资源。 */
+export type ServeStatic = (req: Request, env: Env) => Promise<Response> | Response;
+
+export function createHandler(serveStatic: ServeStatic) {
+  return {
+    async fetch(req: Request, env: Env): Promise<Response> {
+      const { pathname } = new URL(req.url);
+      switch (`${req.method.toUpperCase()} ${pathname}`) {
+        case "GET /api/me":
+          return handleMe(req, env);
+        case "GET /auth/login":
+          return login(req, env);
+        case "GET /auth/callback":
+          return callback(req, env);
+        case "POST /api/auth/logout":
+          return logout(req);
+      }
+      if (pathname.startsWith("/api/") || pathname.startsWith("/auth/")) return json({ error: "Not Found" }, 404);
+      return serveStatic(req, env);
+    },
+  };
+}
+
+export default createHandler((req, env) => {
+  if (!env.ASSETS) return new Response("ASSETS binding missing", { status: 500 });
+  return env.ASSETS.fetch(req);
+});

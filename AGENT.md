@@ -10,6 +10,7 @@
 - 母题库：**27 个**（4 分类：A极简线条 / B波点网格 / C 渐变流体 / D 像素复古）
 - 部署：Cloudflare Worker（`src/worker/`，只接管 `/api/*` `/auth/*`）+ Static Assets（`dist/`）
 - 账户：Google OAuth 登录（与 avatar-sloppy 同一套实现，签名 cookie 会话）
+- 线上：https://vector-wallpapers.rei8t.workers.dev（内联部署）。Secrets：SESSION_SECRET（已设）、GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET（在 CF 控制台添加）；Google 回调 `/auth/callback`
 - ~~纯静态、无后端、无第三方请求、无需登录~~ —— 该限制已于 2026-10-12 按用户决定**取消**
 
 ## 事实来源的优先级
@@ -42,7 +43,9 @@
 npm install --legacy-peer-deps   # 当前 lockfile 在 npm 10 下 ci 会报 Invalid Version
 npm run dev        # http://localhost:5173
 npm run test       # vitest（串行）
-npm run deploy     # build + wrangler deploy → Cloudflare Workers Static Assets
+npm run dev:worker # build + wrangler dev（含 /api、/auth；.dev.vars 写 AUTH_DISABLED=true 可跳过登录）
+npm run deploy:inline  # API Token 部署：dist/ 内联进 Worker（Static Assets 上传接口在 token 网关下 401）
+npm run deploy     # wrangler login 后可用：Static Assets 版本
 ```
 
 ## 技术栈（锁定，勿擅自更换）

@@ -1,7 +1,7 @@
 /** Worker 运行环境（wrangler.jsonc 的 vars + secrets + 绑定）。 */
 export interface Env {
-  /** 静态资源绑定（Vite 产物 dist/）。 */
-  ASSETS: { fetch(req: Request): Promise<Response> };
+  /** 静态资源绑定（Vite 产物 dist/）。内联部署（wrangler.inline.jsonc）时不存在。 */
+  ASSETS?: { fetch(req: Request): Promise<Response> };
 
   // secrets（wrangler secret put … 或 CF 控制台）
   SESSION_SECRET?: string;

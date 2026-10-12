@@ -14,3 +14,6 @@ _c.mjs
 
 # wrangler 本地密钥
 .dev.vars
+
+# 内联部署生成物
+worker-inline/assets.generated.ts
