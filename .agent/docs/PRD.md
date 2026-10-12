@@ -5,7 +5,7 @@
 | 项目名称 | `vector-wallpapers`                                                         |
 | 文档类型 | 简单 PRD（不做竞品分析与市场象限图）                                                        |
 | 语言   | 中文                                                                          |
-| 技术栈  | Vite + React + MUI + Tailwind CSS，部署至 Cloudflare Workers（纯静态 SPA，无后端 /无数据库） |
+| 技术栈  | Vite + React + MUI + Tailwind CSS，部署至 Cloudflare Workers（Worker + Static Assets；2026-10-12 起取消「纯静态/无后端/无第三方请求/无需登录」限制，已接入 Google 登录） |
 | 文档日期 | 2026-10-10                                                                  |
 
 ---

@@ -17,7 +17,7 @@ SVG 格式的**桌面背景图生成器**（不是素材库）。核心差异化
    - D 像素复古：`memphis-grid` `neon-pixels` `new-wave-sunset` `pixel-terrain` `glitch-rgb` `isometric-voxel`
    - **pattern id 一经上线不可改名**（分享链接依赖稳定性）
 2. **PNG 导出取预览当前帧**（非架构默认的 t=0）
-3. 部署：**纯静态 SPA，无后端无数据库**，Cloudflare Workers
+3. 部署：Cloudflare Worker + Static Assets。⚠️ 2026-10-12 用户取消「纯静态、无后端、无第三方请求、无需登录」限制，已接入 Google OAuth 登录（src/worker/）
 4. Phase 1 范围 = T1+T2+T3（脚手架+ 引擎 + 母题 + Lab 预览页），已收口
 
 ## 用户 10 项产品决策（2026-10-10 全部拍板，写入 PRD §5）

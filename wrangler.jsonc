@@ -2,18 +2,30 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "vector-wallpapers",
 
-  // ⚠️ 刻意不配置 "main"：wrangler 不生成任何 Worker 脚本，
-  //    静态资源由 Cloudflare 边缘直接服务 → 免费且无限、不计 CPU、
-  //    不占 100K 请求/天 配额。PRD 的「单文件返回静态资源 + SPA 回退」
-  //    由 assets.not_found_handling 完整满足。
-  //    若将来要加 API 路由，才补 "main": "src/worker/index.ts"
+  // Worker 只接管 /api/* 与 /auth/*（Google 登录）；其余请求由静态资源在边缘直接返回，
+  // 不计 Worker 请求数与 CPU。SPA 回退由 assets.not_found_handling 负责。
+  "main": "src/worker/index.ts",
   "compatibility_date": "2026-10-10",
 
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "html_handling": "auto-trailing-slash"
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": ["/api/*", "/auth/*"]
   },
+
+  "vars": {
+    // 允许登录的邮箱域名，逗号分隔；"*" = 任意已验证的 Google 账号
+    "ALLOWED_EMAIL_DOMAINS": "*"
+  },
+
+  // Secrets（绝不提交；wrangler secret put … 或 CF 控制台）：
+  //   SESSION_SECRET（必填，随机长串）、GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
+  //   三者缺任何一个，/auth/login 显示「登录尚未配置」，站点其余功能不受影响。
+  // Google Cloud 授权回调：https://<域名>/auth/callback 与 http://localhost:8787/auth/callback
+  // 可选 var OAUTH_REDIRECT_URI（默认 <origin>/auth/callback）。
+  // 本地：.dev.vars 写 AUTH_DISABLED=true 可跳过登录（只对 localhost 生效）。
 
   "observability": {
     "enabled": true

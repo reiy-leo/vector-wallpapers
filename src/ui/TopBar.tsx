@@ -20,6 +20,8 @@ import { useEffect, useState } from 'react';
 import { LIMITS } from '../shared/constants';
 import { readFavorites, setUI, usePatternDef, useWorkbenchSelector, writeFavorites } from './store';
 import { Button, IconButton, Tooltip } from './primitives';
+import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
+import { consumeLoginError, loadMe, logout, startLogin, useAuth } from './auth';
 import { IconGoogle, IconPanel, IconStar } from './icons';
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
@@ -80,20 +82,95 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
 
       <BarDivider />
 
-      {/* ── 账户：Google 登录 / 用户头像 ──
-          产品当前是纯静态、无后端（PRD Q9/部署决策），因此这里只放**占位**：
-          视觉上把账户位坐实，将来接 OAuth 时不需要再动顶栏布局。 */}
-      <Tooltip content="账号同步功能开发中">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => onNotice('账号与云端同步尚未上线，当前配置仅存在本机浏览器中。', 'info')}
-        >
-          <IconGoogle size={15} />
-          登录
-        </Button>
-      </Tooltip>
+      <AccountControl onNotice={onNotice} />
     </header>
+  );
+}
+
+/**
+ * 账户：未登录 → 「Google 登录」；已登录 → 头像按钮 + kumo DropdownMenu（邮箱 / 退出）。
+ * 登录是整页跳转到 Worker 的 /auth/login（OAuth 授权码流程），会话在 HttpOnly cookie 里。
+ */
+function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
+  const auth = useAuth();
+
+  useEffect(() => {
+    void loadMe();
+    const err = consumeLoginError();
+    if (err) onNotice(err, 'danger');
+  }, [onNotice]);
+
+  const user = auth.status === 'ready' ? auth.me.user : null;
+
+  if (!user) {
+    const onLogin = () => {
+      if (auth.status === 'loading') return;
+      if (auth.status === 'unavailable') {
+        onNotice('当前环境没有登录服务（用 npm run dev:worker 启动 Worker）。', 'warning');
+        return;
+      }
+      if (auth.me.authMode === 'unconfigured') {
+        onNotice('站点尚未配置 Google 登录（缺少 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / SESSION_SECRET）。', 'warning');
+        return;
+      }
+      startLogin();
+    };
+    return (
+      <Button variant="secondary" size="sm" disabled={auth.status === 'loading'} onClick={onLogin}>
+        <IconGoogle size={15} />
+        登录
+      </Button>
+    );
+  }
+
+  const label = user.name ?? user.email;
+  return (
+    <DropdownMenu>
+      <DropdownMenu.Trigger
+        render={
+          <Button variant="ghost" size="sm" aria-label={`账户：${user.email}`}>
+            <Avatar picture={user.picture} label={label} />
+            <span className="hidden max-w-32 truncate sm:inline">{label}</span>
+          </Button>
+        }
+      />
+      <DropdownMenu.Content>
+        <DropdownMenu.Group>
+          <DropdownMenu.Label>{user.email}</DropdownMenu.Label>
+        </DropdownMenu.Group>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          onClick={() => {
+            void logout().then(() => onNotice('已退出登录', 'info'));
+          }}
+        >
+          退出登录
+        </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu>
+  );
+}
+
+function Avatar({ picture, label }: { picture: string | null; label: string }) {
+  if (picture) {
+    return (
+      <img
+        src={picture}
+        alt=""
+        width={20}
+        height={20}
+        referrerPolicy="no-referrer"
+        className="h-5 w-5 shrink-0 rounded-full"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-tint text-2xs font-medium text-brand"
+    >
+      {label.slice(0, 1).toUpperCase()}
+    </span>
   );
 }
 

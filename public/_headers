@@ -10,8 +10,9 @@
   #  · style-src 需 'unsafe-inline' —— Tailwind v4 运行时注入 CSS 变量，
   #    MUI/Emotion 运行时注入组件样式，SVG 内部亦可能带 <style> 动画。
   #  · img-src 需 data: blob: —— 缩略图 data URI 与 PNG 导出的 Blob URL。
-  #  · 不设任何外部域 —— PRD NFR「无第三方请求」。
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  #  · img-src 放行 *.googleusercontent.com —— Google 登录后的用户头像。
+  #  · Google 登录是整页跳转（/auth/login → accounts.google.com），不经 fetch，connect-src 仍只需 'self'。
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
 
 # hash 化产物 → 永久不可变
 /assets/*

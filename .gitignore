@@ -11,3 +11,6 @@ coverage/
 !.env.example
 # 诊断用临时脚本
 _c.mjs
+
+# wrangler 本地密钥
+.dev.vars

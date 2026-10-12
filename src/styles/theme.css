@@ -550,6 +550,7 @@
   --color-kumo-recessed: var(--vw-surface-3);
   --color-kumo-tint: var(--vw-surface-2);
   --color-kumo-control: var(--vw-surface);
+  --color-kumo-overlay: var(--vw-surface);
   --color-kumo-line: var(--vw-line);
   --color-kumo-hairline: var(--vw-line);
   --color-kumo-brand: var(--vw-brand);

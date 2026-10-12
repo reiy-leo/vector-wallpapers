@@ -17,7 +17,8 @@
     "_vite": "node node_modules/vite/bin/vite.js",
     "_vitest": "node node_modules/vitest/vitest.mjs",
     "_tsc": "node node_modules/typescript/bin/tsc",
-    "_wrangler": "node node_modules/wrangler/bin/wrangler.js"
+    "_wrangler": "node node_modules/wrangler/bin/wrangler.js",
+    "dev:worker": "npm run build && npm --prefix . run _wrangler -- dev"
   },
   "dependencies": {
     "@cloudflare/kumo": "^2.14.0",

@@ -8,7 +8,9 @@
 
 - 参考站点：`https://www.svgbackgrounds.com/`（SVG 素材库 + 可定制导出）
 - 母题库：**27 个**（4 分类：A极简线条 / B波点网格 / C 渐变流体 / D 像素复古）
-- 部署：纯静态 SPA → Cloudflare Workers Static Assets，**无后端无数据库**
+- 部署：Cloudflare Worker（`src/worker/`，只接管 `/api/*` `/auth/*`）+ Static Assets（`dist/`）
+- 账户：Google OAuth 登录（与 avatar-sloppy 同一套实现，签名 cookie 会话）
+- ~~纯静态、无后端、无第三方请求、无需登录~~ —— 该限制已于 2026-10-12 按用户决定**取消**
 
 ## 事实来源的优先级
 
