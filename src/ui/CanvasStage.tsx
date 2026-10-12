@@ -17,7 +17,7 @@ import { svgToDataUri } from '../shared/download';
 import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
 import { applyTone, allowedTones, bgTone, type BgTone } from './coloring';
-import { IconButton, Segmented, Tooltip, inputClass } from './primitives';
+import { IconButton, Segmented, SelectBox, Tooltip, inputClass } from './primitives';
 import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
 import {
@@ -343,7 +343,7 @@ function SizeSelect({
       <label htmlFor="vw-size" className="shrink-0 whitespace-nowrap text-base text-fg-soft">
         尺寸
       </label>
-      <select
+      <SelectBox
         id="vw-size"
         value={known ? current : 'custom'}
         onChange={(e) => {
@@ -351,7 +351,6 @@ function SizeSelect({
           const [w, h] = e.target.value.split('x').map(Number);
           onChange(w, h);
         }}
-        className={inputClass('shrink-0')}
       >
         {!known && <option value="custom">自定义 {cfg.width}×{cfg.height}</option>}
         {groupByDevice(SIZE_PRESETS).map(([group, list]) => (
@@ -363,7 +362,7 @@ function SizeSelect({
             ))}
           </optgroup>
         ))}
-      </select>
+      </SelectBox>
       <CustomSizeInput cfg={cfg} onChange={onChange} />
     </div>
   );

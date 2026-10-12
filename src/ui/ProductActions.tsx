@@ -69,7 +69,12 @@ export function ProductActions({ onNotice }: { onNotice: NoticeFn }) {
 
       {/* 导出：单个主动作，对话框里再选格式 */}
       <Tooltip side="bottom" content="导出 SVG / PNG">
-        <IconButton label="导出" nativeTitle={false} variant="primary" onClick={gated(() => setExportOpen(true))}>
+        <IconButton
+          label="导出"
+          nativeTitle={false}
+          // 与其他图标按钮同样式，hover 才露出品牌蓝，提示它是主动作（Rei 2026-10-12）
+          variant="secondary-brand"
+          onClick={gated(() => setExportOpen(true))}>
           <IconDownload size={16} />
         </IconButton>
       </Tooltip>

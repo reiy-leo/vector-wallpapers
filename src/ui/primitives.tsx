@@ -11,6 +11,7 @@ import {
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type SelectHTMLAttributes,
   type ReactNode,
 } from 'react';
 import { IconCheck, IconChevron, IconClose } from './icons';
@@ -99,7 +100,7 @@ export const CONTROL_H = 'h-8';
 export const CHIP_H = 'h-7';
 export const CONTROL_H_LG = 'h-9';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'secondary-brand' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md';
 
 const BUTTON_BASE =
@@ -116,6 +117,8 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   //   3:1 的 line-input 只留给表单输入框（WCAG 1.4.11 的对比度义务）。
   //   按钮的边界靠填充色差（surface-2 / surface）就足够，深描边会显脏。
   secondary: 'bg-surface-2 text-fg hover:bg-surface-3',
+  // 静态与 secondary 一致，hover 露出品牌蓝：用于图标按钮组里的主动作（导出）
+  'secondary-brand': 'bg-surface-2 text-fg hover:bg-brand hover:text-on-brand',
   ghost: 'text-fg-soft hover:bg-surface-2 hover:text-fg',
   danger: 'bg-danger text-on-brand hover:brightness-110',
 };
@@ -343,7 +346,8 @@ export function Chip({
  * 的「聚焦态可辨」，又不牺牲静态视觉。
  */
 const INPUT_BASE =
-  'w-full rounded-sm bg-surface text-sm text-fg ring-1 ring-line ' +
+  // ⭐ Kumo content-text-size：输入框文字与按钮一致 14px（此前 13px，与旁边按钮字号不齐）
+  'w-full rounded-sm bg-surface text-base text-fg ring-1 ring-line ' +
   'placeholder:text-fg-mute ' +
   // 聚焦：ring 变粗 + 品牌色（内环，不偏移，不与外层 outline 打架）
   'focus:ring-2 focus:ring-brand focus:outline-none';
@@ -360,7 +364,33 @@ const INPUT_BASE =
 // ⚠️ 去掉 INPUT_BASE 里的 w-full：select / number 按内容定宽，w-full 会与调用方的 w-[4.5rem]
 // 同为工具类、谁赢取决于产物顺序 —— 实测 number 框被 flex 压成 16px、select 撑满整行。
 export const inputClass = (extra = '') =>
-  [INPUT_BASE.replace('w-full ', ''), 'h-8 px-2', extra].filter(Boolean).join(' ');
+  [INPUT_BASE.replace('w-full ', ''), 'h-8 px-2.5', extra].filter(Boolean).join(' ');
+
+/**
+ * 原生 `<select>` 的统一外壳（Rei 2026-10-12：系统自带箭头离边框太近）。
+ *
+ * 去掉系统外观（appearance-none），右侧留 32px 给自绘箭头：箭头距右边框 10px，
+ * 与输入框左内边距一致；箭头用 fg-mute，与搜索框前缀图标同色。
+ */
+export function SelectBox({
+  className = '',
+  children,
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="relative inline-flex shrink-0">
+      <select
+        className={`${INPUT_BASE.replace('w-full ', '')} h-8 cursor-pointer appearance-none pl-2.5 pr-8 ${className}`}
+        {...rest}
+      >
+        {children}
+      </select>
+      <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-fg-mute">
+        <IconChevron dir="down" size={14} />
+      </span>
+    </span>
+  );
+}
 
 export function TextInput({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`h-8 px-2.5 ${INPUT_BASE} ${className}`} {...rest} />;
@@ -372,8 +402,8 @@ export function TextInput({ className = '', ...rest }: InputHTMLAttributes<HTMLI
  * ⭐ Kumo `kumo-input`：白底浅描边、32px 高、14px 文字、6px 圆角；
  * 聚焦时 ring 加粗为品牌色（见 INPUT_BASE 的说明）。
  *
- * ⭐ Kumo `icon-alignment`：图标用 `h-lh` 与文字**首行**对齐。
- * 搜索框是单行控件，此处 h-lh 等于 21px，与 14px/1.5 的行高一致。
+ * 前缀图标在 32px 高的单行框里**垂直居中**（inset-y-0 + items-center）。
+ * ⚠️ 不要用 h-lh：它把图标盒压成 21px 并贴顶，图标会比文字偏上（Rei 2026-10-12 截图）。
  */
 export function SearchInput({
   value,
@@ -386,7 +416,7 @@ export function SearchInput({
 }) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-2.5 flex h-lh items-center text-fg-mute">
+      <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-fg-mute">
         <SearchGlyph />
       </span>
       <input
@@ -397,7 +427,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         className={[
           INPUT_BASE,
-          'h-8 pl-7.5 pr-7',
+          'h-8 pl-8 pr-7',
           // 去掉 Safari search 域自带的清除按钮，我们自己放一个
           '[&::-webkit-search-cancel-button]:appearance-none',
         ].join(' ')}
@@ -407,7 +437,7 @@ export function SearchInput({
           type="button"
           aria-label="清空搜索"
           onClick={() => onChange('')}
-          className="absolute inset-y-0 right-1.5 flex h-lh items-center text-fg-mute hover:text-fg"
+          className="absolute inset-y-0 right-2 flex items-center text-fg-mute hover:text-fg"
         >
           <IconClose size={13} />
         </button>
