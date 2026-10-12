@@ -12,6 +12,9 @@ import { callback, getUser, login, logout } from "./auth";
 import { authMode } from "./env";
 import type { Env } from "./env";
 
+/** Service Binding 入口：shortlink-personal 调用 OgImage.render() 生成 OG 图（不要改名）。 */
+export { OgImage } from "./og";
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,

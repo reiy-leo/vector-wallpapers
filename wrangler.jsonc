@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "vector-wallpapers",
+  // ⚠️ 本 Worker 导出命名入口 OgImage（src/worker/og.ts），被 shortlink-personal 通过 Service Binding 调用：
+  //   "services": [{ "binding": "WALLPAPERS", "service": "vector-wallpapers", "entrypoint": "OgImage" }]
+  // Worker 名 vector-wallpapers、导出名 OgImage、方法 render(seed,width,height) 都是跨 Worker 契约——别改名。
   "workers_dev": false,
   "routes": [{ "pattern": "vector-wallpapers.rei8t.dev", "custom_domain": true }],
 
