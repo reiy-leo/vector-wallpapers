@@ -94,9 +94,9 @@ export function PalettePanel({
 const ROLE_ORDER: readonly ElementRole[] = ['bg', 'primary', 'secondary', 'accent', 'detail'];
 
 const STRATEGY_OPTIONS = [
-  { value: 'analogous', label: '邻近色', title: '以当前底色推导一组和谐色（默认）' },
-  { value: 'palette', label: '当前色板', title: '只在内置色板内重新分配，整体调性不漂移' },
-  { value: 'full', label: '全色域', title: '完全随机，可能跳脱也可能惊喜' },
+  { value: 'analogous', label: '邻近色', title: '沿用作者配色的明暗层次，整体换一组色相（默认）' },
+  { value: 'palette', label: '当前色板', title: '随机套用一套内置色板' },
+  { value: 'full', label: '全色域', title: '每个元件各自换色相，明暗层次不变' },
 ] as const satisfies ReadonlyArray<{ value: ColorStrategy; label: string; title: string }>;
 
 /* ─────────────────────────────────────────────────────────────────
