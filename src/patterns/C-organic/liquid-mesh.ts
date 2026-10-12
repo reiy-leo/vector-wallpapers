@@ -62,6 +62,7 @@ const def: PatternDef = {
     { id: 'blob_a', label: '渐变团 A', role: 'primary', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#f472b6' }, { offset: 1, color: '#7c3aed' }] }, opacity: 0.75, visible: true, configurable: true },
     { id: 'blob_b', label: '渐变团 B', role: 'secondary', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#22d3ee' }, { offset: 1, color: '#0ea5e9' }] }, opacity: 0.7, visible: true, configurable: true },
     { id: 'blob_c', label: '渐变团 C', role: 'accent', paint: { type: 'radial', cx: 0.5, cy: 0.5, r: 0.5, stops: [{ offset: 0, color: '#fde047' }, { offset: 1, color: '#f97316' }] }, opacity: 0.6, visible: true, configurable: true },
+    { id: 'grain', label: '颗粒色', role: 'detail', paint: { type: 'solid', color: '#ffffff' }, opacity: 0.08, visible: true, configurable: true },
   ],
 
   controls: [
@@ -107,7 +108,7 @@ const def: PatternDef = {
     },
   ],
 
-  paletteSlots: { bg: ['bg'], primary: ['blob_a'], secondary: ['blob_b'], accent: ['blob_c'] },
+  paletteSlots: { bg: ['bg'], primary: ['blob_a'], secondary: ['blob_b'], accent: ['blob_c'], detail: ['grain'] },
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng, animate } = cfg;
@@ -118,6 +119,7 @@ const def: PatternDef = {
     const drift = params.drift === true;
 
     const bg = elements.get('bg')!;
+    const grainEl = elements.get('grain')!;
     const pool = [elements.get('blob_a')!, elements.get('blob_b')!, elements.get('blob_c')!];
 
     const parts: string[] = [rect(0, 0, W, H, { fill: bg.paintValue, 'fill-opacity': bg.opacity })];
@@ -135,7 +137,12 @@ const def: PatternDef = {
 
     // 颗粒层：<pattern> 平铺。密度只影响单元尺寸，DOM 结构恒定。
     // 三点分别落在单元中心与两处对角 —— 比规则点阵更自然，且仍严格可平铺。
-    if (grain > 0) {
+    //
+    // ⭐ 颗粒用**独立的 grain 元件**而不是复用底色：
+    // 底色若改成浅色，白色颗粒会一起变白而消失（那正是原实现的 bug）。
+    // 拆成两个元件后，用户可以单独把颗粒调成任何颜色，
+    // 也可以直接把 grain 的 visible 关掉得到纯净的流体。
+    if (grain > 0 && grainEl.visible && grainEl.opacity > 0) {
       const gs = unit / Math.max(6, grain);
       const r1 = Math.max(0.25, gs * 0.055);
       const r2 = Math.max(0.25, gs * 0.04);
@@ -144,7 +151,7 @@ const def: PatternDef = {
         w: gs,
         h: gs,
         content: g(
-          { fill: bg.paintValue },
+          { fill: grainEl.paintValue },
           [
             circle(gs / 2, gs / 2, r1, {}),
             circle(0, 0, r2, {}),
@@ -152,7 +159,9 @@ const def: PatternDef = {
           ].join(''),
         ),
       });
-      parts.push(rect(0, 0, W, H, { fill: tileRef, 'fill-opacity': 0.06 }));
+      parts.push(
+        rect(0, 0, W, H, { fill: tileRef, 'fill-opacity': grainEl.opacity }),
+      );
     }
 
     const body = parts.join('');

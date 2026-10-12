@@ -53,6 +53,9 @@ React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算
 8. 导出的 SVG 根标签必须带 `xmlns` + `width`/`height` + `viewBox`，否则按 300×150 渲染
 9. 单 pattern SVG 体积 < 20KB（开发期 throw 级断言）
 10. UI 层零硬编码：grep `src/ui/` 不得出现任何 pattern id / element id（证明 registry 抽象真实成立）
+11. **纯色元件占比 ≥50%** 是母题硬指标。渐变可做「层」不可做「面」——
+    纯色元件改色=整块变色（换肤），渐变元件改色=只染一端（染色）。
+    豁免须写理由（aurora-wave / liquid-mesh），由 `structure.guard.test.ts` 强制
 
 ## Cloudflare Workers 限制（2026-10 核实，与旧文档不同）
 - Worker size: **64 MiB**（不是旧文档的 1MB）
@@ -68,7 +71,24 @@ React 19+ MUI 9（**必须深路径导入**，barrel 导入会突破体积预算
 ## 规划文档位置
 - `docs/PRD.md` —— 许清楚产出，PRD v1.0 修订版（产品事实来源）
 - `docs/ARCHITECTURE.md` —— 高见远产出 v2.0，1568 行（技术事实来源）
+- `docs/PATTERN-SELECTION.md` —— 母题取舍依据（2026-10-12）：参考站 48 张判读 + 19 母题结构审查
 - `docs/01~07-*.mermaid` —— 架构附带的 7 张流程图（分层/预览/PNG导出/首屏/任务依赖/类图/分享数据流）
+
+## ⚠️ 三条「只有实测才能发现」的坑（2026-10-12 全部踩过）
+1. **URL 编解码分隔符冲突**：`ElementPatch` 用 `,` 分隔字段，而渐变编码内部也用 `,`
+   → 三色标渐变被截断成一个色标，**静默失败**（链接照常打开只是颜色变了）。
+   已改用 `~`，回归测试在 `src/ui/share.test.ts`。
+2. **跳过 preflight 的连带代价**：`[hidden]` 被工具类 `display:flex` 压制失效
+   → 弹窗常驻页面。已在 theme.css 补 `[hidden]{display:none!important}`。
+3. **「4 个元件全是渐变」这类缺陷，测试与肉眼都发现不了** ——
+   用户看到 4 个色块都能点，功能看似完好，但每次改色只染一半。
+   必须量化「纯色元件占比」才能发现。教训：**审查读代码，不靠印象。**
+
+## 测试规模（2026-10-12）
+19 母题 / 86 元件 / 平均 4.5 个·张 / 纯色占比 84%。
+UI 测试 101 项（share 29 / tokens 66 / hardcoding 6）+ structure 10 + liquid-mesh 11。
+⚠️ **全量单批跑会被沙箱 OOM kill（exit 137）**，需分批 + `--max-old-space-size=3072`。
+**任何新写的门禁都必须用变异测试自证**（注入缺陷 → 必须失败 → 还原）。
 
 ## 协作模式
 本项目走 software-company 专家团 SOP：主理人（齐活林）编排 → 产品经理（许清楚）出 PRD → 架构师（高见远）出架构+任务分解 → 工程师（寇豆码）写代码 → QA（严过关）测试。
