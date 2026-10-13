@@ -3,7 +3,7 @@
  *
  * 内置默认（PatternDef）不动 —— 引擎与测试仍是纯的；这里在它之上叠一层「服务器覆盖」：
  *   - 新选一个母题 / 恢复默认 → `defaultConfigFor()`
- *   - 浅底 / 深底切换        → `applyToneDefaults()`：该底色有覆盖就用 Rei 上传的配色，否则沿用 applyTone
+ *   - 浅底 / 深底切换        → `applyToneDefaults()`：默认配色 ↔ 默认配色；色板 / 自定义配色保留颜色翻明度（浅深一一对应）
  * 分享链接 / 收藏的编解码（share.ts）仍以**内置默认**为基准 —— 链接说什么就渲染什么，不受覆盖影响。
  *
  * 覆盖只存「与内置默认不同」的元件 / 参数；还原 = 内置默认 + 覆盖（无损，见 recordFromConfig）。
@@ -18,7 +18,7 @@ import {
   type ElementOverride,
   type ToneOverride,
 } from '../shared/defaults-api';
-import { applyTone, bgTone, type BgTone } from './coloring';
+import { applyTone, bgTone, keepTone, type BgTone } from './coloring';
 import type { ElementConfig, PatternConfig } from '../engine/types';
 import type { ControlDef, PaintSpec, ParamValue, PatternDef } from '../patterns/types';
 
@@ -157,19 +157,17 @@ export function defaultConfigFrom(
 }
 
 /**
- * 浅底 / 深底切换：目标底色有覆盖 → 套 Rei 上传的配色（锁定元件不动、参数不动）；否则走 applyTone。
+ * 浅底 / 深底切换（Rei 2026-10-14：浅底、深底的色板要一一对应）：
+ * - 当前就是该底色的默认配色 → 换成目标底色的默认配色（上传覆盖 / 内置 / 内置切过去）；
+ * - 否则（色板、换一版、自己调的）→ 保留这套颜色，按明度翻到目标底色（keepTone，翻不过去才退回作者同色调配色）。
+ *   以前一律套作者同色调配色，于是浅底换任何色板，切到深底都是同一套。
+ * `base`：判断「是不是默认」用的默认表（运行时传服务器默认，不含批改模式待上传叠层）。锁定元件不动、参数不动。
  */
-export function applyToneFrom(map: DefaultsMap, cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
-  const over = map[def.id]?.tones?.[tone];
-  if (!over) return applyTone(cfg, def, tone);
-  if (bgTone(cfg, def) === tone) return cfg;
-  const src = new Map(elementsForTone(def, over).map((e) => [e.id, e]));
-  const next = structuredCloneConfig(cfg);
-  next.elements = next.elements.map((e) => {
-    const s = src.get(e.id);
-    return e.locked || !s ? e : { ...e, paint: s.paint, opacity: s.opacity, visible: s.visible };
-  });
-  return next;
+export function applyToneFrom(map: DefaultsMap, cfg: PatternConfig, def: PatternDef, tone: BgTone, base: DefaultsMap = map): PatternConfig {
+  const from = bgTone(cfg, def);
+  if (from === tone) return cfg;
+  if (colorsMatchDefault(base, cfg, def, from)) return withDefaultColors(map, cfg, def, tone);
+  return keepTone(cfg, def, tone);
 }
 
 /* ── 运行时：服务器副本 + 批改模式的待上传叠层 ────────────────── */
@@ -230,6 +228,22 @@ export function defaultConfigFor(
   return defaultConfigFrom(effective, def, size, tone);
 }
 
+/** 上一次浅/深切换：切回去时原样还原（翻明度不可逆，来回切不该越切越走样）。 */
+let lastFlip: { pattern: string; fromTone: BgTone; from: ElementConfig[]; to: ElementConfig[] } | null = null;
+
+const sameElements = (a: ElementConfig[], b: ElementConfig[]): boolean =>
+  a.length === b.length && a.every((e, i) => e.id === b[i].id && sameLook(e, b[i]));
+
 export function applyToneDefaults(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
-  return applyToneFrom(effective, cfg, def, tone);
+  const from = bgTone(cfg, def);
+  if (from === tone) return cfg;
+  if (lastFlip && lastFlip.pattern === def.id && lastFlip.fromTone === tone && sameElements(cfg.elements, lastFlip.to)) {
+    const back = structuredCloneConfig(cfg);
+    back.elements = lastFlip.from.map((e) => ({ ...e }));
+    lastFlip = null;
+    return back;
+  }
+  const next = applyToneFrom(effective, cfg, def, tone, server);
+  lastFlip = { pattern: def.id, fromTone: from, from: cfg.elements, to: next.elements };
+  return next;
 }

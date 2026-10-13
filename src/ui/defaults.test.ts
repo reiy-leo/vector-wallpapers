@@ -110,11 +110,11 @@ describe('纯函数', () => {
     expect(o.elements.every((e) => e.paint.type === 'solid' && e.paint.color === otherColor)).toBe(true);
   });
 
-  it('applyToneFrom：目标底色有覆盖 → 用上传的配色、参数不动；无覆盖 → 与 applyTone 一致', () => {
+  it('applyToneFrom：从默认配色切 → 目标底色有覆盖用上传的配色、参数不动；无覆盖 → 与 applyTone 一致', () => {
     const base = createDefaultConfig(def);
-    const out = applyToneFrom(map, base, def, other);
+    const out = applyToneFrom(map, defaultConfigFrom(map, def), def, other);
     expect(out.elements.every((e) => e.paint.type === 'solid' && e.paint.color === otherColor)).toBe(true);
-    expect(out.params).toEqual(base.params);
+    expect(out.params).toEqual(defaultConfigFrom(map, def).params);
     expect(applyToneFrom({}, base, def, other)).toEqual(applyTone(base, def, other));
   });
 
@@ -181,5 +181,34 @@ describe('默认配色（浅底 / 深底各一套，Rei 2026-10-14）', () => {
       expect(defaultElementsFrom({}, def, away)).toHaveLength(def.elements.length);
       expect(bgTone(flipped, def)).toBe(away);
     }
+  });
+});
+
+describe('浅/深切换：色板一一对应（Rei 2026-10-14）', () => {
+  it('浅底不同色板切到深底得到不同配色；默认配色切到默认配色', async () => {
+    const { registry } = await import('../patterns');
+    const { allowedTones, applyPaletteSlots, bgTone } = await import('./coloring');
+    const { applyToneFrom, builtinTone, colorsMatchDefault } = await import('./defaults');
+    const { createDefaultConfig } = await import('../engine/render');
+    const { PALETTES } = await import('../patterns/palettes');
+    let checked = 0;
+    for (const def of registry.list()) {
+      if (allowedTones(def).length < 2 || def.rerollSchemes) continue;
+      const home = builtinTone(def);
+      const away = home === 'light' ? 'dark' : 'light';
+      const base = createDefaultConfig(def);
+      expect(colorsMatchDefault({}, applyToneFrom({}, base, def, away), def, away)).toBe(true);
+      const outs = PALETTES.slice(0, 6)
+        .map((p) => applyPaletteSlots(base, def, { ...p.slots }))
+        .filter((c) => bgTone(c, def) === home && !colorsMatchDefault({}, c, def, home))
+        .map((c) => applyToneFrom({}, c, def, away));
+      for (const o of outs) expect(bgTone(o, def)).toBe(away);
+      const keys = new Set(outs.map((o) => JSON.stringify(o.elements.map((e) => e.paint))));
+      if (outs.length >= 2) {
+        expect(keys.size).toBeGreaterThan(1);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
   });
 });

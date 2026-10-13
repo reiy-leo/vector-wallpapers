@@ -547,7 +547,7 @@ export function isScenic(def: PatternDef): boolean {
 }
 
 /** 换色后若浅/深底被改变（色板、无同色调配色等情况），按明度翻转回原来的底色类别。 */
-function keepTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
+export function keepTone(cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
   if (bgTone(cfg, def) === tone) return cfg;
   const flipped = flipLightness(cfg, def, tone);
   // 翻转仍不达标（前景占比大的母题）→ 退回作者的同色调配色，保证底色类别一定不跳
