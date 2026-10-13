@@ -23,6 +23,8 @@ import { CommentsDrawer, IconChat } from './Comments';
 import { JUST_SIGNED_IN_TO_GISCUS } from '../shared/giscusBoot';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
+import { Switch } from '@cloudflare/kumo/components/switch';
+import { setReviewMode, useReview } from './admin-review';
 import { consumeLoginError, loadMe, loginBlocker, logout, startLogin, useAuth } from './auth';
 import { IconAuto, IconGoogle, IconMoon, IconPanel, IconSun } from './icons';
 import type { UIState } from '../engine/types';
@@ -44,6 +46,7 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
           <span>矢量壁纸</span>
           <span className="text-xs font-normal text-fg-soft">Vector Wallpapers</span>
         </span>
+        <ReviewBadge />
       </h1>
 
       {/* ── 视图偏好：面板位置 / 收藏 ── */}
@@ -93,6 +96,7 @@ function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
   const auth = useAuth();
   const [favOpen, setFavOpen] = useState(false);
   const savedCount = useWorkbenchSelector((s) => s.saved.length);
+  const review = useReview();
 
   useEffect(() => {
     void loadMe();
@@ -121,6 +125,19 @@ function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
   }
 
   const label = user.name ?? user.email;
+  const toggleReview = async () => {
+    const r = await setReviewMode(!review.on);
+    if (!r.ok) {
+      onNotice(`批改模式：上传失败（${r.error}），改动已保留，批改模式仍开启`, 'danger');
+      return;
+    }
+    if (r.on) onNotice('已开启批改模式：接下来改动的母题会被记录，关闭时上传为默认值', 'info');
+    else if (!r.uploaded) onNotice('已关闭批改模式（没有需要上传的改动）', 'info');
+    else {
+      const extra = r.scores > 0 ? `、${r.scores} 条配色打分` : '';
+      onNotice(`默认值已更新到服务器（${r.patterns} 个母题${extra}）`, 'success');
+    }
+  };
   return (
     <>
     <DropdownMenu>
@@ -140,6 +157,29 @@ function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
         <DropdownMenu.Item onClick={() => setFavOpen(true)}>
           管理收藏{savedCount > 0 ? `（${savedCount}）` : ''}
         </DropdownMenu.Item>
+        {review.admin && (
+          <>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item
+              closeOnClick={false}
+              disabled={review.submitting}
+              aria-label={`批改模式：${review.on ? '已开启（点击关闭并上传）' : '已关闭'}`}
+              onClick={() => void toggleReview()}
+            >
+              <span className="flex w-full items-center justify-between gap-4">
+                <span>{review.submitting ? '批改模式（上传中…）' : '批改模式'}</span>
+                {/* 纯视觉：交互由整行菜单项承担（菜单项里不嵌套可聚焦按钮） */}
+                <Switch
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  size="sm"
+                  checked={review.on}
+                  className="pointer-events-none"
+                />
+              </span>
+            </DropdownMenu.Item>
+          </>
+        )}
         <DropdownMenu.Separator />
         <DropdownMenu.Item
           onClick={() => {
@@ -152,6 +192,22 @@ function AccountControl({ onNotice }: { onNotice: NoticeFn }) {
     </DropdownMenu>
     <FavoritesDialog open={favOpen} onClose={() => setFavOpen(false)} onNotice={onNotice} />
     </>
+  );
+}
+
+/** 批改模式常驻标记（标题旁）：提醒管理员当前改动会被记录为默认值，并显示待上传数量。 */
+function ReviewBadge() {
+  const review = useReview();
+  if (!review.admin || !review.on) return null;
+  const n = review.pendingPatterns;
+  const tip = `批改模式：待上传 ${n} 个母题${review.pendingScores > 0 ? `、${review.pendingScores} 条打分` : ''}（头像菜单里关闭即上传）`;
+  return (
+    <span
+      title={tip}
+      className="rounded-full bg-warning-tint px-2 py-px text-2xs font-medium text-warning"
+    >
+      批改中{n > 0 ? ` · ${n}` : ''}
+    </span>
   );
 }
 

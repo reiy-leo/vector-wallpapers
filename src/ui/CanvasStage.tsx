@@ -12,11 +12,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LIMITS, SIZE_PRESETS } from '../shared/constants';
 import { clamp } from '../shared/guards';
-import { renderStandaloneSVG, createDefaultConfig } from '../engine/render';
+import { renderStandaloneSVG } from '../engine/render';
+import { applyToneDefaults } from './defaults';
 import { svgToDataUri } from '../shared/download';
-import { setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
+import { resetConfig, setConfig, setSize, setUI, usePatternDef, useWorkbenchSelector } from './store';
 import { shuffleCurrent } from './Panels';
-import { applyTone, allowedTones, bgTone, type BgTone } from './coloring';
+import { allowedTones, bgTone, type BgTone } from './coloring';
 import { IconButton, Segmented, SelectBox, Tooltip, inputClass } from './primitives';
 import { ControlsPopover } from './ControlChips';
 import { ProductActions } from './ProductActions';
@@ -179,12 +180,8 @@ export function CanvasStage({
                 <IconButton
                   label="恢复默认"
                   onClick={() => {
-                    const base = createDefaultConfig(def, {
-                      width: cfg.width,
-                      height: cfg.height,
-                      seed: cfg.seed,
-                    });
-                    setConfig(base);
+                    // 叠加服务器默认值，保留当前浅底 / 深底（该底色有上传的默认配色就用它）
+                    resetConfig();
                     onNotice('已恢复默认配置', 'info');
                   }}
                 >
@@ -287,7 +284,7 @@ function ThemeSwitchOverlay({ target }: { target: React.RefObject<HTMLImageEleme
           label="壁纸底色"
           size="sm"
           value={tone}
-          onChange={(t) => setConfig(applyTone(cfg, def, t as BgTone))}
+          onChange={(t) => setConfig(applyToneDefaults(cfg, def, t as BgTone))}
           options={[
             { value: 'light', label: '', icon: <IconSun size={14} />, title: '浅底' },
             { value: 'dark', label: '', icon: <IconMoon size={14} />, title: '深底' },

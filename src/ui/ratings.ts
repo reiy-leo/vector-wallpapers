@@ -34,6 +34,7 @@ import {
   type RatingState,
 } from './rating-machine';
 import { enqueueRating, removeSent, shouldSubmit, takeBatch, type RatingQueue } from './rating-queue';
+import { adminRerollExclusions } from './admin-review';
 import { emptySyncStatus, type RatingSyncLast, type RatingSyncStatus } from './rating-sync';
 import {
   getConfig,
@@ -203,9 +204,14 @@ export function chooseVerdict(verdict: Verdict): void {
   dispatch({ type: 'choose', verdict });
 }
 
-/** 换一版之前：该母题里要排除的色板（服务端 + 本地队列 + 当前未入队的 👎）。 */
+/**
+ * 换一版之前：该母题里要排除的色板（服务端 + 本地队列 + 当前未入队的 👎）
+ * ∪ 管理员批改模式打分 ≤ −3 的色板（仅管理员本人，见 admin-review.ts）。
+ */
 export function rerollExclusions(patternId: string): Set<string> {
-  return excludedPalettes(state, patternId);
+  const out = excludedPalettes(state, patternId);
+  for (const p of adminRerollExclusions(patternId)) out.add(p);
+  return out;
 }
 
 /** 把当前这一对的选择写进本地队列（页面隐藏时调用；不发网络请求，除非队列恰好满阈值）。 */

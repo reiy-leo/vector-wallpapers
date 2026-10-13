@@ -7,10 +7,12 @@
  *   GET  /auth/callback     ← Google，签发会话 cookie
  *   POST /api/auth/logout
  *   POST /api/ratings · GET /api/ratings/mine · GET /api/ratings/summary   （见 ratings.ts）
+ *   GET /api/defaults · PUT /api/defaults · GET /api/admin/scores           （见 defaults.ts）
  */
 import type { MeResponse } from "../shared/auth-api";
 import { callback, getUser, login, logout } from "./auth";
-import { authMode } from "./env";
+import { adminEmails, authMode } from "./env";
+import { getAdminScores, getDefaults, putDefaults } from "./defaults";
 import { getMyRatings, getSummary, postRating } from "./ratings";
 import type { Env } from "./env";
 
@@ -25,6 +27,7 @@ async function handleMe(req: Request, env: Env): Promise<Response> {
   const me: MeResponse = {
     user: user ? { email: user.email, name: user.name ?? null, picture: user.picture ?? null } : null,
     authMode: authMode(env, req),
+    admin: user ? adminEmails(env).includes(user.email.trim().toLowerCase()) : false,
   };
   return json(me);
 }
@@ -58,6 +61,13 @@ export function createHandler(serveStatic: ServeStatic) {
           return getMyRatings(req, env);
         case "GET /api/ratings/summary":
           return getSummary(req, env);
+        case "GET /api/defaults":
+          return getDefaults(req, env);
+        case "PUT /api/defaults":
+          if (!sameOrigin(req)) return json({ error: "forbidden" }, 403);
+          return putDefaults(req, env);
+        case "GET /api/admin/scores":
+          return getAdminScores(req, env);
       }
       if (pathname.startsWith("/api/") || pathname.startsWith("/auth/")) return json({ error: "Not Found" }, 404);
       return serveStatic(req, env);

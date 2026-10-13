@@ -15,6 +15,10 @@ export const STORAGE_KEY = {
   ratingQueue: 'vw:rating-queue:v1',
   /** 上一次批量提交评分的结果（同样按邮箱分 key），见 ui/rating-sync.ts。 */
   ratingSync: 'vw:rating-sync:v1',
+  /** 批改模式（仅管理员）：开关 + 待上传的默认值 / 打分（按邮箱分 key），见 ui/admin-review.ts。 */
+  review: 'vw:review:v1',
+  /** 上一次成功上传默认值的 updatedAt（绕过 GET /api/defaults 的 60 秒缓存）。 */
+  defaultsStamp: 'vw:defaults-stamp:v1',
 } as const;
 
 /** URL query 参数名 —— 严格对齐 PRD P0-6。 */

@@ -20,6 +20,7 @@ import { CuratedSetsPanel, PalettePanel, ParamPanel } from './Panels';
 import { PatternRail } from './PatternRail';
 import { TopBar, type NoticeTone } from './TopBar';
 import { Toast } from './primitives';
+import { installReviewListeners, loadDefaults, setReviewOwner } from './admin-review';
 import { LoginGateDialog } from './LoginGate';
 import { isSignedIn, openLoginGate, useAuth } from './auth';
 import {
@@ -93,6 +94,21 @@ export function Workbench() {
       openLoginGate('share');
     }
   }, [auth, onNotice]);
+
+  /**
+   * 服务器默认值（批改模式上传的）：不阻塞首屏，到达后未动过的默认画布换成覆盖后的默认。
+   * 批改模式只对管理员账号生效（/api/me 的 admin）。
+   */
+  useEffect(() => {
+    installReviewListeners();
+    void loadDefaults();
+  }, []);
+  const reviewEmail = auth.status === 'ready' ? (auth.me.user?.email ?? null) : null;
+  const reviewAdmin = auth.status === 'ready' && auth.me.admin === true;
+  useEffect(() => {
+    if (auth.status === 'loading') return;
+    setReviewOwner(reviewEmail, reviewAdmin);
+  }, [auth.status, reviewEmail, reviewAdmin]);
 
   // 切母题 → 记入「最近使用」（PRD P0-7）
   const patternId = useWorkbenchSelector((s) => s.cfg.patternId);

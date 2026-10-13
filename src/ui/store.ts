@@ -28,6 +28,9 @@ import { registry } from '../patterns';
 import { decodeConfig, encodeConfig, type DecodedState } from './share';
 import { sanitizeDoc, type RatingsDoc } from '../shared/ratings-api';
 import { sanitizeSyncLast, type RatingSyncLast } from './rating-sync';
+import { defaultConfigFor } from './defaults';
+import { bgTone } from './coloring';
+import { sanitizeDefaultsMap, sanitizeScores, type AdminScores, type DefaultsMap } from '../shared/defaults-api';
 import type { PatternConfig, UIState } from '../engine/types';
 import type { PatternDef, ParamValue } from '../patterns/types';
 
@@ -94,6 +97,25 @@ let pendingShare: DecodedState | null = null;
 let pendingBaseCfg: PatternConfig | null = null;
 
 let state: WorkbenchState = initialState();
+/** 首屏默认画布的引用：服务器默认值到达时，若画布还没被动过就换成覆盖后的默认（见 refreshUntouchedDefault）。 */
+let initialCfg: PatternConfig | null = state.cfg;
+
+/**
+ * 服务器默认值（admin-review.ts 加载）到达后调用：首屏默认画布若仍未被动过（引用未变），
+ * 换成叠加覆盖后的默认。分享链接 / 收藏 / 用户已有改动一律不碰。
+ */
+export function refreshUntouchedDefault(): void {
+  if (!initialCfg || state.cfg !== initialCfg) {
+    initialCfg = null;
+    return;
+  }
+  const def = registry.get(state.cfg.patternId);
+  if (!def) return;
+  const next = defaultConfigFor(def, { width: state.cfg.width, height: state.cfg.height, seed: state.cfg.seed });
+  if (pendingBaseCfg === initialCfg) pendingBaseCfg = next; // 等登录的分享仍视为「画布没动过」
+  initialCfg = next;
+  set({ cfg: next });
+}
 
 /** 地址栏里有一条尚未套用的分享链接。 */
 export function hasPendingShare(): boolean {
@@ -169,7 +191,8 @@ export function setSeed(seed: number): void {
 export function selectPattern(id: string, keepSize = true): void {
   const def = registry.get(id);
   if (!def) return;
-  const next = createDefaultConfig(def, {
+  // 叠加服务器默认值（批改模式上传的参数 / 配色），见 defaults.ts
+  const next = defaultConfigFor(def, {
     width: keepSize ? state.cfg.width : DEFAULT_SIZE.w,
     height: keepSize ? state.cfg.height : DEFAULT_SIZE.h,
     seed: state.cfg.seed,
@@ -177,16 +200,19 @@ export function selectPattern(id: string, keepSize = true): void {
   set({ cfg: next, search: '' });
 }
 
-/** 恢复当前母题的默认配置（保留尺寸与 seed）。 */
+/**
+ * 恢复当前母题的默认配置（保留尺寸与 seed）。叠加服务器默认值，并尽量保留当前浅底 / 深底：
+ * 当前底色有上传的默认配色就用它。
+ */
 export function resetConfig(): void {
   const def = registry.get(state.cfg.patternId);
   if (!def) return;
   set({
-    cfg: createDefaultConfig(def, {
-      width: state.cfg.width,
-      height: state.cfg.height,
-      seed: state.cfg.seed,
-    }),
+    cfg: defaultConfigFor(
+      def,
+      { width: state.cfg.width, height: state.cfg.height, seed: state.cfg.seed },
+      bgTone(state.cfg, def),
+    ),
   });
 }
 
@@ -478,6 +504,57 @@ export function writeRatingSync(owner: string, last: RatingSyncLast): void {
     localStorage.setItem(ratingSyncKey(owner), JSON.stringify(last));
   } catch {
     /* 同上 */
+  }
+}
+
+/* ── 批改模式（仅管理员，见 admin-review.ts）：开关 + 待上传的默认值 / 打分，按邮箱分 key ── */
+
+export interface ReviewStored {
+  on: boolean;
+  pending: DefaultsMap;
+  scores: AdminScores;
+}
+
+const reviewKey = (owner: string) => `${STORAGE_KEY.review}:${owner.trim().toLowerCase()}`;
+
+export function readReviewState(owner: string): ReviewStored {
+  try {
+    const raw = localStorage.getItem(reviewKey(owner));
+    const v: unknown = raw ? JSON.parse(raw) : null;
+    if (!v || typeof v !== 'object') return { on: false, pending: {}, scores: {} };
+    const o = v as Record<string, unknown>;
+    return { on: o.on === true, pending: sanitizeDefaultsMap(o.pending), scores: sanitizeScores(o.scores, true) };
+  } catch {
+    return { on: false, pending: {}, scores: {} };
+  }
+}
+
+export function writeReviewState(owner: string, v: ReviewStored): void {
+  try {
+    if (!v.on && Object.keys(v.pending).length === 0 && Object.keys(v.scores).length === 0) {
+      localStorage.removeItem(reviewKey(owner));
+    } else {
+      localStorage.setItem(reviewKey(owner), JSON.stringify(v));
+    }
+  } catch {
+    /* 配额满 / 隐私模式：只在内存里，刷新即丢 */
+  }
+}
+
+/** 上一次成功 PUT 的 updatedAt：启动时 GET 拿到更旧的（浏览器缓存 60 秒内）就强制重新拉一次。 */
+export function readDefaultsStamp(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY.defaultsStamp);
+  } catch {
+    return null;
+  }
+}
+
+export function writeDefaultsStamp(updatedAt: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY.defaultsStamp, updatedAt);
+  } catch {
+    /* 忽略 */
   }
 }
 

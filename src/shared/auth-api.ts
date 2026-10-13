@@ -2,6 +2,8 @@
 export interface MeResponse {
   user: { email: string; name: string | null; picture: string | null } | null;
   authMode: 'google' | 'unconfigured' | 'disabled';
+  /** 会话邮箱在 ADMIN_EMAILS 里（批改模式开关只对管理员显示）。旧 Worker 不返回该字段 = false。 */
+  admin?: boolean;
 }
 
 /** /auth/callback 失败时回跳 `/?login_error=<code>`，前端据此给出中文提示。 */

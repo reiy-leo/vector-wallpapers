@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { CATEGORY_META } from '../shared/constants';
 import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
+import { defaultConfigFrom, getServerDefaults, useServerDefaultsVersion } from './defaults';
 import { svgToDataUri } from '../shared/download';
 import { useWorkbenchSelector, selectPattern, setCategory, setSearch } from './store';
 import { CountBadge, SearchInput } from './primitives';
@@ -36,7 +37,7 @@ interface ThumbData {
  * 不应因此在渲染列表时抛错。
  */
 function useThumbs(defs: readonly PatternDef[]): ThumbData[] {
-  return useMemo(
+  const base = useMemo(
     () =>
       defs.map((def) => {
         const cfg = createDefaultConfig(def, { width: THUMB_W, height: THUMB_H, seed: 7 });
@@ -44,6 +45,17 @@ function useThumbs(defs: readonly PatternDef[]): ThumbData[] {
       }),
     [defs],
   );
+  // 服务器默认值（批改模式上传的）到达后：只重渲染有覆盖的母题
+  const serverVersion = useServerDefaultsVersion();
+  return useMemo(() => {
+    const map = getServerDefaults();
+    if (serverVersion === 0 || Object.keys(map).length === 0) return base;
+    return base.map((t) => {
+      if (!map[t.def.id]) return t;
+      const cfg = defaultConfigFrom(map, t.def, { width: THUMB_W, height: THUMB_H, seed: 7 });
+      return { def: t.def, uri: svgToDataUri(renderStandaloneSVG(t.def, cfg, { skipBudget: true })) };
+    });
+  }, [base, serverVersion]);
 }
 
 const ALL = 'all';
