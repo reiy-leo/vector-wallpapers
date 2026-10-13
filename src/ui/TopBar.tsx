@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { setUI, useWorkbenchSelector } from './store';
 import { FavoritesDialog } from './FavoritesDialog';
 import { CommentsDrawer, IconChat } from './Comments';
+import { JUST_SIGNED_IN_TO_GISCUS } from './giscusBoot';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
 import { consumeLoginError, loadMe, loginBlocker, logout, startLogin, useAuth } from './auth';
@@ -32,7 +33,7 @@ export type NoticeFn = (message: string, tone?: NoticeTone) => void;
 export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const panel = useWorkbenchSelector((s) => s.ui.panel);
   const theme = useWorkbenchSelector((s) => s.ui.theme);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(JUST_SIGNED_IN_TO_GISCUS); // 刚从 GitHub 登录回来 → 直接打开留言
 
 
   return (
