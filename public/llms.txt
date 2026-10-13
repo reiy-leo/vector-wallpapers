@@ -1,0 +1,24 @@
+# Vector Wallpapers（矢量壁纸）
+
+> Vector Wallpapers is a free browser-based SVG wallpaper generator: pick one of 98 pattern motifs in 14 categories, recolor each element independently, export SVG or PNG.
+
+矢量壁纸是一个在浏览器里生成桌面壁纸的工具，不是素材库。先从极简线条、几何构成、风景意境、传统纹样、植物花卉、宇宙天文等 14 类共 98 个图案母题里选一个，再给底色、圆点、山峦等每个元件分别上色，调密度、大小和随机种子，同一个母题能出无数变体。满意后导出 SVG 或 PNG，或复制源码，也可以用链接把配置分享给别人。
+
+## 要点
+
+- 98 个图案母题，14 个分类（极简线条、几何构成、风景意境、传统纹样、植物花卉、宇宙天文等）
+- 每个元件（底色、圆点、山峦……）可单独配色；可调密度、大小和随机种子
+- 实时预览；导出 SVG / PNG，或复制 SVG 源码 / CSS
+- 配置保存在链接里，可分享
+- 免费；导出、收藏和打开分享链接需 Google 登录
+
+## 常见问题
+
+- **免费吗？** 免费。浏览和调色不用登录，导出、收藏和打开分享链接需要用 Google 账号登录。
+- **能导出什么格式？** SVG、PNG，或直接复制 SVG 源码 / CSS。
+- **和普通壁纸素材站有什么不同？** 素材站是成品图再改色；这里先定结构，再逐个元件配色。
+- **能分享吗？** 配置保存在链接里，打开链接就能还原同一张壁纸。
+
+## 链接
+
+- 网站：https://vector-wallpapers.rei8t.dev/

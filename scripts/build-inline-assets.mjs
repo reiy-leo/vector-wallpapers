@@ -11,6 +11,7 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.webp': 'image/webp',
@@ -24,7 +25,7 @@ const assets = {};
     if (statSync(p).isDirectory()) { walk(p); continue; }
     if (SKIP.has(f) || f.endsWith('.map')) continue;
     const t = TYPES[extname(f)] ?? 'application/octet-stream';
-    const bin = !(t.startsWith('text/') || t === 'image/svg+xml' || t === 'application/json');
+    const bin = !(t.startsWith('text/') || t === 'image/svg+xml' || t === 'application/json' || t.startsWith('application/xml'));
     assets['/' + relative(root, p)] = { t, b: bin, d: bin ? readFileSync(p).toString('base64') : readFileSync(p, 'utf8') };
   }
 })(root);

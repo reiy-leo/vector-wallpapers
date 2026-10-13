@@ -1,3 +1,20 @@
-# Vector Wallpapers —— 纯静态 SPA，无追踪、无第三方请求。
+# 矢量壁纸 / Vector Wallpapers
 User-agent: *
 Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://vector-wallpapers.rei8t.dev/sitemap.xml
