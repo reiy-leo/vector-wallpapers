@@ -34,9 +34,10 @@ import {
   type RatingState,
 } from './rating-machine';
 import { enqueueRating, removeSent, shouldSubmit, takeBatch, type RatingQueue } from './rating-queue';
-import { adminRerollExclusions, atDefaultColoring, getReview, subscribeReview } from './admin-review';
+import { adminRerollExclusions, subscribeReview } from './admin-review';
 import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
-import { pickedPaletteFor } from './defaults';
+import { colorsMatchDefault, getBaseServerDefaults, pickedPaletteFor } from './defaults';
+import { bgTone } from './coloring';
 import { registry } from '../patterns';
 import { emptySyncStatus, type RatingSyncLast, type RatingSyncStatus } from './rating-sync';
 import {
@@ -195,26 +196,26 @@ function dispatch(e: RatingEvent): void {
 
 /** 换一版之后：paletteId 为 null（非色板来源）时隐藏评分条。 */
 export function noteReroll(patternId: string, paletteId: string | null): void {
-  // 「默认」这套只在批改打分里可评（普通 👍/👎 的 Worker 不收这个 id）
-  if (paletteId === DEFAULT_PALETTE_ID && !(getReview().admin && getReview().on)) paletteId = null;
   dispatch(paletteId ? { type: 'show', pattern: patternId, palette: paletteId } : { type: 'clear' });
 }
 
 /**
- * 批改模式里画布停在母题自己的默认配色（选母题 / 恢复默认 / 切浅深底）→ 评分条打分「默认」这套。
- * 浅底、深底各算一套（打分键带底色）。普通评分不涉及（Worker 不收这个 id）。
+ * 画布停在母题自己的默认配色（打开的第一张 / 选母题 / 恢复默认 / 切浅深底）→ 评分条评「默认」这套
+ * （Rei 2026-10-14：非批改模式的默认图也要有 👍/👎）。默认展示的是打分选中的色板 → 评那套色板本身。
+ * 批改模式里同一位置是 ±5 打分，浅底、深底各算一套。
  */
 export function noteDefaultColoring(): void {
   const cfg = getConfig();
   const def = registry.get(cfg.patternId);
-  if (!def || !(getReview().admin && getReview().on)) return;
+  if (!def) return;
   // 默认展示的是打分选中的色板 → 评分条打分的是那套色板本身
   const pickedId = pickedPaletteFor(cfg, def);
   if (pickedId) {
     dispatch({ type: 'show', pattern: cfg.patternId, palette: pickedId });
     return;
   }
-  if (!atDefaultColoring(cfg)) return;
+  // 「默认」= 上传覆盖 / 内置（不含批改模式待上传叠层：那是正在改的这张，0ca7004）
+  if (!colorsMatchDefault(getBaseServerDefaults(), cfg, def, bgTone(cfg, def))) return;
   dispatch({ type: 'show', pattern: cfg.patternId, palette: DEFAULT_PALETTE_ID });
 }
 
