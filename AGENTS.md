@@ -108,6 +108,15 @@ React 19 + Tailwind v4 + Vite 8 + TypeScript
 
 ---
 
+## ⛔ GEO 文案（Rei 2026-10-14）
+
+- 「关于 / 常见问题」**只在 `index.html` `<body>` 的 `<noscript>` 里**（挂载点之后），**不在页面上显示**，仅供 LLM / 爬虫读原始 HTML；无 JS 访客看到带少量样式的版本。
+- `<div id="root"></div>` 在原始 HTML 中保持为空；head 的 `#vw-critical` 只留底色 + `#root{min-height:100vh}`（工作台满屏，首屏零位移）。
+- noscript 里的 FAQ 文字 = head JSON-LD `FAQPage` = `public/llms.txt`，逐字一致；母题数 98 / 14 变化时三处同步。
+- 不要把它放回 `#root` 或做成可见区块。`src/__verify__/geo-html.test.ts` 对此有断言。
+
+---
+
 ## 跑验证（不要凭"看起来对"就交付）
 
 ```bash

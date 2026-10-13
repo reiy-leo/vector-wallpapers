@@ -26,7 +26,6 @@ import {
   IconClose,
   IconFocus,
   IconGrid,
-  IconInfo,
   IconMoon,
   IconReset,
   IconShuffle,
@@ -56,7 +55,6 @@ export function CanvasStage({
    * 用 rAF 合并同帧内的多次变更 —— 一帧最多渲染一次。
    */
   const [svg, setSvg] = useState('');
-  const [metrics, setMetrics] = useState({ bytes: 0, nodes: 0 });
   const frame = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -69,14 +67,11 @@ export function CanvasStage({
       // 动画只是预览层的叠加：下载 / PNG / 缩略图仍走默认 animate:false。
       const out = renderStandaloneSVG(def, cfg, { skipBudget: true, animate: true });
       setSvg(out);
-      setMetrics({ bytes: measureBytes(out), nodes: countNodes(out) });
     });
     return () => cancelAnimationFrame(frame.current);
   }, [def, cfg]);
 
   const uri = useMemo(() => (svg ? svgToDataUri(svg) : ''), [svg]);
-
-  const overBudget = metrics.bytes > LIMITS.MAX_SVG_BYTES;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -143,7 +138,7 @@ export function CanvasStage({
       {/* ───────────────────────────────────────────────────────────
           工具条：单行。
             左：画布（尺寸）｜ 参数上拉列表（kumo Popover）+ 模式（离散选项）
-            右：诊断（体积/节点）+ 视图动作
+            右：视图动作
           ─────────────────────────────────────────────────────────── */}
       <div className="grid shrink-0 gap-3 border-t border-line px-5 py-3">
         {/* 行① */}
@@ -156,17 +151,7 @@ export function CanvasStage({
           <ControlsPopover />
 
           <div className="ml-auto flex items-center gap-3">
-            {/* 体积/节点：纯诊断信息，与可点物用分隔线隔开 */}
-            <p
-              className={`flex items-center gap-1 whitespace-nowrap font-mono text-[0.9em] ${
-                overBudget ? 'text-danger' : 'text-fg-mute'
-              }`}
-            >
-              <IconInfo size={13} />
-              {(metrics.bytes / 1024).toFixed(1)} KB / {(LIMITS.MAX_SVG_BYTES / 1024).toFixed(0)} KB
-              <span>· {metrics.nodes} 节点</span>
-            </p>
-            <div aria-hidden="true" className="h-6 w-px shrink-0 bg-line" />
+            {/* 体积/节点诊断不在 UI 显示（Rei 2026-10-14）；超预算仍由 __verify__ 门禁兜底 */}
             <div className="flex items-center gap-1">
             <Tooltip content={grid ? '隐藏栅格' : '显示栅格'}>
                 <IconButton
@@ -493,18 +478,3 @@ function GridOverlay({ target }: { target: React.RefObject<HTMLImageElement | nu
   );
 }
 
-/**
- * 与引擎 `measure()` 同口径的字节统计。
- *
- * ⚠️ 必须用 TextEncoder：`String.length` 是 UTF-16 码元数，
- * 而 SVG 里含中文 aria-label，两者算出的字节数不同 ——
- * 用 .length 会让体积显示偏小，用户据此判断「有没有超红线」时就不可信了。
- */
-function measureBytes(svg: string): number {
-  return new TextEncoder().encode(svg).length;
-}
-
-/** body 下的图形节点数 —— 复杂度的心跳指标。 */
-function countNodes(svg: string): number {
-  return (svg.match(/<(rect|circle|path|line|polygon|ellipse|g)\b/g) ?? []).length;
-}

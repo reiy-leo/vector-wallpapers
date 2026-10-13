@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react';
 import { setUI, useWorkbenchSelector } from './store';
 import { FavoritesDialog } from './FavoritesDialog';
 import { CommentsDrawer, IconChat } from './Comments';
-import { JUST_SIGNED_IN_TO_GISCUS } from './giscusBoot';
+import { JUST_SIGNED_IN_TO_GISCUS } from '../shared/giscusBoot';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
 import { consumeLoginError, loadMe, loginBlocker, logout, startLogin, useAuth } from './auth';

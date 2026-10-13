@@ -31,37 +31,17 @@
     <script src="/theme-boot.js"></script>
 
     <!--
-      首帧关键样式（style-src 已含 'unsafe-inline'）：挂载点占满首屏 + 页底「关于」区块的排版与浅/深色。
-      颜色取自 src/styles/theme.css 的 --vw-* token，保持与设计系统一致。
+      首帧关键样式（style-src 已含 'unsafe-inline'）：只留底色与挂载点占位。
+      工作台是满屏三栏（h-screen），首屏实际高度 = 100vh，挂载点为空时也占满，挂载后零位移（CLS≈0）。
+      #root 之后没有任何可见区块（GEO 文案在 <noscript> 里），所以不需要 scripting 隐藏规则。
     -->
     <style id="vw-critical">
       html, body { margin: 0; }
       html { background: oklch(0.985 0.002 264); color-scheme: light; }
       #root { min-height: 100vh; }
-      .vw-about {
-        --a-bg: oklch(0.985 0.002 264); --a-fg: oklch(0.22 0.014 264);
-        --a-soft: oklch(0.44 0.016 264); --a-line: oklch(0.912 0.005 264);
-        box-sizing: border-box; max-width: 720px; margin: 0 auto; padding: 40px 20px 56px;
-        border-top: 1px solid var(--a-line); background: var(--a-bg); color: var(--a-fg);
-        font: 14px/1.6 system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-      }
-      .vw-about h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.3; font-weight: 600; }
-      .vw-about h3 { margin: 28px 0 4px; font-size: 16px; line-height: 1.4; font-weight: 600; }
-      .vw-about p { margin: 0; color: var(--a-soft); }
-      .vw-about dl { margin: 0; }
-      .vw-about dt { margin-top: 14px; font-weight: 600; }
-      .vw-about dd { margin: 2px 0 0; color: var(--a-soft); }
       :root[data-theme='dark'] { background: oklch(0.18 0.012 264); color-scheme: dark; }
-      :root[data-theme='dark'] .vw-about {
-        --a-bg: oklch(0.18 0.012 264); --a-fg: oklch(0.97 0.003 264);
-        --a-soft: oklch(0.78 0.014 264); --a-line: oklch(0.32 0.016 264);
-      }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme='light']) { background: oklch(0.18 0.012 264); color-scheme: dark; }
-        :root:not([data-theme='light']) .vw-about {
-          --a-bg: oklch(0.18 0.012 264); --a-fg: oklch(0.97 0.003 264);
-          --a-soft: oklch(0.78 0.014 264); --a-line: oklch(0.32 0.016 264);
-        }
       }
     </style>
 
@@ -127,29 +107,45 @@
     </script>
   </head>
   <body>
-    <!-- 应用挂载点：保持为空，min-height:100vh 占位（见 head 里的 #vw-critical），首帧不出现裸文字 -->
+    <!-- 应用挂载点：原始 HTML 中保持为空，min-height:100vh 占位（见 head 里的 #vw-critical） -->
     <div id="root"></div>
 
     <!--
-      关于 / 常见问题（GEO，Rei 2026-10-13）：在 #root 之外，React 不会碰它；位于应用下方，
-      向下滚动可见。爬虫与 AI 直接读原始 HTML。⚠️ 不要删、不要 display:none / 移出屏幕隐藏。
+      关于 / 常见问题（GEO，Rei 2026-10-14：不在页面上显示，只给 LLM / 爬虫读原始 HTML）。
+      放在 <noscript> 里：开 JS 的访客永远看不到（无裸文字帧），无 JS 访客看到带少量样式的版本。
+      ⚠️ FAQ 文字必须与 head 里 JSON-LD FAQPage 逐字一致（geo-html.test.ts 校验）。
       数字 98 / 14 以 patterns.test.ts 为准，母题数变化时同步这里、JSON-LD、public/llms.txt。
+      ⚠️ 不要把它放回 #root 里或做成可见区块。
     -->
-    <section id="vw-about" class="vw-about" aria-labelledby="vw-about-title">
-      <h2 id="vw-about-title">关于矢量壁纸</h2>
-      <p>矢量壁纸是一个在浏览器里生成桌面壁纸的工具，不是素材库。先从极简线条、几何构成、风景意境、传统纹样、植物花卉、宇宙天文等 14 类共 98 个图案母题里选一个，再给底色、圆点、山峦等每个元件分别上色，调密度、大小和随机种子，同一个母题能出无数变体。满意后导出 SVG 或 PNG，或复制源码，也可以用链接把配置分享给别人。</p>
-      <h3>常见问题</h3>
-      <dl>
-        <dt>免费吗？</dt>
-        <dd>免费。浏览和调色不用登录，导出、收藏和打开分享链接需要用 Google 账号登录。</dd>
-        <dt>能导出什么格式？</dt>
-        <dd>SVG、PNG，或直接复制 SVG 源码 / CSS。</dd>
-        <dt>和普通壁纸素材站有什么不同？</dt>
-        <dd>素材站是成品图再改色；这里先定结构，再逐个元件配色。</dd>
-        <dt>能分享吗？</dt>
-        <dd>配置保存在链接里，打开链接就能还原同一张壁纸。</dd>
-      </dl>
-    </section>
+    <noscript>
+      <style>
+        .vw-about { box-sizing: border-box; max-width: 720px; margin: 0 auto; padding: 40px 20px 56px; color: #1d1d1f; font: 14px/1.6 system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; }
+        .vw-about .eyebrow { margin: 0; font-size: 12px; color: #7a7a7a; }
+        .vw-about h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.3; font-weight: 600; }
+        .vw-about h2 { margin: 28px 0 4px; font-size: 16px; line-height: 1.4; font-weight: 600; }
+        .vw-about p, .vw-about dd { color: #555; }
+        .vw-about p { margin: 0; }
+        .vw-about dl { margin: 0; }
+        .vw-about dt { margin-top: 14px; font-weight: 600; }
+        .vw-about dd { margin: 2px 0 0; }
+      </style>
+      <section id="vw-about" class="vw-about" aria-labelledby="vw-about-title">
+        <p class="eyebrow">关于</p>
+        <h1 id="vw-about-title">矢量壁纸</h1>
+        <p>矢量壁纸是一个在浏览器里生成桌面壁纸的工具，不是素材库。先从极简线条、几何构成、风景意境、传统纹样、植物花卉、宇宙天文等 14 类共 98 个图案母题里选一个，再给底色、圆点、山峦等每个元件分别上色，调密度、大小和随机种子，同一个母题能出无数变体。满意后导出 SVG 或 PNG，或复制源码，也可以用链接把配置分享给别人。</p>
+        <h2>常见问题</h2>
+        <dl>
+          <dt>免费吗？</dt>
+          <dd>免费。浏览和调色不用登录，导出、收藏和打开分享链接需要用 Google 账号登录。</dd>
+          <dt>能导出什么格式？</dt>
+          <dd>SVG、PNG，或直接复制 SVG 源码 / CSS。</dd>
+          <dt>和普通壁纸素材站有什么不同？</dt>
+          <dd>素材站是成品图再改色；这里先定结构，再逐个元件配色。</dd>
+          <dt>能分享吗？</dt>
+          <dd>配置保存在链接里，打开链接就能还原同一张壁纸。</dd>
+        </dl>
+      </section>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
