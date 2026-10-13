@@ -44,7 +44,7 @@ function safeReturnTo(v: string | null | undefined): string {
 }
 
 function unconfiguredPage(): Response {
-  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录尚未配置 · Vector Wallpapers</title></head>
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>矢量壁纸</title></head>
 <body style="font-family:system-ui,-apple-system,'PingFang SC',sans-serif;max-width:520px;margin:15vh auto;padding:0 24px;color:#1d1d1f">
 <h1 style="font-size:28px">登录尚未配置</h1>
 <p>站点管理员还没有设置 Google 登录（缺少 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET）。请稍后再来。</p>

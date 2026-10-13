@@ -4,6 +4,8 @@
 
 ## 项目是什么
 
+> **显示名**（Rei 2026-10-13，不加任何后缀）：中文「矢量壁纸」用于 `<title>`、页头、中文 UI；英文「Vector Wallpapers」用于 og:title / og:site_name / manifest，页头可作小号副标题。仓库名、Worker 名、域名不变。
+
 **SVG 桌面背景图生成器**（不是素材库）。核心差异化：**母题中的每个元件可独立设置不同颜色**。
 
 - 参考站点：`https://www.svgbackgrounds.com/`（SVG 素材库 + 可定制导出）

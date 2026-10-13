@@ -39,7 +39,10 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
     <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-2">
       <h1 className="mr-auto flex items-center gap-2 text-md font-semibold text-fg">
         <LogoMark />
-        <span className="hidden sm:inline">Vector Wallpapers</span>
+        <span className="hidden items-baseline gap-1.5 sm:inline-flex">
+          <span>矢量壁纸</span>
+          <span className="text-xs font-normal text-fg-soft">Vector Wallpapers</span>
+        </span>
       </h1>
 
       {/* ── 视图偏好：面板位置 / 收藏 ── */}
