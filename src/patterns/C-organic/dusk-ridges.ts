@@ -2,51 +2,23 @@
  * 山峦日落 —— C 渐变流体 / 有机形态。
  *
  * 构图要点：天空线性渐变打底 + 径向渐变太阳 + N 层山脊剪影。
- * 山脊线用「多频正弦叠加 + seeded rng 相位」生成，同 seed 稳定、换 seed 换山形。
+ * 山脊线复用 E-scene 共享的 `peakRange`（与 starry-night-sky 同款）：
+ * 若干「锥形山峰」取上包络（相邻山峰相交自然成谷）+ 一层分形碎石细节，
+ * 再以密集等距采样输出整数相对坐标折线 —— 视觉上连续平滑，不再是 48 段大折线。
+ * 同 seed 稳定、换 seed 换山形；随机数只来自 cfg.rng。
  *
- * ⚠️ 本pattern 是 20KB 红线的主要风险点（6 元件 / 多段渐变），
- * 因此：山脊层数受控件上限约束（≤6），渐变由 DefsRegistry 按内容去重，
- * 路径点数固定 48 —— 三者共同保证体积与层数线性且可控。
+ * ⚠️ 本 pattern 曾是 20KB 红线的主要风险点（6 元件 / 多段渐变），
+ * 因此：山脊层数受控件上限约束（≤3 条山脊），渐变由 DefsRegistry 按内容去重，
+ * 山脊在「短边 = V」的虚拟坐标里采样（与分辨率无关），总长超过 RIDGE_CAP 时自动放大步长 —— 体积有硬上限。
  */
-import { circle, n, path, rect } from '../../engine/svg';
+import { circle, path, rect } from '../../engine/svg';
+import { encLine, peakRange, virt } from '../E-scene/_scene';
 import type { PatternDef, ResolvedConfig, RenderApi, RenderResult } from '../types';
 
-/** 山脊采样点数：固定值，与尺寸、层数无关 → 体积可预测。 */
-const RIDGE_POINTS = 48;
-
-/**
- * 生成一条山脊路径。
- * 用 3 个不同频率的正弦叠加模拟自然山体：低频定走势、中频造峰、高频加噪。
- */
-function ridgePath(
-  w: number,
-  baseY: number,
-  height: number,
-  rng: () => number,
-  roughness: number,
-): string {
-  const f1 = 0.7 + rng() * 0.8;
-  const f2 = 1.8 + rng() * 1.6;
-  const f3 = 4.2 + rng() * 3;
-  const p1 = rng() * Math.PI * 2;
-  const p2 = rng() * Math.PI * 2;
-  const p3 = rng() * Math.PI * 2;
-  const steep = 0.35 + roughness * 0.9;
-
-  const yAt = (t: number): number => {
-    const a = Math.sin(t * Math.PI * 2 * f1 + p1);
-    const b = Math.sin(t * Math.PI * 2 * f2 + p2) * 0.42;
-    const c = Math.sin(t * Math.PI * 2 * f3 + p3) * 0.16 * roughness;
-    return baseY - height * (0.55 + steep * 0.45) * (a * 0.5 + b + c);
-  };
-
-  let d = `M0 ${n(yAt(0))}`;
-  for (let i = 1; i <= RIDGE_POINTS; i++) {
-    const t = i / RIDGE_POINTS;
-    d += ` L${n(t * w)} ${n(yAt(t))}`;
-  }
-  return `${d} L${n(w)} ${n(baseY + height * 3)} L0 ${n(baseY + height * 3)} Z`;
-}
+/** 虚拟坐标短边。 */
+const V = 1000;
+/** 全部山脊路径 d 字符总长上限（≈ 字节），超出则放大采样步长。 */
+const RIDGE_CAP = 6000;
 
 const def: PatternDef = {
   id: 'dusk-ridges',
@@ -197,19 +169,55 @@ const def: PatternDef = {
     // 同pixel-terrain：切片起点必须用「实际保留层数」，
     // 写成 `length - (layerCount - 1)` 会 off-by-one，在 layers=2 时少画一层。
     const keep = Math.min(layerCount - 1, RIDGE_IDS.length);
-  const chosen = RIDGE_IDS.slice(RIDGE_IDS.length - keep);
+    const chosen = RIDGE_IDS.slice(RIDGE_IDS.length - keep);
+
+    // 虚拟坐标（短边 = V）：几何与分辨率解耦，整条 path 用 transform 放大。
+    const { Wv, Hv, tf } = virt(W, H, V);
+    const k = Wv / V;
+    const x0 = -V * 0.2;
+    const x1 = Wv + V * 0.2;
+    const bottom = Math.ceil(Hv) + 2;
+
+    // 先按固定顺序生成全部山脊高度场（rng 消耗与显隐无关 → 切换显隐不改山形）。
+    const ridges = chosen.map((_, i) => {
+      // t：0 远 → 1 近
+      const t = chosen.length === 1 ? 1 : i / (chosen.length - 1);
+      const depth = (i + 1) / (chosen.length + 1);
+      const baseY = Hv * (0.54 + depth * 0.34);
+      const height = Hv * ridgeH * (0.6 + depth * 0.9);
+      // 远山：峰更多、坡更缓、细节更少 → 柔和；近山：峰少而大、坡陡、带碎石细节。
+      const count = Math.max(2, Math.round(k * (3.4 - t * 1.4)));
+      const s0 = 0.16 + rough * 0.28 + t * 0.1;
+      const R = peakRange(rng, {
+        x0,
+        x1,
+        count,
+        height,
+        slope: [s0, s0 + 0.2 + rough * 0.2],
+        detail: height * (0.01 + rough * 0.035) * (0.4 + t * 0.6),
+      });
+      // 5 抽头盒式平滑：把锥顶磨圆、压掉残余高频抖动（半径按 V 取，与分辨率无关）。
+      const r = V * (0.006 + (1 - rough) * 0.008);
+      const h = (x: number): number => (R(x - 2 * r) + R(x - r) + R(x) + R(x + r) + R(x + 2 * r)) / 5;
+      return (x: number): number => baseY + height * 0.15 - h(x);
+    });
+
+    let step = 4;
+    let ds: string[] = [];
+    for (let guard = 0; guard < 12; guard++) {
+      ds = ridges.map((f) => {
+        const pts: Array<[number, number]> = [];
+        for (let x = -step; x <= Wv + step; x += step) pts.push([x, f(x)]);
+        return `${encLine(pts)}V${bottom}H${-step}z`;
+      });
+      if (ds.reduce((s, d) => s + d.length, 0) <= RIDGE_CAP) break;
+      step *= 1.25;
+    }
+
     for (let i = 0; i < chosen.length; i++) {
       const e = elements.get(chosen[i])!;
       if (!e.visible) continue;
-      const t = (i + 1) / (chosen.length + 1);
-      const baseY = H * (0.52 + t * 0.3);
-      const height = H * ridgeH * (0.6 + t * 0.9);
-      parts.push(
-        path(ridgePath(W, baseY, height, rng, rough), {
-          fill: e.paintValue,
-          'fill-opacity': e.opacity,
-        }),
-      );
+      parts.push(path(ds[i], { transform: tf, fill: e.paintValue, 'fill-opacity': e.opacity }));
     }
 
     // 前景：底部暗带，压住画面下缘

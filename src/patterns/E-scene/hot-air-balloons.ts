@@ -3,12 +3,15 @@
  *
  * 构图要点：柔和天空 + 底部远山；条纹热气球分 3 个深度层（远小、中、近大），
  * 远层之后叠一层与天色同色的半透明「空气透视」薄幕 → 远处气球和远云自然褪色；
- * 气球为经典倒水滴外形，竖向气囊瓣按 sin(θ) 分布（越靠边越窄 → 立体感），
- * 右侧压一层淡影，下沿裙边换色，吊绳 + 吊篮；平底扁云分远近两色。
+ * 气球为经典倒梨形：外形是三段三次贝塞尔（圆冠 → 收腰 → 窄口裙边），完全光滑；
+ * 竖向气囊瓣的边界是同一条曲线按 x 缩放得到的弯曲子午线，按 sin(θ) 分布（越靠边越窄 → 立体感），
+ * 瓣缝细线 + 一条径向渐变（左上高光、右下暗面）出球体感；下沿裙边换色，四根吊绳 + 梯形吊篮；
+ * 平底扁云分远近两色。
  *
  * ⭐ 体积/节点策略：
  *   - 坐标系：短边 = 1000 的虚拟坐标，整体 `<g transform="scale(q)">` 放大；体积与分辨率解耦。
- *   - 4 款气球样式（不同瓣数 / 配色轮换 / 赤道色带款）各在 `<defs>` 里定义一次（单位高 100 的整数坐标），
+ *   - 4 款气球样式（不同瓣数 / 配色轮换 / 赤道色带款）各在 `<defs>` 里定义一次（单位高 100，一位小数），
+ *     条纹/色带由共享 clipPath（气囊外形）裁齐，明暗共用一个 radialGradient；
  *     每只气球只是一个 `<use transform="translate scale">` ≈ 60B → 数量对体积几乎无影响。
  *   - 云：圆弧串成的平底云，每朵一个子路径，远 / 近各一条 path。
  * 动画（仅预览，cfg.animate 且「缓缓上飘」打开）：每个深度层整体匀速上升（近快远慢），
@@ -19,24 +22,83 @@ import type { PatternDef, RenderApi, RenderResult, ResolvedConfig } from '../typ
 
 const V = 1000;
 
-/** 气囊外形：单位高 100，(y, 半宽)。顶部圆、下部收成口。 */
-const PROFILE: Array<[number, number]> = [
-  [0, 0],
-  [2, 15],
-  [6, 25],
-  [12, 33],
-  [20, 39],
-  [30, 42],
-  [40, 42.5],
-  [50, 41],
-  [60, 37],
-  [70, 30.5],
-  [79, 23],
-  [87, 15.5],
-  [93, 11],
-  [96, 10],
+/**
+ * 气囊外形（右半边）：单位高 100，三段三次贝塞尔，自顶点 (0,0) 起：
+ *   冠部圆顶（顶点切线水平 → 赤道切线竖直）→ 倒梨形收腰 → 窄口裙边。
+ * 子午线 u ∈ [-1,1] 就是把所有控制点的 x 乘 u —— x 方向线性缩放对贝塞尔精确成立，
+ * 所以瓣的边界是真正贴着球面弯曲的曲线，而不是折线。
+ */
+type Pt = [number, number];
+const OUTLINE: Array<[Pt, Pt, Pt]> = [
+  [[24, 0], [43, 15], [43, 38]],
+  [[43, 58], [30, 72], [15.5, 82.5]],
+  [[12.5, 84.7], [10.8, 88.5], [10, 93]],
 ];
+const NECK_Y = 93;
 const SKIRT_Y = 84;
+
+/** 曲线轮廓上 y 处的半宽（对贝塞尔逐段二分）。 */
+const hwAt = (y: number): number => {
+  let p0: Pt = [0, 0];
+  for (const [c1, c2, p1] of OUTLINE) {
+    if (y <= p1[1]) {
+      let lo = 0;
+      let hi = 1;
+      const bz = (t: number, i: 0 | 1): number => {
+        const m = 1 - t;
+        return m * m * m * p0[i] + 3 * m * m * t * c1[i] + 3 * m * t * t * c2[i] + t * t * t * p1[i];
+      };
+      for (let k = 0; k < 30; k++) {
+        const mid = (lo + hi) / 2;
+        if (bz(mid, 1) < y) lo = mid;
+        else hi = mid;
+      }
+      return bz((lo + hi) / 2, 0);
+    }
+    p0 = p1;
+  }
+  return OUTLINE[OUTLINE.length - 1][2][0];
+};
+
+/** 一位小数（defs 只定义一次，精度换平滑几乎不占体积）。 */
+const g1 = (v: number): string => {
+  const r = Math.round(v * 10) / 10;
+  return Object.is(r, -0) ? '0' : String(r);
+};
+const pt = (x: number, y: number): string => `${g1(x)} ${g1(y)}`;
+
+/** 子午线 u：自顶向下的 C 指令串（不含起点 M）。 */
+const meridianDown = (u: number): string =>
+  OUTLINE.map(([c1, c2, p1]) => `C${pt(c1[0] * u, c1[1])} ${pt(c2[0] * u, c2[1])} ${pt(p1[0] * u, p1[1])}`).join('');
+/** 子午线 u：自底向上（逆序控制点）回到顶点。 */
+const meridianUp = (u: number): string => {
+  let d = '';
+  for (let i = OUTLINE.length - 1; i >= 0; i--) {
+    const [c1, c2] = OUTLINE[i];
+    const p0: Pt = i === 0 ? [0, 0] : OUTLINE[i - 1][2];
+    d += `C${pt(c2[0] * u, c2[1])} ${pt(c1[0] * u, c1[1])} ${pt(p0[0] * u, p0[1])}`;
+  }
+  return d;
+};
+
+/** 整个气囊外形（含裙边口，底边微弧）。 */
+const ENVELOPE = `M0 0${meridianDown(1)}Q0 ${NECK_Y + 2.5} ${pt(-OUTLINE[2][2][0], NECK_Y)}${meridianUp(-1)}z`;
+
+/** 子午线 u1、u2 之间的瓣（底部越过口沿，交给 clipPath 裁齐）。 */
+const gore = (u1: number, u2: number): string =>
+  `M0 0${meridianDown(u1)}L${pt(u1 * 12, 100)}L${pt(u2 * 12, 100)}L${pt(u2 * OUTLINE[2][2][0], NECK_Y)}${meridianUp(u2)}z`;
+
+/** 横向色带 y0..y1：上下沿都是随半宽变化的微弧（纬线透视），整宽，交给 clipPath 裁。 */
+const band = (y0: number, y1: number): string => {
+  const c0 = hwAt(y0) * 0.16;
+  const c1 = hwAt(y1) * 0.16;
+  return `M-50 ${g1(y0)}Q0 ${g1(y0 + c0 * 2)} 50 ${g1(y0)}V${g1(y1)}Q0 ${g1(y1 + c1 * 2)} -50 ${g1(y1)}z`;
+};
+/** 裙边：从收口处一直到底（不做下沿弧，clip 裁）。 */
+const skirtBand = (): string => {
+  const c0 = hwAt(SKIRT_Y) * 0.16;
+  return `M-50 ${g1(SKIRT_Y)}Q0 ${g1(SKIRT_Y + c0 * 2)} 50 ${g1(SKIRT_Y)}V101H-50z`;
+};
 
 /** 深度层：气球高（相对短边）范围、数量占比、上升一屏的周期（秒）。 */
 const DEPTHS = [
@@ -44,38 +106,6 @@ const DEPTHS = [
   { hMin: 0.12, hMax: 0.17, share: 0.35, dur: 105 },
   { hMin: 0.23, hMax: 0.31, share: 0.2, dur: 72 },
 ];
-
-const hwAt = (y: number): number => {
-  for (let i = 1; i < PROFILE.length; i++) {
-    if (y <= PROFILE[i][0]) {
-      const [y0, w0] = PROFILE[i - 1];
-      const [y1, w1] = PROFILE[i];
-      return w0 + ((w1 - w0) * (y - y0)) / (y1 - y0);
-    }
-  }
-  return PROFILE[PROFILE.length - 1][1];
-};
-
-const f1 = (v: number): string => {
-  const r = Math.round(v);
-  return Object.is(r, -0) ? '0' : String(r);
-};
-
-/** 子午线 u ∈ [-1,1] 与 v 之间的瓣（多边形，自顶向下再折回）。 */
-function gore(u1: number, u2: number, yFrom = 0, yTo = 96): string {
-  const ys = PROFILE.map((p) => p[0]).filter((y) => y > yFrom && y < yTo);
-  const pts: Array<[number, number]> = [];
-  const col = [yFrom, ...ys, yTo];
-  col.forEach((y) => pts.push([u1 * hwAt(y), y]));
-  col
-    .slice()
-    .reverse()
-    .forEach((y) => pts.push([u2 * hwAt(y), y]));
-  return `M${pts.map(([x, y]) => `${f1(x)} ${f1(y)}`).join(' ')}z`;
-}
-
-/** 横向色带：y0..y1 之间的整宽环带。 */
-const band = (y0: number, y1: number): string => gore(-1, 1, y0, y1);
 
 const def: PatternDef = {
   id: 'hot-air-balloons',
@@ -216,31 +246,52 @@ const def: PatternDef = {
     const C = 'balloon_c';
     const vis = (id: string): boolean => el(id).visible;
     const P = (d: string, id: string, k = 1): string => (vis(id) ? `<path d="${d}" fill="${paint(id)}" fill-opacity="${fo(id, k)}"/>` : '');
+    /** 竖瓣：n 瓣里隔一瓣上色，边界按 sin(θ) 分布（越靠边越窄 → 球面透视）。 */
+    const uOf = (i: number, n: number): number => Math.sin(-Math.PI / 2 + (Math.PI * i) / n);
     const stripes = (n: number): string => {
       let d = '';
-      for (let i = 1; i < n; i += 2) {
-        const t1 = -Math.PI / 2 + (Math.PI * i) / n;
-        const t2 = -Math.PI / 2 + (Math.PI * (i + 1)) / n;
-        d += gore(Math.sin(t1), Math.sin(t2));
-      }
+      for (let i = 1; i < n; i += 2) d += gore(uOf(i, n), uOf(i + 1, n));
       return d;
     };
-    const envelope = gore(-1, 1);
-    const skirt = band(SKIRT_Y, 96);
-    const shade = gore(0.42, 1);
+    /** 瓣缝（加强带）：所有内部子午线，细线。 */
+    const seams = (n: number): string => {
+      let d = '';
+      for (let i = 1; i < n; i++) d += `M0 0${meridianDown(uOf(i, n))}`;
+      return d;
+    };
+    const hexOr = (v: string, fb: string): string => (/^#[0-9a-fA-F]{3,8}$/.test(v) ? v : fb);
+    const ink = hexOr(paint('basket'), '#000000');
+    const clipId = `hb${seed}c`;
+    const gradId = `hb${seed}g`;
+    // 立体明暗：一条径向渐变 —— 左上高光（白）→ 中间透明 → 右下暗面（吊篮色）。
+    const shadeK = vis('basket') ? el('basket').opacity : 0;
+    const grad =
+      `<radialGradient id="${gradId}" cx="0.36" cy="0.3" r="0.78" fx="0.3" fy="0.24">` +
+      `<stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>` +
+      `<stop offset="0.3" stop-color="#ffffff" stop-opacity="0"/>` +
+      `<stop offset="0.58" stop-color="${ink}" stop-opacity="0"/>` +
+      `<stop offset="1" stop-color="${ink}" stop-opacity="${op(0.42 * shadeK)}"/>` +
+      `</radialGradient>`;
+    const clip = `<clipPath id="${clipId}"><path d="${ENVELOPE}"/></clipPath>`;
+    const shadeMk = `<path d="${ENVELOPE}" fill="url(#${gradId})"/>`;
+    const seamMk = (n: number): string =>
+      vis('basket') ? `<path d="${seams(n)}" fill="none" stroke="${paint('basket')}" stroke-opacity="${fo('basket', 0.14)}" stroke-width="0.35"/>` : '';
+    // 吊绳（口沿 → 篮沿，四根）+ 吊篮（微梯形、圆角底、上沿一道亮边）
     const basketMk = vis('basket')
-      ? `<path d="M-10 96L-6 106M10 96L6 106" fill="none" stroke="${paint('basket')}" stroke-opacity="${fo('basket')}" stroke-width="1.2"/>` +
-        `<rect x="-7" y="105" width="14" height="10" rx="2" fill="${paint('basket')}" fill-opacity="${fo('basket')}"/>`
+      ? `<path d="M-9.3 93.6L-5.2 104M-3.6 94.6L-2.2 104M3.6 94.6L2.2 104M9.3 93.6L5.2 104" fill="none" stroke="${paint('basket')}" stroke-opacity="${fo('basket', 0.85)}" stroke-width="0.55" stroke-linecap="round"/>` +
+        `<path d="M-6.2 103.6H6.2L5.3 112.6Q5.1 114 3.8 114H-3.8Q-5.1 114 -5.3 112.6Z" fill="${paint('basket')}" fill-opacity="${fo('basket')}"/>` +
+        `<path d="M-6.6 103.4H6.6V105.4H-6.6Z" fill="#ffffff" fill-opacity="0.18"/>`
       : '';
-    const shadeMk = P(shade, 'basket', 0.16);
+    const body = (base: string, rest: string, n: number): string =>
+      `${P(ENVELOPE, base)}<g clip-path="url(#${clipId})">${rest}${seamMk(n)}</g>${shadeMk}`;
     const styles: string[] = [
-      P(envelope, A) + P(stripes(8), Bc) + P(skirt, C),
-      P(envelope, Bc) + P(stripes(6), C) + P(skirt, A),
-      P(envelope, C) + P(stripes(10), A) + P(skirt, Bc),
-      P(envelope, A) + P(band(36, 52), Bc) + P(band(0, 13), C) + P(skirt, C),
-    ].map((s) => s + shadeMk + basketMk);
+      body(A, P(stripes(8), Bc) + P(skirtBand(), C), 16),
+      body(Bc, P(stripes(6), C) + P(skirtBand(), A), 12),
+      body(C, P(stripes(10), A) + P(skirtBand(), Bc), 20),
+      body(A, P(band(36, 52), Bc) + P(band(0, 13), C) + P(skirtBand(), C), 14),
+    ].map((s) => s + basketMk);
     const sid = (k: number): string => `hb${seed}t${k}`;
-    inner += `<defs>${styles.map((s, k) => `<g id="${sid(k)}">${s}</g>`).join('')}</defs>`;
+    inner += `<defs>${grad}${clip}${styles.map((s, k) => `<g id="${sid(k)}">${s}</g>`).join('')}</defs>`;
 
     // ── 远山（两道缓坡）──────────────────────────────
     const B = Math.ceil(Hv) + 2;
