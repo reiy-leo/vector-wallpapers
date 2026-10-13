@@ -2,8 +2,8 @@
 
 > 日期：2026-10-12
 > 性质：**决策依据文档**，不修改任何产品事实。
-> 关联：`.agent/docs/PATTERN-SELECTION.md`（上一轮取舍）、`.agent/docs/PRD.md`（产品事实来源）。
-> 本文全部结论按 `.agent/docs/PATTERN-SELECTION.md` §4 的纪律得出：
+> 关联：`.agents/docs/PATTERN-SELECTION.md`（上一轮取舍）、`.agents/docs/PRD.md`（产品事实来源）。
+> 本文全部结论按 `.agents/docs/PATTERN-SELECTION.md` §4 的纪律得出：
 > **可拆解性用量化指标判定，风格是否好看的部分才用目视，不靠印象。**
 
 ---
@@ -13,7 +13,7 @@
 1. 清单实为 **143 条 / 142 个唯一风格**（「太阳朋克」重复一次），比标题的 100 条多 42%。
 2. 判据沿用上轮唯一一条：**能否拆成 ≥3 个可独立设色的区域**。
    但必须先过一道**更前置**的筛子：**能否用纯矢量几何表达**——
-   因为产品是 SVG 引擎，`.agent/docs/ARCHITECTURE.md` 的铁律已经排除了
+   因为产品是 SVG 引擎，`.agents/docs/ARCHITECTURE.md` 的铁律已经排除了
    `<text>`、`<foreignObject>`、位图。
 3. **摄影 12 类 + 绘画媒介 8 类 + 依赖文字的（阿拉伯书法）= 21 类直接出局**，
    占清单 15%。它们定义在笔触、光影、纸纹上，SVG 几何无对应物。

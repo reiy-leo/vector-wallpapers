@@ -1,6 +1,6 @@
 # 设计规范 —— Cloudflare Kumo 落地清单
 
-> 上游规范：`.agent/skills/kumo-design/SKILL.md`（Cloudflare 16 条）
+> 上游规范：`.agents/skills/kumo-design/SKILL.md`（Cloudflare 16 条）
 > 本文只记**本项目怎么落地**，以及 Kumo 没覆盖但本项目自定的部分。
 > 合规扫描由 `src/ui/kumo.guard.test.ts` 强制（19 项）。
 

@@ -1,7 +1,7 @@
 # 项目长期记忆 · vector-wallpapers
 
-> AI 协作者的工作记忆，不是项目文档。入口见 `AGENT.md`，设计规范 `.agent/design.md`，
-> 待办 `.agent/todo.md`。这里只留**换个会话就找不回来**的东西：用户决策、铁律、踩过的坑、方法论。
+> AI 协作者的工作记忆，不是项目文档。入口见 `AGENTS.md`，设计规范 `.agents/design.md`，
+> 待办 `.agents/todo.md`。这里只留**换个会话就找不回来**的东西：用户决策、铁律、踩过的坑、方法论。
 > 过程日志（2026-10-10 ~ 10-12 的逐日记录）已于 2026-10-12 整理删除，需要时查 git 历史。
 > 标 **⚠️待确认** 的条目与现状不一致，等 Rei 拍板后再改。
 
@@ -93,5 +93,5 @@ SVG **桌面壁纸生成器**（不是素材库）。核心差异化：**母题�
 4. **铁律 6「取短边」** —— 新加的 tortoise-grid / arrow-repeat / pyramid-facets 和 chevron 的**平铺单元尺寸**按长边算（避免竖屏过密），线宽仍按短边。是否把「单元尺寸可按长边」写成铁律 6 的例外？
 5. **协作模式「software-company 专家团 SOP（齐活林/许清楚/高见远/寇豆码/严过关）」** —— 这是 WorkBuddy 侧的角色设定，还在用吗？不用就删。
 6. **WorkBuddy 本机环境坑**（`sandbox-exec` 64KB 阻塞、`CODEBUDDY_BROKER_DENY`、npmmirror semver 空版本 → 用 `npm pack` 解包装 Kumo）—— Hark 侧用 `npm install --legacy-peer-deps --package-lock=false` 即可。这些 WorkBuddy 专属的坑要保留吗？
-7. **仓库 PUBLIC** —— 之前建议改 Private 或把 `.agent/memory` 移出版本库（含内部踩坑记录、PRD 商业模式章节）。还要处理吗？
+7. **仓库 PUBLIC** —— 之前建议改 Private 或把 `.agents/memory` 移出版本库（含内部踩坑记录、PRD 商业模式章节）。还要处理吗？
 8. **两个旧的审美待决**：`arc-composition` 偏朴素、`blob-field` 平铺周期可感知 —— 本轮母题优化已在改，等审核结果后关闭？

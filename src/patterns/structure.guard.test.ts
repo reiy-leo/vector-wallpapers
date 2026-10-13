@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * 母题结构健康度门禁 —— 把 `.agent/docs/PATTERN-SELECTION.md` 的判据固化成可执行断言。
+ * 母题结构健康度门禁 —— 把 `.agents/docs/PATTERN-SELECTION.md` 的判据固化成可执行断言。
  *
  * 背景：审查发现 `liquid-mesh` 的 4 个元件**全部是渐变**（纯色占比 0%），
  * 导致它在产品层面的「元件级配色」实质失效 —— 用户能点到 4 个色块，
@@ -111,7 +111,7 @@ function metricsOf(id: string): Metrics {
 
 const ALL = registry.list().map((d) => metricsOf(d.id));
 
-describe('母题结构健康度（.agent/docs/PATTERN-SELECTION.md §3 的判据）', () => {
+describe('母题结构健康度（.agents/docs/PATTERN-SELECTION.md §3 的判据）', () => {
   it('扫描到了全部母题（确保下面的断言不是空跑）', () => {
     expect(ALL.length).toBe(registry.size);
     expect(ALL.length).toBeGreaterThan(0);

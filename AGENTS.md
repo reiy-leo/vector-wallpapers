@@ -1,6 +1,6 @@
-# AGENT.md —— AI 协作者上手入口
+# AGENTS.md —— AI 协作者上手入口
 
-> 读完这一份就能开工。更详细的规范在 `.agent/design.md`，待办在 `.agent/todo.md`。
+> 读完这一份就能开工。更详细的规范在 `.agents/design.md`，待办在 `.agents/todo.md`。
 
 ## 项目是什么
 
@@ -22,23 +22,23 @@
 
 | 层级 | 文件 | 管什么 |
 |---|---|---|
-| 1 | `.agent/docs/PRD.md` | **产品事实**（做什么、给谁、边界在哪）|
-| 2 | `.agent/docs/ARCHITECTURE.md` | **技术实现**（怎么分层、模块边界）|
-| 3 | `.agent/docs/PATTERN-SELECTION.md` | 母题取舍依据 |
-| 4 | `.agent/docs/STYLE-100-ANALYSIS.md` | 142 风格 × 母题的可添加性判定 |
-| 5 | `.agent/design.md` | 本项目**额外**自定的门禁（Kumo 规范未覆盖的部分）|
+| 1 | `.agents/docs/PRD.md` | **产品事实**（做什么、给谁、边界在哪）|
+| 2 | `.agents/docs/ARCHITECTURE.md` | **技术实现**（怎么分层、模块边界）|
+| 3 | `.agents/docs/PATTERN-SELECTION.md` | 母题取舍依据 |
+| 4 | `.agents/docs/STYLE-100-ANALYSIS.md` | 142 风格 × 母题的可添加性判定 |
+| 5 | `.agents/design.md` | 本项目**额外**自定的门禁（Kumo 规范未覆盖的部分）|
 
 > PRD 与架构冲突时：PRD 定产品，架构定实现。架构师 v1.0 曾与 PRD 冲突 7 处，v2.0 已全部对齐。
 
-## 文档地图（全部在 `.agent/`）
+## 文档地图（全部在 `.agents/`）
 
 | 路径 | 内容 |
 |---|---|
-| `.agent/skills/kumo-design/SKILL.md` | **唯一设计规范**：Cloudflare Kumo（`npx skills add cloudflare/kumo@kumo-design` 安装，`.claude/skills/` 下为软链）。Apple 风格的 `DESIGN.md` 已删除 |
-| `.agent/design.md` | Kumo 在本项目的落地清单 + 自定门禁 |
-| `.agent/todo.md` | 待办 |
-| `.agent/docs/` | PRD / ARCHITECTURE / PATTERN-SELECTION / STYLE-100-ANALYSIS + 6 张 mermaid 图 |
-| `.agent/memory/` | 长期记忆 `MEMORY.md` 与各阶段工作日志（原 `.workbuddy/memory/`）|
+| `.agents/skills/kumo-design/SKILL.md` | **唯一设计规范**：Cloudflare Kumo（`npx skills add cloudflare/kumo@kumo-design` 安装，`.claude/skills/` 下为软链）。Apple 风格的 `DESIGN.md` 已删除 |
+| `.agents/design.md` | Kumo 在本项目的落地清单 + 自定门禁 |
+| `.agents/todo.md` | 待办 |
+| `.agents/docs/` | PRD / ARCHITECTURE / PATTERN-SELECTION / STYLE-100-ANALYSIS + 6 张 mermaid 图 |
+| `.agents/memory/` | 长期记忆 `MEMORY.md` 与各阶段工作日志（原 `.workbuddy/memory/`）|
 
 ## 常用命令
 
@@ -55,7 +55,7 @@ npm run deploy     # wrangler login 后可用：Static Assets 版本
 
 React 19 + Tailwind v4 + Vite 8 + TypeScript
 状态管理：**自研 external store**（零依赖，不用 Redux/Zustand）
-设计规范：**Cloudflare Kumo** 16 条规则（`.agent/design.md` 有落地清单）
+设计规范：**Cloudflare Kumo** 16 条规则（`.agents/design.md` 有落地清单）
 
 ---
 
@@ -84,7 +84,7 @@ React 19 + Tailwind v4 + Vite 8 + TypeScript
 10. **UI 层零硬编码**：`src/ui/` 内不得出现任何 pattern id / element id 字面量
 11. **纯色元件占比 ≥50%** —— 渐变可做「层」不可做「面」。纯色改色=换肤，渐变改色=染色
 
-### UI 层（详见 `.agent/design.md`）
+### UI 层（详见 `.agents/design.md`）
 
 12. **禁止在 theme.css 自定义 `.h-lh`** —— Tailwind v4.3 已内置，覆盖它反而把 `1lh` 降级成 `1.5em`
 13. **输入控件统一走 `primitives.inputClass()`**：白底 + `ring-line` + 聚焦 `ring-2 brand`
@@ -174,4 +174,4 @@ npm run build
 | Firefox | 472 M px |
 
 **canvas 像素上限需按平台区分** —— 当前 `guardCanvasSize` 统一按 16M 设，
-导致桌面用户被误伤（详见 `.agent/todo.md`）。
+导致桌面用户被误伤（详见 `.agents/todo.md`）。

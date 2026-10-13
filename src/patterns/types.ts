@@ -218,7 +218,7 @@ export interface RenderResult {
  *
  * 19 个 id 已全部落地（见 `patterns/index.ts`）。
  *
- * ⚠️ 第二批（2026-10-12，依据 `.agent/docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口）
+ * ⚠️ 第二批（2026-10-12，依据 `.agents/docs/STYLE-100-ANALYSIS.md` §4.2 的 6 个结构缺口）
  * 的 id 在**首次上线前**仍可调整；一旦分享链接流出即锁定，
  * 与其余 19 个遵守同一条「一经上线不可重命名」的契约。
  */
