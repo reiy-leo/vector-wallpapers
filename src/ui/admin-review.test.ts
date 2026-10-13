@@ -1,3 +1,4 @@
+import { bgTone } from './coloring';
 /**
  * 批改模式运行时：只对管理员生效；开着时按「母题 × 底色」记录改动、刷新不丢；
  * 关闭时 PUT —— 成功清空并更新默认值，失败保留且保持开启、错误带中文释义；
@@ -81,11 +82,18 @@ describe('纯函数', () => {
     for (let i = 0; i < 20; i++) s = scoreDown(s);
     expect(s).toBe(-5);
     expect([goodCount(3), badCount(3), goodCount(-2), badCount(-2)]).toEqual([3, 0, 0, 2]);
-    expect(bumpScoreIn({ 'a|b': 2 }, 'a', 'b', 'down')).toBe(1);
+    expect(bumpScoreIn({ 'a|b|light': 2 }, 'a', 'b', 'light', 'down')).toBe(1);
   });
 
   it('scoreExclusions：≤ −3 排除，只看该母题', () => {
-    expect([...scoreExclusions({ 'a|x': -3, 'a|y': -2, 'a|z': -5, 'b|x': -5 }, 'a')].sort()).toEqual(['x', 'z']);
+    const scores = { 'a|x|light': -3, 'a|y|light': -2, 'a|z|light': -5, 'b|x|light': -5, 'a|y|dark': -5 };
+    expect([...scoreExclusions(scores, 'a', 'light')].sort()).toEqual(['x', 'z']);
+    expect([...scoreExclusions(scores, 'a', 'dark')]).toEqual(['y']);
+  });
+
+  it('浅底 / 深底单独打分：同一母题 × 色板互不影响', () => {
+    expect(bumpScoreIn({ 'a|b|light': 3 }, 'a', 'b', 'dark', 'up')).toBe(1);
+    expect(bumpScoreIn({ 'a|b|dark': -2 }, 'a', 'b', 'light', 'down')).toBe(-1);
   });
 
   it('recordPending：与生效默认相同不记；改了参数 / 配色按底色分开记', () => {
@@ -127,12 +135,12 @@ describe('运行时', () => {
     selectPattern(def.id);
     await setReviewMode(true);
     setConfig(applyTone(getConfig(), def, other));
-    bumpAdminScore(def.id, 'nord', 'down');
+    bumpAdminScore(def.id, 'nord', other, 'down');
     const r = await setReviewMode(false);
     expect(r).toEqual({ ok: true, on: false, patterns: 1, scores: 1, uploaded: true });
     expect(puts).toHaveLength(1);
     expect(puts[0].defaults?.[def.id]?.tones?.[other]).toBeTruthy();
-    expect(puts[0].scores).toEqual({ [`${def.id}|nord`]: -1 });
+    expect(puts[0].scores).toEqual({ [`${def.id}|nord|${other}`]: -1 });
     expect(getReview()).toMatchObject({ on: false, pendingPatterns: 0, pendingScores: 0 });
     expect(getServerDefaults()[def.id].tones?.[other]).toBeTruthy();
   });
@@ -159,11 +167,16 @@ describe('运行时', () => {
 
   it('打分 ≤ −3 进入换一版排除（仅管理员）', async () => {
     setReviewOwner(ADMIN, true);
-    for (let i = 0; i < 3; i++) bumpAdminScore(def.id, 'nord', 'down');
+    selectPattern(def.id);
+    const t = bgTone(getConfig(), def);
+    const flip = t === 'light' ? 'dark' : 'light';
+    for (let i = 0; i < 3; i++) bumpAdminScore(def.id, 'nord', flip, 'down');
+    expect(rerollExclusions(def.id).has('nord')).toBe(false); // 另一底色的打分不影响当前底色
+    for (let i = 0; i < 3; i++) bumpAdminScore(def.id, 'nord', t, 'down');
     expect(rerollExclusions(def.id).has('nord')).toBe(true);
-    bumpAdminScore(def.id, 'nord', 'up'); // −2
+    bumpAdminScore(def.id, 'nord', t, 'up'); // −2
     expect(rerollExclusions(def.id).has('nord')).toBe(false);
-    for (let i = 0; i < 3; i++) bumpAdminScore(def.id, 'nord', 'down');
+    for (let i = 0; i < 3; i++) bumpAdminScore(def.id, 'nord', t, 'down');
     setReviewOwner('x@y.z', false);
     expect(rerollExclusions(def.id).has('nord')).toBe(false);
   });

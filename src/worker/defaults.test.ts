@@ -113,7 +113,7 @@ describe('PUT /api/defaults', () => {
     expect((await call('PUT', '/api/defaults', { email: admin, body: {} })).status).toBe(400);
     expect((await call('PUT', '/api/defaults', { email: admin, body: { defaults: { 'polka-dots': { tones: { sepia: lightTone } } } } })).status).toBe(400);
     expect((await call('PUT', '/api/defaults', { email: admin, body: { defaults: { 'polka-dots': { tones: { light: { elements: [{ id: 'bg', paint: solid('red'), opacity: 1, visible: true }] } } } } } })).status).toBe(400);
-    expect((await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'polka-dots|nord': 6 } } })).status).toBe(400);
+    expect((await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'polka-dots|nord|dark': 6 } } })).status).toBe(400);
     expect((await call('PUT', '/api/defaults', { email: admin, raw: 'x'.repeat(DEFAULTS_MAX_BODY_BYTES + 1) })).status).toBe(413);
     expect(kv.writes).toBe(0);
   });
@@ -141,14 +141,14 @@ describe('PUT /api/defaults', () => {
 
   it('打分：存在 adminScores:v1（与 defaults 分开），0 = 删除；GET /api/admin/scores 仅管理员', async () => {
     const admin = 'admin@example.com';
-    const r1 = await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'a|nord': -4, 'a|riso-pop': 2 } } });
+    const r1 = await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'a|nord|dark': -4, 'a|riso-pop|dark': 2 } } });
     expect(r1.status).toBe(200);
     expect(kv.data.has(DEFAULTS_KV_KEY)).toBe(false);
-    await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'a|riso-pop': 0, 'b|nord': 5 } } });
+    await call('PUT', '/api/defaults', { email: admin, body: { scores: { 'a|riso-pop|dark': 0, 'b|nord|dark': 5 } } });
     expect((await call('GET', '/api/admin/scores', { email: 'x@y.z' })).status).toBe(403);
     expect((await call('GET', '/api/admin/scores')).status).toBe(401);
     const j = (await (await call('GET', '/api/admin/scores', { email: admin })).json()) as { scores: Record<string, number> };
-    expect(j.scores).toEqual({ 'a|nord': -4, 'b|nord': 5 });
+    expect(j.scores).toEqual({ 'a|nord|dark': -4, 'b|nord|dark': 5 });
   });
 });
 

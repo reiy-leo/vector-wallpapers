@@ -115,6 +115,22 @@ export const SCORE_EXCLUDE_AT = -3;
 
 export const clampScore = (n: number): number =>
   Math.max(-SCORE_MAX, Math.min(SCORE_MAX, Math.round(Number.isFinite(n) ? n : 0)));
+/**
+ * 打分键：「母题 | 色板 | 底色」。同一母题 × 色板在浅底 / 深底下单独打分（Rei 2026-10-14）。
+ * 旧的两段键（不分底色）清洗时丢弃。
+ */
+export type ScoreTone = 'light' | 'dark';
+export const scoreKey = (pattern: string, palette: string, tone: ScoreTone): string => `${pattern}|${palette}|${tone}`;
+
+export function splitScoreKey(key: string): { pattern: string; palette: string; tone: ScoreTone } | null {
+  const i = key.lastIndexOf('|');
+  if (i <= 0) return null;
+  const tone = key.slice(i + 1);
+  if (tone !== 'light' && tone !== 'dark') return null;
+  const pair = splitPairKey(key.slice(0, i));
+  return pair ? { ...pair, tone } : null;
+}
+
 /** 👍：先抵消 👎，封顶 +5。 */
 export const scoreUp = (s: number): number => clampScore(s + 1);
 /** 👎：先抵消 👍，封底 −5。 */
@@ -135,7 +151,7 @@ export function sanitizeScores(raw: unknown, keepZero = false): AdminScores {
   const out: AdminScores = {};
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (splitPairKey(k) && isScore(v) && (keepZero || v !== 0)) out[k] = v;
+    if (splitScoreKey(k) && isScore(v) && (keepZero || v !== 0)) out[k] = v;
   }
   return out;
 }
@@ -251,7 +267,7 @@ export function validatePutBody(raw: unknown): DefaultsPutBody | string {
     if (entries.length > MAX_SCORES) return 'too many scores';
     const scores: AdminScores = {};
     for (const [k, v] of entries) {
-      if (!splitPairKey(k)) return `invalid score key: ${k.slice(0, 100)}`;
+      if (!splitScoreKey(k)) return `invalid score key: ${k.slice(0, 100)}`;
       if (!isScore(v)) return `invalid score for ${k}`;
       scores[k] = v;
     }

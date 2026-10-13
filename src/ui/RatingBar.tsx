@@ -18,7 +18,9 @@ import { IconButton } from './primitives';
 import { chooseVerdict, installRatingListeners, setRatingOwner, useRatings } from './ratings';
 import { bumpAdminScore, useReview } from './admin-review';
 import { badCount, goodCount } from '../shared/defaults-api';
-import { pairKey } from '../shared/ratings-api';
+import { scoreKey } from '../shared/defaults-api';
+import { bgTone } from './coloring';
+import { usePatternDef, useWorkbenchSelector } from './store';
 
 /** 无操作多久后收起（毫秒）。 */
 export const RATING_IDLE_MS = 4000;
@@ -28,6 +30,9 @@ export function RatingBar() {
   const signedIn = isSignedIn(auth);
   const { state, seq } = useRatings();
   const review = useReview();
+  const cfg = useWorkbenchSelector((s) => s.cfg);
+  const def = usePatternDef();
+  const tone = bgTone(cfg, def); // 同一母题 × 色板，浅底 / 深底分开打分
   const [open, setOpen] = useState(true);
   const [held, setHeld] = useState(false); // 悬停 / 焦点在条内
   const [poke, setPoke] = useState(0); // 每次交互重置计时
@@ -58,7 +63,7 @@ export function RatingBar() {
   if (!signedIn || !current) return null;
   const verdict = current.verdict;
   const scoring = review.admin && review.on;
-  const score = scoring ? (review.scores[pairKey(current.pattern, current.palette)] ?? 0) : 0;
+  const score = scoring ? (review.scores[scoreKey(current.pattern, current.palette, tone)] ?? 0) : 0;
 
   const holdProps = {
     onPointerEnter: () => setHeld(true),
@@ -68,25 +73,26 @@ export function RatingBar() {
   };
 
   if (!open && scoring) {
-    const tone = score > 0 ? 'text-success' : score < 0 ? 'text-danger' : 'text-fg-mute';
+    const iconTone = score > 0 ? 'text-success' : score < 0 ? 'text-danger' : 'text-fg-mute';
+    // 角标放在圆形外壳之外（外壳 overflow-hidden 会把它裁掉）
     return (
-      <span className="inline-flex overflow-hidden rounded-full bg-surface shadow-pop ring-1 ring-line">
-        <IconButton
-          label={`批改打分：${score > 0 ? `+${score}` : score}（点击展开）`}
-          onClick={() => {
-            setOpen(true);
-            setPoke((n) => n + 1);
-          }}
-        >
-          <span className="relative inline-flex">
+      <span className="relative inline-flex">
+        <span className="inline-flex overflow-hidden rounded-full bg-surface shadow-pop ring-1 ring-line">
+          <IconButton
+            label={`批改打分（${tone === 'dark' ? '深底' : '浅底'}）：${score > 0 ? `+${score}` : score}（点击展开）`}
+            onClick={() => {
+              setOpen(true);
+              setPoke((n) => n + 1);
+            }}
+          >
             {score < 0 ? (
-              <ThumbsDown size={16} weight="fill" className={tone} />
+              <ThumbsDown size={16} weight="fill" className={iconTone} />
             ) : (
-              <ThumbsUp size={16} weight={score > 0 ? 'fill' : 'regular'} className={tone} />
+              <ThumbsUp size={16} weight={score > 0 ? 'fill' : 'regular'} className={iconTone} />
             )}
-            <ScoreBadge n={score > 0 ? goodCount(score) : badCount(score)} tone={score > 0 ? 'good' : 'bad'} />
-          </span>
-        </IconButton>
+          </IconButton>
+        </span>
+        <ScoreBadge n={score > 0 ? goodCount(score) : badCount(score)} tone={score > 0 ? 'good' : 'bad'} />
       </span>
     );
   }
@@ -94,7 +100,7 @@ export function RatingBar() {
   if (!open) {
     const label =
       verdict === 'good' ? '已评：适合（点击展开评分）' : verdict === 'bad' ? '已评：不适合（点击展开评分）' : '给这套配色评分';
-    const tone = verdict === 'good' ? 'text-success' : verdict === 'bad' ? 'text-danger' : 'text-fg-mute';
+    const verdictTone = verdict === 'good' ? 'text-success' : verdict === 'bad' ? 'text-danger' : 'text-fg-mute';
     return (
       // 圆形外壳在 span 上：IconButton 自带 rounded-sm，同属性类名叠加时谁赢取决于 CSS 生成顺序，不可靠
       <span className="inline-flex overflow-hidden rounded-full bg-surface shadow-pop ring-1 ring-line">
@@ -106,9 +112,9 @@ export function RatingBar() {
           }}
         >
           {verdict === 'bad' ? (
-            <ThumbsDown size={16} weight="fill" className={tone} />
+            <ThumbsDown size={16} weight="fill" className={verdictTone} />
           ) : (
-            <ThumbsUp size={16} weight={verdict ? 'fill' : 'regular'} className={tone} />
+            <ThumbsUp size={16} weight={verdict ? 'fill' : 'regular'} className={verdictTone} />
           )}
         </IconButton>
       </span>
@@ -117,7 +123,7 @@ export function RatingBar() {
 
   if (scoring) {
     const bump = (dir: 'up' | 'down') => {
-      bumpAdminScore(current.pattern, current.palette, dir);
+      bumpAdminScore(current.pattern, current.palette, tone, dir);
       setPoke((n) => n + 1);
     };
     const good = goodCount(score);
@@ -129,18 +135,12 @@ export function RatingBar() {
         className="flex items-center gap-1 rounded-full bg-surface p-1 pl-4 shadow-pop ring-1 ring-line"
         {...holdProps}
       >
-        <span className="whitespace-nowrap pr-1 text-base text-fg-soft">批改打分</span>
-        <VerdictButton label={`适合 +1（当前 ${score}）`} active={good > 0} activeClass="bg-success-tint" onClick={() => bump('up')}>
-          <span className="relative inline-flex">
-            <ThumbsUp size={16} weight={good > 0 ? 'fill' : 'regular'} className={good > 0 ? 'text-success' : 'text-fg-mute'} />
-            <ScoreBadge n={good} tone="good" />
-          </span>
+        <span className="whitespace-nowrap pr-1 text-base text-fg-soft">批改打分 · {tone === 'dark' ? '深底' : '浅底'}</span>
+        <VerdictButton label={`适合 +1（当前 ${score}）`} active={good > 0} activeClass="bg-success-tint" badge={<ScoreBadge n={good} tone="good" />} onClick={() => bump('up')}>
+          <ThumbsUp size={16} weight={good > 0 ? 'fill' : 'regular'} className={good > 0 ? 'text-success' : 'text-fg-mute'} />
         </VerdictButton>
-        <VerdictButton label={`不适合 −1（当前 ${score}）`} active={bad > 0} activeClass="bg-danger-tint" onClick={() => bump('down')}>
-          <span className="relative inline-flex">
-            <ThumbsDown size={16} weight={bad > 0 ? 'fill' : 'regular'} className={bad > 0 ? 'text-danger' : 'text-fg-mute'} />
-            <ScoreBadge n={bad} tone="bad" />
-          </span>
+        <VerdictButton label={`不适合 −1（当前 ${score}）`} active={bad > 0} activeClass="bg-danger-tint" badge={<ScoreBadge n={bad} tone="bad" />} onClick={() => bump('down')}>
+          <ThumbsDown size={16} weight={bad > 0 ? 'fill' : 'regular'} className={bad > 0 ? 'text-danger' : 'text-fg-mute'} />
         </VerdictButton>
       </div>
     );
@@ -178,30 +178,36 @@ function VerdictButton({
   active,
   activeClass,
   onClick,
+  badge,
   children,
 }: {
   label: string;
   active: boolean;
   activeClass: string;
   onClick: () => void;
+  /** 角标：放在裁切圆之外，否则 overflow-hidden 会挡住数字。 */
+  badge?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <span className={`inline-flex overflow-hidden rounded-full ${active ? activeClass : ''}`}>
-      <IconButton label={label} aria-pressed={active} onClick={onClick}>
-        {children}
-      </IconButton>
+    <span className="relative inline-flex">
+      <span className={`inline-flex overflow-hidden rounded-full ${active ? activeClass : ''}`}>
+        <IconButton label={label} aria-pressed={active} onClick={onClick}>
+          {children}
+        </IconButton>
+      </span>
+      {badge}
     </span>
   );
 }
 
-/** 打分角标：图标右上角的次数（0 不显示）。纯装饰，数值已在按钮的 aria-label 里。 */
+/** 打分角标：圆按钮右上角的次数（0 不显示），压在外壳描边上、不被裁切。纯装饰，数值已在按钮的 aria-label 里。 */
 function ScoreBadge({ n, tone }: { n: number; tone: 'good' | 'bad' }) {
   if (n <= 0) return null;
   return (
     <span
       aria-hidden="true"
-      className={`absolute -right-2 -top-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-2xs tabular-nums leading-none text-on-brand ${
+      className={`pointer-events-none absolute -right-1 -top-1 z-10 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold tabular-nums leading-none text-on-brand ring-2 ring-surface ${
         tone === 'good' ? 'bg-success' : 'bg-danger'
       }`}
     >

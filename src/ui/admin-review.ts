@@ -5,7 +5,7 @@
  *   - 每次画布配置变化 → 把当前母题的「参数 + 当前底色（浅/深）的配色」记进待上传表
  *     （参数浅深共用；配色按 bgTone 分开存），与当前生效默认完全相同则不记。
  *   - 待上传表即时叠到默认值上（defaults.ts 的 overlay）：切底色 / 恢复默认马上看到自己刚改的。
- *   - 评分条变成打分：每个「母题 × 色板」一个整数 −5…+5（👍 +1、👎 −1，先互相抵消），与普通评分分开。
+ *   - 评分条变成打分：每个「母题 × 色板 × 底色（浅/深）」一个整数 −5…+5（👍 +1、👎 −1，先互相抵消），与普通评分分开。
  *   - 开关与待上传表按邮箱存 localStorage（经 store），刷新不丢。
  * 关掉时：PUT /api/defaults { defaults, scores }；成功 → 清空待上传、通知「默认值已更新到服务器（N 个母题）」；
  *   失败 → 保留待上传、保持开启、返回带中文释义的状态码（如「403 禁止访问」）。
@@ -14,7 +14,6 @@
  */
 import { useSyncExternalStore } from 'react';
 import { registry } from '../patterns';
-import { pairKey } from '../shared/ratings-api';
 import { httpStatusText } from '../shared/http-status';
 import {
   ADMIN_SCORES_ENDPOINT,
@@ -25,7 +24,10 @@ import {
   sanitizeDefaultsMap,
   sanitizeScores,
   scoreDown,
+  scoreKey,
   scoreUp,
+  splitScoreKey,
+  type ScoreTone,
   type AdminScores,
   type DefaultsMap,
   type DefaultsPutBody,
@@ -84,18 +86,18 @@ function sameAsEffective(effective: DefaultsMap, cfg: PatternConfig, def: Patter
   });
 }
 
-/** 打分：+1 / −1，先抵消对方，封顶 ±5。 */
-export function bumpScoreIn(scores: AdminScores, pattern: string, palette: string, dir: 'up' | 'down', base = 0): number {
-  const cur = scores[pairKey(pattern, palette)] ?? base;
+/** 打分：+1 / −1，先抵消对方，封顶 ±5。浅底 / 深底各自独立。 */
+export function bumpScoreIn(scores: AdminScores, pattern: string, palette: string, tone: ScoreTone, dir: 'up' | 'down', base = 0): number {
+  const cur = scores[scoreKey(pattern, palette, tone)] ?? base;
   return dir === 'up' ? scoreUp(cur) : scoreDown(cur);
 }
 
-/** 某母题里打分 ≤ SCORE_EXCLUDE_AT（−3）的色板 —— 换一版排除。 */
-export function scoreExclusions(scores: AdminScores, pattern: string): Set<string> {
+/** 某母题在某底色下打分 ≤ SCORE_EXCLUDE_AT（−3）的色板 —— 换一版排除。 */
+export function scoreExclusions(scores: AdminScores, pattern: string, tone: ScoreTone): Set<string> {
   const out = new Set<string>();
-  const prefix = `${pattern}|`;
   for (const [k, v] of Object.entries(scores)) {
-    if (k.startsWith(prefix) && v <= SCORE_EXCLUDE_AT) out.add(k.slice(prefix.length));
+    const key = splitScoreKey(k);
+    if (key && key.pattern === pattern && key.tone === tone && v <= SCORE_EXCLUDE_AT) out.add(key.palette);
   }
   return out;
 }
@@ -253,22 +255,26 @@ export function installReviewListeners(): void {
 
 /* ── 打分 ─────────────────────────────────────────────────────── */
 
-export function getAdminScore(pattern: string, palette: string): number {
-  return view.scores[pairKey(pattern, palette)] ?? 0;
+export function getAdminScore(pattern: string, palette: string, tone: ScoreTone): number {
+  return view.scores[scoreKey(pattern, palette, tone)] ?? 0;
 }
 
-export function bumpAdminScore(pattern: string, palette: string, dir: 'up' | 'down'): number {
+export function bumpAdminScore(pattern: string, palette: string, tone: ScoreTone, dir: 'up' | 'down'): number {
   if (!owner) return 0;
-  const s = bumpScoreIn(view.scores, pattern, palette, dir);
-  pendingScores = { ...pendingScores, [pairKey(pattern, palette)]: s };
+  const s = bumpScoreIn(view.scores, pattern, palette, tone, dir);
+  pendingScores = { ...pendingScores, [scoreKey(pattern, palette, tone)]: s };
   persist();
   emit();
   return s;
 }
 
-/** 换一版排除：管理员打分 ≤ −3 的色板（不论批改模式开关；非管理员为空集）。 */
+/** 换一版排除：管理员在当前底色下打分 ≤ −3 的色板（不论批改模式开关；非管理员为空集）。 */
 export function adminRerollExclusions(pattern: string): Set<string> {
-  return owner ? scoreExclusions(view.scores, pattern) : new Set();
+  if (!owner) return new Set();
+  const cfg = getConfig();
+  const def = registry.get(cfg.patternId);
+  if (!def || def.id !== pattern) return new Set();
+  return scoreExclusions(view.scores, pattern, bgTone(cfg, def));
 }
 
 /* ── 开关 ─────────────────────────────────────────────────────── */
