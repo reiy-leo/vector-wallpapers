@@ -63,6 +63,8 @@ export interface DefaultsGetResponse {
   defaults: DefaultsMap;
   /** ISO 时间；从未写过为 null。 */
   updatedAt: string | null;
+  /** 打分最高的色板（见 pickTopPalettes）：`母题|底色` → 色板 id。旧 Worker 没有这个字段。 */
+  picks?: ScorePicks;
 }
 
 /** PUT /api/defaults 的响应体。 */
@@ -134,6 +136,40 @@ export function splitScoreKey(key: string): { pattern: string; palette: string; 
   if (tone !== 'light' && tone !== 'dark') return null;
   const pair = splitPairKey(key.slice(0, i));
   return pair ? { ...pair, tone } : null;
+}
+
+/** `母题|底色` → 该底色下打分最高的色板 id。 */
+export type ScorePicks = Record<string, string>;
+
+/**
+ * 默认配色用打分最高的色板（Rei 2026-10-14）：每个「母题 × 底色」取打分最高的那套，
+ * 必须 > 0 且唯一；最高的是「默认」本身、并列、或没有正分 → 不选（维持现状：上传覆盖 / 内置）。
+ */
+export function pickTopPalettes(scores: AdminScores): ScorePicks {
+  const best = new Map<string, { palette: string; score: number; tie: boolean }>();
+  for (const [k, v] of Object.entries(scores)) {
+    const key = splitScoreKey(k);
+    if (!key || v <= 0) continue;
+    const slot = `${key.pattern}|${key.tone}`;
+    const cur = best.get(slot);
+    if (!cur || v > cur.score) best.set(slot, { palette: key.palette, score: v, tie: false });
+    else if (v === cur.score) cur.tie = true;
+  }
+  const out: ScorePicks = {};
+  for (const [slot, b] of best) if (!b.tie && b.palette !== DEFAULT_PALETTE_ID) out[slot] = b.palette;
+  return out;
+}
+
+/** 宽松清洗 GET /api/defaults 的 picks：键 `母题|底色`，值色板 id。 */
+export function sanitizePicks(raw: unknown): ScorePicks {
+  const out: ScorePicks = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const i = k.lastIndexOf('|');
+    if (i <= 0 || typeof v !== 'string') continue;
+    if (splitScoreKey(`${k.slice(0, i)}|${v}${k.slice(i)}`)) out[k] = v;
+  }
+  return out;
 }
 
 /** 👍：先抵消 👎，封顶 +5。 */

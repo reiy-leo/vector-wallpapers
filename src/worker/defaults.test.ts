@@ -83,17 +83,17 @@ describe('GET /api/defaults', () => {
     const res = await call('GET', '/api/defaults');
     expect(res.status).toBe(200);
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
-    expect(await res.json()).toEqual({ defaults: {}, updatedAt: null });
+    expect(await res.json()).toEqual({ defaults: {}, updatedAt: null, picks: {} });
   });
 
   it('KV 未绑定 → 仍 200 空覆盖（前端照常用内置默认）', async () => {
     env.RATINGS = undefined;
-    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: {}, updatedAt: null });
+    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: {}, updatedAt: null, picks: {} });
   });
 
   it('KV 里的损坏条目被清洗掉', async () => {
     kv.data.set(DEFAULTS_KV_KEY, JSON.stringify({ defaults: { 'good-one': { params: { n: 3 } }, 'Bad Id': {}, x: { params: 5 } }, updatedAt: 't' }));
-    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: { 'good-one': { params: { n: 3 } } }, updatedAt: 't' });
+    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: { 'good-one': { params: { n: 3 } } }, updatedAt: 't', picks: {} });
   });
 });
 
@@ -181,5 +181,12 @@ describe('纯函数', () => {
 
   it('sanitizeDefaultsMap 丢弃非法母题、保留合法', () => {
     expect(sanitizeDefaultsMap({ ok: { params: { k: true } }, 'no way': {}, bad: { tones: { light: 1 } } })).toEqual({ ok: { params: { k: true } } });
+  });
+});
+
+describe('GET /api/defaults 的 picks', () => {
+  it('只公开每个母题 × 底色打分最高的色板，不公开分数', async () => {
+    const { pickTopPalettes } = await import('../shared/defaults-api');
+    expect(pickTopPalettes({ 'p|ocean|light': 5, 'p|sand|light': 1 })).toEqual({ 'p|light': 'ocean' });
   });
 });

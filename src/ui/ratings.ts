@@ -36,6 +36,8 @@ import {
 import { enqueueRating, removeSent, shouldSubmit, takeBatch, type RatingQueue } from './rating-queue';
 import { adminRerollExclusions, atDefaultColoring, getReview, subscribeReview } from './admin-review';
 import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
+import { pickedPaletteFor } from './defaults';
+import { registry } from '../patterns';
 import { emptySyncStatus, type RatingSyncLast, type RatingSyncStatus } from './rating-sync';
 import {
   getConfig,
@@ -204,6 +206,14 @@ export function noteReroll(patternId: string, paletteId: string | null): void {
  */
 export function noteDefaultColoring(): void {
   const cfg = getConfig();
+  const def = registry.get(cfg.patternId);
+  if (!def || !(getReview().admin && getReview().on)) return;
+  // 默认展示的是打分选中的色板 → 评分条打分的是那套色板本身
+  const pickedId = pickedPaletteFor(cfg, def);
+  if (pickedId) {
+    dispatch({ type: 'show', pattern: cfg.patternId, palette: pickedId });
+    return;
+  }
   if (!atDefaultColoring(cfg)) return;
   dispatch({ type: 'show', pattern: cfg.patternId, palette: DEFAULT_PALETTE_ID });
 }

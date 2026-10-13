@@ -21,6 +21,8 @@ import {
   SCORE_EXCLUDE_AT,
   mergeDefaults,
   mergeScores,
+  pickTopPalettes,
+  sanitizePicks,
   sanitizeDefaultsMap,
   sanitizeScores,
   scoreDown,
@@ -38,7 +40,8 @@ import {
   builtinTone,
   colorsMatchDefault,
   getEffectiveDefaults,
-  getServerDefaults,
+  getBaseServerDefaults,
+  setScorePicks,
   getServerDefaultsUpdatedAt,
   paramsWith,
   recordFromConfig,
@@ -170,7 +173,7 @@ export function atDefaultColoring(cfg: PatternConfig): boolean {
   if (!owner || !on) return false;
   const def = registry.get(cfg.patternId);
   // 用服务器默认（不含批改模式待上传叠层）：否则每次改动都被记成待上传默认，画布永远「停在默认」
-  return !!def && colorsMatchDefault(getServerDefaults(), cfg, def, bgTone(cfg, def));
+  return !!def && colorsMatchDefault(getBaseServerDefaults(), cfg, def, bgTone(cfg, def));
 }
 
 /* ── 网络 ─────────────────────────────────────────────────────── */
@@ -190,15 +193,19 @@ export async function loadDefaults(): Promise<void> {
     const res = await fetcher(DEFAULTS_ENDPOINT, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache });
     const type = res.headers.get('Content-Type') ?? '';
     if (!res.ok || !type.includes('application/json')) return null; // 纯 vite 预览没有 Worker
-    const body = (await res.json()) as { defaults?: unknown; updatedAt?: unknown };
-    return { defaults: sanitizeDefaultsMap(body.defaults), updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : null };
+    const body = (await res.json()) as { defaults?: unknown; updatedAt?: unknown; picks?: unknown };
+    return {
+      defaults: sanitizeDefaultsMap(body.defaults),
+      updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : null,
+      picks: sanitizePicks(body.picks),
+    };
   };
   try {
     let doc = await get();
     const stamp = readDefaultsStamp();
     if (doc && stamp && (!doc.updatedAt || doc.updatedAt < stamp)) doc = (await get('reload')) ?? doc;
     if (!doc) return;
-    setServerDefaults(doc.defaults, doc.updatedAt);
+    setServerDefaults(doc.defaults, doc.updatedAt, doc.picks);
     refreshUntouchedDefault();
   } catch {
     /* 拉不到：继续用内置默认 */
@@ -356,10 +363,11 @@ export async function setReviewMode(next: boolean): Promise<ReviewToggleResult> 
     if (owner !== who) return { ok: false, error: '上传期间切换了账号' };
     const updatedAt = typeof j.updatedAt === 'string' ? j.updatedAt : getServerDefaultsUpdatedAt();
     // 服务器返回的是合并后的全量；兜底时用本地合并
-    const merged = j.defaults !== undefined ? sanitizeDefaultsMap(j.defaults) : mergeDefaults(getEffectiveDefaults(), sentPending);
+    const merged = j.defaults !== undefined ? sanitizeDefaultsMap(j.defaults) : mergeDefaults(getBaseServerDefaults(), sentPending);
     setServerDefaults(merged, updatedAt);
     if (updatedAt && nPatterns > 0) writeDefaultsStamp(updatedAt);
     serverScores = j.adminScores !== undefined ? sanitizeScores(j.adminScores) : sanitizeScores(mergeScores(serverScores, sentScores));
+    setScorePicks(pickTopPalettes(serverScores)); // 默认配色用打分最高的色板，上传后马上生效
     // 上传期间又记下的改动（理论上 UI 不允许）保留
     pending = Object.fromEntries(Object.entries(pending).filter(([k, v]) => sentPending[k] !== v));
     pendingScores = Object.fromEntries(Object.entries(pendingScores).filter(([k, v]) => sentScores[k] !== v));

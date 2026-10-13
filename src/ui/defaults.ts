@@ -16,9 +16,12 @@ import {
   mergeDefaults,
   type DefaultsMap,
   type ElementOverride,
+  type ScorePicks,
   type ToneOverride,
 } from '../shared/defaults-api';
-import { applyTone, bgTone, keepTone, type BgTone } from './coloring';
+import { applyPaletteSlots, applyTone, bgTone, keepTone, type BgTone } from './coloring';
+import { registry } from '../patterns';
+import { PALETTES, VIVID_PALETTES } from '../patterns/palettes';
 import type { ElementConfig, PatternConfig } from '../engine/types';
 import type { ControlDef, PaintSpec, ParamValue, PatternDef } from '../patterns/types';
 
@@ -182,14 +185,61 @@ let version = 0;
 let serverVersion = 0;
 const listeners = new Set<() => void>();
 
+/** 打分最高的色板（`母题|底色` → 色板 id），以及把它们叠成底色覆盖后的服务器默认。 */
+let picks: ScorePicks = {};
+let picked: DefaultsMap = server;
+
+/** 色板按 id（基础 + 鲜艳池）。 */
+const paletteById = new Map([...PALETTES, ...VIVID_PALETTES].map((p) => [p.id, p]));
+
+/**
+ * 把打分选中的色板叠成底色覆盖（纯函数，Rei 2026-10-14）：只看母题默认展示的那个底色（内置底色）；
+ * 在该底色原本的默认配色上套色板（与色板面板手动套用同一套映射），再保证底色类别不跳（keepTone）。
+ * 选中的优先于上传覆盖（想保留上传的就给「默认」打最高分）。切到另一底色时，因为它不是「原本的默认」，
+ * 走 keepTone 翻明度 —— 显示对应的那套，而不是另一底色打分最高的。
+ */
+export function withPicks(map: DefaultsMap, p: ScorePicks): DefaultsMap {
+  let out = map;
+  for (const [slot, paletteId] of Object.entries(p)) {
+    const i = slot.lastIndexOf('|');
+    const patternId = slot.slice(0, i);
+    const tone = slot.slice(i + 1);
+    const def = registry.get(patternId);
+    const pal = paletteById.get(paletteId);
+    // 只作用于母题默认展示的底色（Rei：另一底色切过去显示「对应」的色板，不是那边打分最高的）
+    if (!def || !pal || tone !== builtinTone(def)) continue;
+    const cfg = createDefaultConfig(def);
+    cfg.elements = defaultElementsFrom(map, def, tone);
+    const painted = keepTone(applyPaletteSlots(cfg, def, { ...pal.slots }), def, tone);
+    const entry = out[patternId] ?? {};
+    out = { ...out, [patternId]: { ...entry, tones: { ...entry.tones, [tone]: { elements: recordFromConfig(painted, def).elements } } } };
+  }
+  return out;
+}
+
+/** 某张配置是否就是打分选中的那套（返回色板 id）。 */
+export function pickedPaletteFor(cfg: PatternConfig, def: PatternDef): string | null {
+  const tone = bgTone(cfg, def);
+  const id = picks[`${def.id}|${tone}`];
+  return id && colorsMatchDefault(picked, cfg, def, tone) ? id : null;
+}
+
+export function setScorePicks(p: ScorePicks): void {
+  picks = p;
+  serverVersion++;
+  recompute();
+}
+
 function recompute(): void {
-  effective = overlay ? mergeDefaults(server, overlay) : server;
+  picked = withPicks(server, picks);
+  effective = overlay ? mergeDefaults(picked, overlay) : picked;
   version++;
   listeners.forEach((l) => l());
 }
 
-export function setServerDefaults(map: DefaultsMap, updatedAt: string | null): void {
+export function setServerDefaults(map: DefaultsMap, updatedAt: string | null, nextPicks?: ScorePicks): void {
   server = map;
+  if (nextPicks) picks = nextPicks;
   serverUpdatedAt = updatedAt;
   serverVersion++;
   recompute();
@@ -200,7 +250,10 @@ export function setDefaultsOverlay(map: DefaultsMap | null): void {
   recompute();
 }
 
-export const getServerDefaults = (): DefaultsMap => server;
+/** 大家看到的服务器默认 = 上传覆盖 + 打分选中的色板（不含批改模式待上传叠层）。 */
+export const getServerDefaults = (): DefaultsMap => picked;
+/** 只有上传覆盖（不含打分选中）—— 「默认」这套打分 / 换一版候选用它，免得和选中的色板绕圈。 */
+export const getBaseServerDefaults = (): DefaultsMap => server;
 export const getServerDefaultsUpdatedAt = (): string | null => serverUpdatedAt;
 export const getEffectiveDefaults = (): DefaultsMap => effective;
 
@@ -243,6 +296,7 @@ export function applyToneDefaults(cfg: PatternConfig, def: PatternDef, tone: BgT
     lastFlip = null;
     return back;
   }
+  // 「是不是默认」按上传覆盖判断（不含打分选中）：选中的色板切底色时翻成对应的那套
   const next = applyToneFrom(effective, cfg, def, tone, server);
   lastFlip = { pattern: def.id, fromTone: from, from: cfg.elements, to: next.elements };
   return next;

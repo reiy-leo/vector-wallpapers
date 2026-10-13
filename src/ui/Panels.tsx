@@ -16,7 +16,7 @@ import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
 import { applyPaletteSlots, bgTone, nextSeed, randomizeColorsWithPalette } from './coloring';
-import { colorsMatchDefault, getServerDefaults, withDefaultColors } from './defaults';
+import { colorsMatchDefault, getBaseServerDefaults, withDefaultColors } from './defaults';
 import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
 import { mulberry32 } from '../engine/rng';
 import { notePalette, noteReroll, rerollExclusions } from './ratings';
@@ -278,7 +278,7 @@ export function shuffleCurrent(strategy: ColorStrategy): void {
   const exclude = rerollExclusions(def.id);
   // 母题自己当前底色的默认配色也是换一版的候选（Rei 2026-10-14），约 1/10；打分 ≤ −3 排除，已经是默认则跳过
   const tone = bgTone(cfg, def);
-  const map = getServerDefaults(); // 不含批改模式待上传叠层（那是正在改的这张）
+  const map = getBaseServerDefaults(); // 「默认」这套 = 上传覆盖 / 内置；不含批改模式待上传叠层与打分选中
   if (
     !exclude.has(DEFAULT_PALETTE_ID) &&
     mulberry32(seed ^ 0x5eed)() < DEFAULT_REROLL_SHARE &&

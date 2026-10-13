@@ -212,3 +212,34 @@ describe('浅/深切换：色板一一对应（Rei 2026-10-14）', () => {
     expect(checked).toBeGreaterThan(20);
   });
 });
+
+describe('默认配色用打分最高的色板（Rei 2026-10-14）', () => {
+  it('pickTopPalettes：唯一最高且 > 0；并列 / 默认最高 / 无正分 → 不选', async () => {
+    const { pickTopPalettes } = await import('../shared/defaults-api');
+    expect(pickTopPalettes({ 'a|x|light': 3, 'a|y|light': 2, 'a|z|dark': 1 })).toEqual({ 'a|light': 'x', 'a|dark': 'z' });
+    expect(pickTopPalettes({ 'a|x|light': 3, 'a|y|light': 3 })).toEqual({});
+    expect(pickTopPalettes({ 'a|default|light': 4, 'a|y|light': 3 })).toEqual({});
+    expect(pickTopPalettes({ 'a|x|light': -1, 'a|y|light': 0 })).toEqual({});
+  });
+
+  it('只作用于默认展示的底色；切到另一底色显示对应的色板（翻明度），不是那边打分最高的', async () => {
+    const { registry } = await import('../patterns');
+    const { allowedTones, applyPaletteSlots, bgTone, keepTone } = await import('./coloring');
+    const d = await import('./defaults');
+    const { PALETTES } = await import('../patterns/palettes');
+    const { createDefaultConfig } = await import('../engine/render');
+    const def = registry.list().find((x) => allowedTones(x).length === 2 && !x.rerollSchemes)!;
+    const home = d.builtinTone(def);
+    const away = home === 'light' ? 'dark' : 'light';
+    const [p1, p2] = PALETTES;
+    const map = d.withPicks({}, { [`${def.id}|${home}`]: p1.id, [`${def.id}|${away}`]: p2.id });
+    expect(map[def.id]?.tones?.[away]).toBeUndefined();
+    const shown = d.defaultConfigFrom(map, def);
+    const expected = keepTone(applyPaletteSlots(createDefaultConfig(def), def, { ...p1.slots }), def, home);
+    expect(shown.elements.map((e) => e.paint)).toEqual(expected.elements.map((e) => e.paint));
+    // 切底色：按上传覆盖（空）判断「是不是默认」→ 选中的色板不是 → 翻明度保留色板
+    const flipped = d.applyToneFrom(map, shown, def, away, {});
+    expect(bgTone(flipped, def)).toBe(away);
+    expect(flipped.elements.map((e) => e.paint)).toEqual(keepTone(shown, def, away).elements.map((e) => e.paint));
+  });
+});

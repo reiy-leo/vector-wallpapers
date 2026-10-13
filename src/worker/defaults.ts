@@ -16,6 +16,7 @@ import {
   MAX_SCORES,
   mergeDefaults,
   mergeScores,
+  pickTopPalettes,
   sanitizeDefaultsMap,
   sanitizeScores,
   validatePutBody,
@@ -65,7 +66,10 @@ async function requireAdmin(req: Request, env: Env): Promise<Response | null> {
 
 /** GET /api/defaults —— 公开、可短暂缓存。KV 未绑定时返回空覆盖（前端照常用内置默认）。 */
 export async function getDefaults(_req: Request, env: Env): Promise<Response> {
-  const doc: DefaultsGetResponse = env.RATINGS ? await readDefaultsDoc(env.RATINGS) : { defaults: {}, updatedAt: null };
+  if (!env.RATINGS) return json({ defaults: {}, updatedAt: null, picks: {} } satisfies DefaultsGetResponse, 200, `public, max-age=${DEFAULTS_MAX_AGE}`);
+  const [dDoc, sDoc] = await Promise.all([readDefaultsDoc(env.RATINGS), readScoresDoc(env.RATINGS)]);
+  // 打分本身只给管理员看；公开的只有「每个母题 × 底色选中了哪套色板」
+  const doc: DefaultsGetResponse = { ...dDoc, picks: pickTopPalettes(sDoc.scores) };
   return json(doc, 200, `public, max-age=${DEFAULTS_MAX_AGE}`);
 }
 
