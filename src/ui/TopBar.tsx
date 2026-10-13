@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { setUI, useWorkbenchSelector } from './store';
 import { FavoritesDialog } from './FavoritesDialog';
+import { CommentsDrawer, IconChat } from './Comments';
 import { Button, IconButton, Segmented, Tooltip } from './primitives';
 import { DropdownMenu } from '@cloudflare/kumo/components/dropdown';
 import { consumeLoginError, loadMe, loginBlocker, logout, startLogin, useAuth } from './auth';
@@ -31,6 +32,7 @@ export type NoticeFn = (message: string, tone?: NoticeTone) => void;
 export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
   const panel = useWorkbenchSelector((s) => s.ui.panel);
   const theme = useWorkbenchSelector((s) => s.ui.theme);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
 
   return (
@@ -64,11 +66,17 @@ export function TopBar({ onNotice }: { onNotice: NoticeFn }) {
             <IconPanel size={16} />
           </IconButton>
         </Tooltip>
+        <Tooltip side="bottom" content="留言">
+          <IconButton label="留言" nativeTitle={false} onClick={() => setCommentsOpen(true)}>
+            <IconChat size={16} />
+          </IconButton>
+        </Tooltip>
       </div>
 
       <BarDivider />
 
       <AccountControl onNotice={onNotice} />
+      <CommentsDrawer open={commentsOpen} onClose={() => setCommentsOpen(false)} />
     </header>
   );
 }

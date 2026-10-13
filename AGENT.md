@@ -10,7 +10,8 @@
 - 母题库：**27 个**（4 分类：A极简线条 / B波点网格 / C 渐变流体 / D 像素复古）
 - 部署：Cloudflare Worker（`src/worker/`，只接管 `/api/*` `/auth/*`）+ Static Assets（`dist/`）
 - 账户：Google OAuth 登录（与 avatar-sloppy 同一套实现，签名 cookie 会话）
-- 线上：https://vector-wallpapers.rei8t.workers.dev（内联部署）。Secrets：SESSION_SECRET（已设）、GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET（在 CF 控制台添加）；Google 回调 `/auth/callback`
+- 线上：https://vector-wallpapers.rei8t.dev（自定义域，内联部署）。Secrets：SESSION_SECRET（已设）、GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET（在 CF 控制台添加）；Google 回调 `/auth/callback`
+- 留言：giscus（GitHub Discussions，仓库 reiy-leo/cfw-comments，分类 vector-wallpapers，mapping=pathname）。实现在 `src/ui/Comments.tsx`：顶栏「留言」按钮 → 右侧抽屉，首次打开才注入 `https://giscus.app/client.js`；主题跟随网站（light/dark/system → noborder_light/noborder_dark），切换时 postMessage `setConfig`。CSP 在 `public/_headers` 放行 giscus.app（script-src / style-src / frame-src），内联部署由 `scripts/build-inline-assets.mjs` 带进 Worker 响应头
 - ~~纯静态、无后端、无第三方请求、无需登录~~ —— 该限制已于 2026-10-12 按用户决定**取消**
 
 ## 事实来源的优先级

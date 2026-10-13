@@ -13,7 +13,8 @@
   #  · img-src 放行 *.googleusercontent.com —— Google 登录后的用户头像。
   #  · Google 登录是整页跳转（/auth/login → accounts.google.com），不经 fetch，connect-src 仍只需 'self'。
   #  · 评分接口 /api/ratings（批量 POST）与 /api/ratings/mine 都是同源 fetch，受 connect-src 'self' 放行，无需改动。
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  #  · 留言区 giscus：client.js（script-src）、default.css（style-src）、iframe（frame-src）放行 https://giscus.app。
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://giscus.app; style-src 'self' 'unsafe-inline' https://giscus.app; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; connect-src 'self'; frame-src https://giscus.app; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
 
 # hash 化产物 → 永久不可变
 /assets/*
