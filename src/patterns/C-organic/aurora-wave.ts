@@ -24,6 +24,47 @@ const PTS = 9;
 /** 上缘采样点数：上缘带「火焰状」褶皱，需要更密的采样。 */
 const TOP_PTS = 21;
 
+/** 竖向两色渐变（下 → 上）。 */
+const band = (lo: string, hi: string): PaintSpec => ({
+  type: 'linear',
+  angle: 90,
+  stops: [
+    { offset: 0, color: lo },
+    { offset: 1, color: hi },
+  ],
+});
+const skyOf = (a: string, b: string, c: string): PaintSpec => ({
+  type: 'linear',
+  angle: 90,
+  stops: [
+    { offset: 0, color: a },
+    { offset: 0.6, color: b },
+    { offset: 1, color: c },
+  ],
+});
+
+/*
+ * 「换一版」配色池（Rei 2026-10-14：大量换一版很难看）。
+ * 全局色板会给出霓虹红黄、绿色/褐色天空、甚至浅色天空 —— 极光不该长那样。
+ * 这里只收真实极光会出现的颜色：氧原子绿（557.7nm）为主，高空氧红、氮紫/粉为辅；
+ * 天空一律深蓝黑。引擎在抽中后只做 ±8° 色相、±8% 饱和度抖动。
+ */
+const NAVY = skyOf('#03060f', '#0a1424', '#16243a');
+const POLAR = skyOf('#020a0c', '#081a1d', '#11272d');
+const INDIGO = skyOf('#06061a', '#110f2c', '#1c1b3a');
+const SLATE = skyOf('#050913', '#0d1626', '#1b2436');
+const STAR = { type: 'solid', color: '#e4ecf2' } as const;
+const REROLL: NonNullable<PatternDef['rerollSchemes']> = [
+  { id: 'aurora:green', elements: { sky: POLAR, band_a: band('#7cf2b0', '#2f9e82'), band_b: band('#a6efd2', '#3f8c96'), stars: STAR } },
+  { id: 'aurora:green-violet', elements: { sky: NAVY, band_a: band('#72eea6', '#2a9a78'), band_b: band('#b9a3f0', '#6a5fc0'), stars: STAR } },
+  { id: 'aurora:green-pink', elements: { sky: INDIGO, band_a: band('#86f2b4', '#35ad88'), band_b: band('#f0a2cc', '#9c5a98'), stars: STAR } },
+  { id: 'aurora:teal-blue', elements: { sky: SLATE, band_a: band('#86e6ee', '#3a8ec0'), band_b: band('#a8b8f4', '#5866c0'), stars: STAR } },
+  { id: 'aurora:storm', elements: { sky: INDIGO, band_a: band('#cf95f0', '#8450bf'), band_b: band('#f6a4c8', '#a8508c'), stars: STAR } },
+  { id: 'aurora:red-crown', elements: { sky: NAVY, band_a: band('#8ef0b2', '#38a083'), band_b: band('#ef9a96', '#9c4a62'), stars: STAR } },
+  { id: 'aurora:pastel', elements: { sky: SLATE, band_a: band('#acead2', '#6eb2ae'), band_b: band('#c6bcef', '#8c8ece'), stars: STAR } },
+  { id: 'aurora:cyan', elements: { sky: POLAR, band_a: band('#a2f6da', '#3ec2a6'), band_b: band('#88d2fa', '#3f7ecc'), stars: STAR } },
+];
+
 const def: PatternDef = {
   id: 'aurora-wave',
   tones: ['dark'],
@@ -109,6 +150,7 @@ const def: PatternDef = {
   ],
 
   paletteSlots: { bg: ['sky'], primary: ['band_a'], secondary: ['band_b'], detail: ['stars'] },
+  rerollSchemes: REROLL,
 
   render(_def, cfg: ResolvedConfig, api: RenderApi): RenderResult {
     const { width: W, height: H, params, elements, rng, animate } = cfg;
@@ -181,7 +223,7 @@ const def: PatternDef = {
       // 远层（i 大）更淡、更薄
       const depth = bandCount === 1 ? 0 : i / (bandCount - 1);
       const t = (i + 1) / (bandCount + 1);
-      const curtainH = H * thickness * (1.15 - depth * 0.35);
+      const curtainH = H * thickness * (1.55 - depth * 0.45); // 2026-10-14 加高：光幕向上化雾更长，读作帘幕而非色带
       const waveA = H * amp * (0.5 + 0.18 * (1 - depth));
       const phase = basePhase + i * 0.7 + rng() * 0.4;
       const c2 = cycles * (1.8 + rng() * 0.6);
@@ -197,7 +239,7 @@ const def: PatternDef = {
       // 基线：帘幕集中在上 1/4 ~ 中部，并保证顶端（含波幅）不越出画布
       const topMargin = H * 0.04;
       const minBase = curtainH + waveA * 1.3 + topMargin;
-      const baseY = Math.min(H * 0.9, Math.max(H * (0.22 + t * 0.5), minBase));
+      const baseY = Math.min(H * 0.9, Math.max(H * (0.4 + t * 0.26), minBase));
 
       const bottomY = (x: number): number => {
         const u = x / W;
@@ -267,8 +309,8 @@ const def: PatternDef = {
         path(smooth(bottom, api, true), {
           fill: 'none',
           stroke: edgeFade,
-          'stroke-width': H * (0.008 + thickness * 0.025),
-          'stroke-opacity': Math.min(1, e.opacity * 0.75) * (1 - depth * 0.4),
+          'stroke-width': H * (0.005 + thickness * 0.018),
+          'stroke-opacity': Math.min(1, e.opacity * 0.5) * (1 - depth * 0.55), // 下缘亮线减弱：太亮会读成一条条霓虹管
           'stroke-linecap': 'round',
         }),
       );

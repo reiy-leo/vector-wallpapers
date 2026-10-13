@@ -137,6 +137,9 @@ export function randomizeColorsWithPalette(
   exclude: ReadonlySet<string> = NO_EXCLUDE,
 ): RerollResult {
   const rng = mulberry32(seed);
+  if (def.rerollSchemes && def.rerollSchemes.length > 0) {
+    return ownScheme(cfg, def, def.rerollSchemes, seed, rng, exclude);
+  }
   const tone = bgTone(cfg, def);
   // 先掷一次骰子决定这一版走「高饱和生成」还是「作者配色骨架」：
   // 用户反馈「换一版的颜色都太保守」→ 大部分点击给出鲜艳配色，作者配色只偶尔出现。
@@ -178,6 +181,52 @@ export function randomizeColorsWithPalette(
   }
 
   return { cfg: authorRecolor(cfg, def, strategy, seed, rng, tone), paletteId: null };
+}
+
+/**
+ * 母题自带配色池（`PatternDef.rerollSchemes`）：抽一套、整体轻微抖动色相 / 饱和度。
+ * 与当前配色相同的那套跳过，保证每次点击都「换了」。锁定元件不动。
+ */
+function ownScheme(
+  cfg: PatternConfig,
+  def: PatternDef,
+  schemes: NonNullable<PatternDef['rerollSchemes']>,
+  seed: number,
+  rng: () => number,
+  exclude: ReadonlySet<string>,
+): RerollResult {
+  let pool = schemes.filter((s) => !exclude.has(s.id));
+  if (pool.length === 0) pool = [...schemes];
+  const same = (s: (typeof schemes)[number]): boolean =>
+    Object.entries(s.elements).every(([id, p]) => {
+      const cur = cfg.elements.find((e) => e.id === id)?.paint;
+      return cur !== undefined && stopsOf(cur)[0] !== undefined && hueNear(stopsOf(cur)[0], stopsOf(p)[0]);
+    });
+  let idx = Math.floor(rng() * pool.length) % pool.length;
+  if (pool.length > 1 && same(pool[idx])) idx = (idx + 1 + Math.floor(rng() * (pool.length - 1))) % pool.length;
+  const pick = pool[idx];
+  const hueShift = (rng() - 0.5) * 16; // ±8°
+  const satScale = 0.92 + rng() * 0.16;
+  const next = structuredCloneConfig(cfg);
+  next.seed = seed;
+  for (const e of next.elements) {
+    const src = pick.elements[e.id];
+    const spec = def.elements.find((d) => d.id === e.id);
+    if (!src || e.locked || spec?.configurable === false) continue;
+    e.paint = mapPaint(src, (hex) => {
+      const { h, s, l } = hexToHsl(hex);
+      return hslToHex((((h + hueShift) % 360) + 360) % 360, clamp(s * satScale, 0, 1), l);
+    });
+  }
+  // 用户切过浅/深底时保持其底色类别（keepTone 翻转明度，不行就退回作者同色调配色）
+  return { cfg: keepTone(next, def, bgTone(cfg, def)), paletteId: pick.id };
+}
+
+function hueNear(a: string, b: string): boolean {
+  const ha = hexToHsl(a);
+  const hb = hexToHsl(b);
+  const d = Math.abs(ha.h - hb.h) % 360;
+  return Math.min(d, 360 - d) < 14 && Math.abs(ha.l - hb.l) < 0.12;
 }
 
 /** 作者配色骨架整体转色相 / 提饱和度（`randomizeColors` 的非 vivid 分支）。 */

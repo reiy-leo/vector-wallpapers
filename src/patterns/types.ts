@@ -153,6 +153,12 @@ export interface PatternDef {
    */
   paletteSlots: Record<string, string[]>;
   /**
+   * 母题自带的「换一版」配色池（可选）。给出时，「换一版」只从这里抽配色（轻微色相抖动），
+   * 不再套用全局色板 —— 用于配色有物理约束的写实母题（如极光只该是绿/青/紫/粉，夜空只该是深蓝黑）。
+   * `elements` 只列要换的元件；`id` 作为评分/排除用的 paletteId。Rei 2026-10-14（aurora-wave）。
+   */
+  rerollSchemes?: ReadonlyArray<{ id: string; elements: Readonly<Record<string, PaintSpec>> }>;
+  /**
    * 纯函数渲染实现。
    * ⚠️ 必须无副作用、不得触碰 DOM —— 预览 / SVG 下载 / PNG 导出 / 复制源码共用此函数。
    */

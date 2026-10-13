@@ -93,10 +93,27 @@ export function ControlChips() {
  * 滑块在前、开关在后，保持「连续调节 → 开关」的阅读顺序。
  */
 function visibleControls(controls: readonly ControlDef[]): readonly ControlDef[] {
-  const sliders = controls.filter((c) => c.type === 'range' || c.type === 'angle');
-  const selects = controls.filter((c) => c.type === 'select');
+  const sliders = controls.filter((c) => c.type === 'angle' || (c.type === 'range' && !discreteValues(c)));
+  // 只有少数几个取值的 range（如「轮廓圈数」3–5）与 select 同组，渲染为分段单选
+  const selects = controls.filter((c) => c.type === 'select' || (c.type === 'range' && discreteValues(c)));
   const switches = controls.filter((c) => c.type === 'toggle');
   return [...sliders, ...selects, ...switches];
+}
+
+/** range 取值个数 ≤ 此值时改用 segmented 分段单选（Rei 2026-10-14：3 个、4 个值的滑块不好用）。 */
+export const MAX_SEGMENTS = 6;
+
+/**
+ * range 的全部取值（个数 ≤ MAX_SEGMENTS 时）；否则 null（保持滑块）。
+ * 取值严格按 min + i·step 生成并按 step 的小数位取整，避免 0.1+0.2 式的浮点尾巴。
+ */
+export function discreteValues(c: ControlDef): number[] | null {
+  // 只处理「个数」类整数参数（圈数、层数…）；小数步长（间距 0.45–0.7）仍是连续调节，保持滑块
+  if (c.type !== 'range' || !(c.step >= 1) || !Number.isInteger(c.step) || !Number.isInteger(c.min)) return null;
+  const n = Math.floor((c.max - c.min) / c.step + 1e-9) + 1;
+  if (n < 2 || n > MAX_SEGMENTS) return null;
+  const dp = (String(c.step).split('.')[1] ?? '').length;
+  return Array.from({ length: n }, (_, i) => Number((c.min + i * c.step).toFixed(dp)));
 }
 
 function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig }) {
@@ -155,6 +172,31 @@ function ControlChip({ control, cfg }: { control: ControlDef; cfg: PatternConfig
   }
 
   if (control.type !== 'range') return null;
+
+  const steps = discreteValues(control);
+  if (steps) {
+    // 与 select 同一套：标签在上、分段单选在下；值仍是数字，分享链接格式不变
+    const cur = Number(value);
+    const nearest = steps.reduce((a, b) => (Math.abs(b - cur) < Math.abs(a - cur) ? b : a), steps[0]);
+    return (
+      <div className="grid min-w-0 gap-1.5">
+        <span className="text-base text-fg-soft">{control.label}</span>
+        <Tabs
+          variant="segmented"
+          className="w-full rounded-md"
+          listClassName="rounded-md"
+          indicatorClassName="rounded-sm"
+          value={String(nearest)}
+          onValueChange={(v) => setParam(control.key, Number(v))}
+          tabs={steps.map((v) => ({
+            value: String(v),
+            label: control.unit ? `${v}${control.unit}` : String(v),
+            className: 'flex-1 justify-center',
+          }))}
+        />
+      </div>
+    );
+  }
 
   return (
     <SliderChip
