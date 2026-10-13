@@ -10,6 +10,7 @@ import { createDefaultConfig } from '../engine/render';
 import { allowedTones, applyTone } from './coloring';
 import {
   __setReviewFetch,
+  atDefaultColoring,
   bumpAdminScore,
   bumpScoreIn,
   getReview,
@@ -163,6 +164,20 @@ describe('运行时', () => {
     const r = await setReviewMode(false);
     expect(r).toMatchObject({ ok: true, uploaded: false });
     expect(puts).toHaveLength(0);
+  });
+
+  it('批改模式里换过的配色不算「默认」：待上传叠层不参与判断（回归：打分乱跳到默认那套）', async () => {
+    setReviewOwner(ADMIN, true);
+    selectPattern(def.id);
+    await setReviewMode(true);
+    expect(atDefaultColoring(getConfig())).toBe(true);
+    setConfig(applyTone(getConfig(), def, other)); // 记进待上传，叠层里它成了「默认」
+    setConfig(applyTone(getConfig(), def, home));
+    const cfg = getConfig();
+    const tweaked = { ...cfg, elements: cfg.elements.map((e, i) => (i === 0 ? { ...e, opacity: e.opacity === 1 ? 0.5 : 1 } : e)) };
+    setConfig(tweaked);
+    expect(getReview().pendingPatterns).toBe(1);
+    expect(atDefaultColoring(getConfig())).toBe(false);
   });
 
   it('打分 ≤ −3 进入换一版排除（仅管理员）', async () => {

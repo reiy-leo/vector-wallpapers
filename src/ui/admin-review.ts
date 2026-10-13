@@ -38,6 +38,7 @@ import {
   builtinTone,
   colorsMatchDefault,
   getEffectiveDefaults,
+  getServerDefaults,
   getServerDefaultsUpdatedAt,
   paramsWith,
   recordFromConfig,
@@ -168,7 +169,8 @@ export function subscribeReview(l: () => void): () => void {
 export function atDefaultColoring(cfg: PatternConfig): boolean {
   if (!owner || !on) return false;
   const def = registry.get(cfg.patternId);
-  return !!def && colorsMatchDefault(getEffectiveDefaults(), cfg, def, bgTone(cfg, def));
+  // 用服务器默认（不含批改模式待上传叠层）：否则每次改动都被记成待上传默认，画布永远「停在默认」
+  return !!def && colorsMatchDefault(getServerDefaults(), cfg, def, bgTone(cfg, def));
 }
 
 /* ── 网络 ─────────────────────────────────────────────────────── */
