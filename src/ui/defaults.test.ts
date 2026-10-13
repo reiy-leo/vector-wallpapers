@@ -162,3 +162,24 @@ describe('接入 store', () => {
     expect(getConfig()).toBe(before);
   });
 });
+
+describe('默认配色（浅底 / 深底各一套，Rei 2026-10-14）', () => {
+  it('内置底色 = 内置；另一底色无覆盖 = 内置切过去；colorsMatchDefault / withDefaultColors 自洽', async () => {
+    const { registry } = await import('../patterns');
+    const { bgTone } = await import('./coloring');
+    const { colorsMatchDefault, defaultElementsFrom, withDefaultColors, builtinTone } = await import('./defaults');
+    const { createDefaultConfig } = await import('../engine/render');
+    for (const def of registry.list()) {
+      const home = builtinTone(def);
+      const away = home === 'light' ? 'dark' : 'light';
+      const { allowedTones } = await import('./coloring');
+      if (!allowedTones(def).includes(away)) continue;
+      const cfg = createDefaultConfig(def);
+      expect(colorsMatchDefault({}, cfg, def, home)).toBe(true);
+      const flipped = withDefaultColors({}, cfg, def, away);
+      expect(colorsMatchDefault({}, flipped, def, away)).toBe(true);
+      expect(defaultElementsFrom({}, def, away)).toHaveLength(def.elements.length);
+      expect(bgTone(flipped, def)).toBe(away);
+    }
+  });
+});

@@ -18,7 +18,7 @@ import { IconButton } from './primitives';
 import { chooseVerdict, installRatingListeners, setRatingOwner, useRatings } from './ratings';
 import { bumpAdminScore, useReview } from './admin-review';
 import { badCount, goodCount } from '../shared/defaults-api';
-import { scoreKey } from '../shared/defaults-api';
+import { DEFAULT_PALETTE_ID, scoreKey } from '../shared/defaults-api';
 import { bgTone } from './coloring';
 import { usePatternDef, useWorkbenchSelector } from './store';
 
@@ -135,7 +135,9 @@ export function RatingBar() {
         className="flex items-center gap-1 rounded-full bg-surface p-1 pl-4 shadow-pop ring-1 ring-line"
         {...holdProps}
       >
-        <span className="whitespace-nowrap pr-1 text-base text-fg-soft">批改打分 · {tone === 'dark' ? '深底' : '浅底'}</span>
+        <span className="whitespace-nowrap pr-1 text-base text-fg-soft">
+          批改打分 · {current.palette === DEFAULT_PALETTE_ID ? '默认' : ''}{tone === 'dark' ? '深底' : '浅底'}
+        </span>
         <VerdictButton label={`适合 +1（当前 ${score}）`} active={good > 0} activeClass="bg-success-tint" badge={<ScoreBadge n={good} tone="good" />} onClick={() => bump('up')}>
           <ThumbsUp size={16} weight={good > 0 ? 'fill' : 'regular'} className={good > 0 ? 'text-success' : 'text-fg-mute'} />
         </VerdictButton>

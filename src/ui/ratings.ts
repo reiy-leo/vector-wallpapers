@@ -34,7 +34,8 @@ import {
   type RatingState,
 } from './rating-machine';
 import { enqueueRating, removeSent, shouldSubmit, takeBatch, type RatingQueue } from './rating-queue';
-import { adminRerollExclusions } from './admin-review';
+import { adminRerollExclusions, atDefaultColoring, getReview, subscribeReview } from './admin-review';
+import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
 import { emptySyncStatus, type RatingSyncLast, type RatingSyncStatus } from './rating-sync';
 import {
   getConfig,
@@ -192,7 +193,19 @@ function dispatch(e: RatingEvent): void {
 
 /** 换一版之后：paletteId 为 null（非色板来源）时隐藏评分条。 */
 export function noteReroll(patternId: string, paletteId: string | null): void {
+  // 「默认」这套只在批改打分里可评（普通 👍/👎 的 Worker 不收这个 id）
+  if (paletteId === DEFAULT_PALETTE_ID && !(getReview().admin && getReview().on)) paletteId = null;
   dispatch(paletteId ? { type: 'show', pattern: patternId, palette: paletteId } : { type: 'clear' });
+}
+
+/**
+ * 批改模式里画布停在母题自己的默认配色（选母题 / 恢复默认 / 切浅深底）→ 评分条打分「默认」这套。
+ * 浅底、深底各算一套（打分键带底色）。普通评分不涉及（Worker 不收这个 id）。
+ */
+export function noteDefaultColoring(): void {
+  const cfg = getConfig();
+  if (!atDefaultColoring(cfg)) return;
+  dispatch({ type: 'show', pattern: cfg.patternId, palette: DEFAULT_PALETTE_ID });
 }
 
 /** 色板面板手动套用之后。 */
@@ -266,10 +279,14 @@ export function installRatingListeners(): void {
   let lastPattern = getConfig().patternId;
   subscribeToStore(() => {
     const p = getConfig().patternId;
-    if (p === lastPattern) return;
-    lastPattern = p;
-    dispatch({ type: 'pattern', pattern: p });
+    if (p !== lastPattern) {
+      lastPattern = p;
+      dispatch({ type: 'pattern', pattern: p });
+    }
+    noteDefaultColoring();
   });
+  subscribeReview(noteDefaultColoring);
+  noteDefaultColoring();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') stashCurrentRating();
   });

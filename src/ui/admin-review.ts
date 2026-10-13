@@ -36,10 +36,9 @@ import {
 import { bgTone } from './coloring';
 import {
   builtinTone,
-  elementsForTone,
+  colorsMatchDefault,
   getEffectiveDefaults,
   getServerDefaultsUpdatedAt,
-  paintEqual,
   paramsWith,
   recordFromConfig,
   setDefaultsOverlay,
@@ -76,14 +75,15 @@ function sameAsEffective(effective: DefaultsMap, cfg: PatternConfig, def: Patter
   const entry = effective[def.id];
   const params = paramsWith(def, entry?.params);
   if (def.controls.some((c) => cfg.params[c.key] !== params[c.key])) return false;
-  const over = entry?.tones?.[tone];
-  const els = over ? elementsForTone(def, over) : tone === builtinTone(def) ? elementsForTone(def, { elements: [] }) : null;
-  if (!els) return false; // 该底色没有任何默认（内置也不是这个底色）→ 视为改动
-  const byId = new Map(els.map((e) => [e.id, e]));
-  return cfg.elements.every((e) => {
-    const d = byId.get(e.id);
-    return !d || (paintEqual(e.paint, d.paint) && e.opacity === d.opacity && e.visible === d.visible);
-  });
+  return colorsAreDefault(effective, cfg, def, tone);
+}
+
+/** cfg 当前底色的配色（颜色 / 不透明度 / 显隐）是否就是该底色的生效默认配色（不看参数）。 */
+export function colorsAreDefault(effective: DefaultsMap, cfg: PatternConfig, def: PatternDef, tone: 'light' | 'dark'): boolean {
+  const entry = effective[def.id];
+  // 待上传 / 记录判断：该底色没有覆盖、又不是内置底色 → 视为改动（切底色后要记下来）
+  if (!entry?.tones?.[tone] && tone !== builtinTone(def)) return false;
+  return colorsMatchDefault(effective, cfg, def, tone);
 }
 
 /** 打分：+1 / −1，先抵消对方，封顶 ±5。浅底 / 深底各自独立。 */
@@ -157,6 +157,19 @@ export function useReview(): ReviewView {
 }
 
 export const getReview = (): ReviewView => view;
+
+/** 非 React 订阅（ratings.ts 用：批改模式开关变化时检查是否停在默认配色）。 */
+export function subscribeReview(l: () => void): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
+/** 正在批改打分，且画布停在当前母题、当前底色的默认配色上 → 该打分「默认」这套。 */
+export function atDefaultColoring(cfg: PatternConfig): boolean {
+  if (!owner || !on) return false;
+  const def = registry.get(cfg.patternId);
+  return !!def && colorsMatchDefault(getEffectiveDefaults(), cfg, def, bgTone(cfg, def));
+}
 
 /* ── 网络 ─────────────────────────────────────────────────────── */
 

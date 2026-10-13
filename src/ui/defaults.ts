@@ -76,6 +76,43 @@ export function elementsForTone(def: PatternDef, over: ToneOverride): ElementCon
 export const builtinTone = (def: PatternDef): BgTone => bgTone(createDefaultConfig(def), def);
 
 /**
+ * 某母题在某底色下的「默认配色」（Rei 2026-10-14：浅底、深底各一套，都可打分、都进换一版）：
+ * 该底色有上传覆盖 → 覆盖；是内置底色 → 内置；否则 = 内置默认切到该底色的结果（与用户点浅/深切换看到的一致）。
+ */
+export function defaultElementsFrom(map: DefaultsMap, def: PatternDef, tone: BgTone): ElementConfig[] {
+  const over = map[def.id]?.tones?.[tone];
+  if (over) return elementsForTone(def, over);
+  const base = elementsForTone(def, { elements: [] });
+  if (tone === builtinTone(def)) return base;
+  const cfg = createDefaultConfig(def);
+  cfg.elements = base;
+  return applyTone(cfg, def, tone).elements;
+}
+
+const sameLook = (a: ElementConfig, b: ElementConfig): boolean =>
+  paintEqual(a.paint, b.paint) && a.opacity === b.opacity && a.visible === b.visible;
+
+/** cfg 的配色是否就是该底色的默认配色（不看参数）。 */
+export function colorsMatchDefault(map: DefaultsMap, cfg: PatternConfig, def: PatternDef, tone: BgTone): boolean {
+  const byId = new Map(defaultElementsFrom(map, def, tone).map((e) => [e.id, e]));
+  return cfg.elements.every((e) => {
+    const d = byId.get(e.id);
+    return !d || sameLook(e, d);
+  });
+}
+
+/** 把 cfg 的配色换成该底色的默认配色（锁定元件不动，参数不动）。 */
+export function withDefaultColors(map: DefaultsMap, cfg: PatternConfig, def: PatternDef, tone: BgTone): PatternConfig {
+  const src = new Map(defaultElementsFrom(map, def, tone).map((e) => [e.id, e]));
+  const next = structuredCloneConfig(cfg);
+  next.elements = next.elements.map((e) => {
+    const d = src.get(e.id);
+    return e.locked || !d ? e : { ...e, paint: d.paint, opacity: d.opacity, visible: d.visible };
+  });
+  return next;
+}
+
+/**
  * 某张配置相对内置默认的差异（要上传的部分）：与控件 default 不同的参数、与内置元件不同的元件。
  * 还原 `elementsForTone(def, {elements})` / `paramsWith(def, params)` 与 cfg 逐值相同。
  */

@@ -15,7 +15,10 @@ import { CURATED_SETS, type SetItem } from '../patterns/sets';
 import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
 import { svgToDataUri } from '../shared/download';
-import { applyPaletteSlots, nextSeed, randomizeColorsWithPalette } from './coloring';
+import { applyPaletteSlots, bgTone, nextSeed, randomizeColorsWithPalette } from './coloring';
+import { colorsMatchDefault, getEffectiveDefaults, withDefaultColors } from './defaults';
+import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
+import { mulberry32 } from '../engine/rng';
 import { notePalette, noteReroll, rerollExclusions } from './ratings';
 import {
   getConfig,
@@ -264,11 +267,28 @@ export function ParamPanel() {
  * 评分（Rei 2026-10-12）：本母题里评过 👎 的色板不再抽到；换完后评分条换到新的 (母题, 色板)，
  * 上一对的最终选择在这一刻提交（见 ratings.ts）。
  */
+/** 换一版抽到母题默认配色的概率。 */
+export const DEFAULT_REROLL_SHARE = 0.1;
+
 export function shuffleCurrent(strategy: ColorStrategy): void {
   const cfg = getConfig();
   const def = registry.get(cfg.patternId);
   if (!def) return;
-  const out = randomizeColorsWithPalette(cfg, def, strategy, nextSeed(cfg.seed), rerollExclusions(def.id));
+  const seed = nextSeed(cfg.seed);
+  const exclude = rerollExclusions(def.id);
+  // 母题自己当前底色的默认配色也是换一版的候选（Rei 2026-10-14），约 1/10；打分 ≤ −3 排除，已经是默认则跳过
+  const tone = bgTone(cfg, def);
+  const map = getEffectiveDefaults();
+  if (
+    !exclude.has(DEFAULT_PALETTE_ID) &&
+    mulberry32(seed ^ 0x5eed)() < DEFAULT_REROLL_SHARE &&
+    !colorsMatchDefault(map, cfg, def, tone)
+  ) {
+    setConfig({ ...withDefaultColors(map, cfg, def, tone), seed });
+    noteReroll(def.id, DEFAULT_PALETTE_ID);
+    return;
+  }
+  const out = randomizeColorsWithPalette(cfg, def, strategy, seed, exclude);
   setConfig(out.cfg);
   noteReroll(def.id, out.paletteId);
 }

@@ -120,6 +120,11 @@ export const clampScore = (n: number): number =>
  * 旧的两段键（不分底色）清洗时丢弃。
  */
 export type ScoreTone = 'light' | 'dark';
+/**
+ * 母题自己的默认配色（浅底 / 深底各一套）在打分里的「色板」id（Rei 2026-10-14）。
+ * 不是真实色板：普通 👍/👎 不会提交它（Worker 只收已知色板），只用于批改打分。
+ */
+export const DEFAULT_PALETTE_ID = 'default';
 export const scoreKey = (pattern: string, palette: string, tone: ScoreTone): string => `${pattern}|${palette}|${tone}`;
 
 export function splitScoreKey(key: string): { pattern: string; palette: string; tone: ScoreTone } | null {
