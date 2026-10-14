@@ -17,6 +17,7 @@ import {
   type DefaultsMap,
   type ElementOverride,
   type ScorePicks,
+  type ScoreRanks,
   type ToneOverride,
 } from '../shared/defaults-api';
 import { applyPaletteSlots, applyTone, bgTone, keepTone, type BgTone } from './coloring';
@@ -187,6 +188,18 @@ const listeners = new Set<() => void>();
 
 /** 打分最高的色板（`母题|底色` → 色板 id），以及把它们叠成底色覆盖后的服务器默认。 */
 let picks: ScorePicks = {};
+/** 母题的打分分布 → 「全部」分类排序（Rei 2026-10-14）。 */
+let ranks: ScoreRanks = {};
+
+export function getScoreRanks(): ScoreRanks {
+  return ranks;
+}
+
+export function setScoreRanks(r: ScoreRanks): void {
+  ranks = r;
+  serverVersion++;
+  recompute();
+}
 let picked: DefaultsMap = server;
 
 /** 色板按 id（基础 + 鲜艳池）。 */
@@ -237,9 +250,10 @@ function recompute(): void {
   listeners.forEach((l) => l());
 }
 
-export function setServerDefaults(map: DefaultsMap, updatedAt: string | null, nextPicks?: ScorePicks): void {
+export function setServerDefaults(map: DefaultsMap, updatedAt: string | null, nextPicks?: ScorePicks, nextRanks?: ScoreRanks): void {
   server = map;
   if (nextPicks) picks = nextPicks;
+  if (nextRanks) ranks = nextRanks;
   serverUpdatedAt = updatedAt;
   serverVersion++;
   recompute();

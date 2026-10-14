@@ -65,6 +65,8 @@ export interface DefaultsGetResponse {
   updatedAt: string | null;
   /** 打分最高的色板（见 pickTopPalettes）：`母题|底色` → 色板 id。旧 Worker 没有这个字段。 */
   picks?: ScorePicks;
+  /** 每个母题的打分分布（见 rankByScores）：母题 → [+5 条数, +4, +3, +2, +1]。旧 Worker 没有这个字段。 */
+  ranks?: ScoreRanks;
 }
 
 /** PUT /api/defaults 的响应体。 */
@@ -157,6 +159,48 @@ export function pickTopPalettes(scores: AdminScores): ScorePicks {
   }
   const out: ScorePicks = {};
   for (const [slot, b] of best) if (!b.tie && b.palette !== DEFAULT_PALETTE_ID) out[slot] = b.palette;
+  return out;
+}
+
+/** 母题 → [+5 条数, +4, +3, +2, +1]（只统计正分；所有色板 × 底色一起数）。 */
+export type ScoreRanks = Record<string, number[]>;
+export const RANK_LEVELS = [5, 4, 3, 2, 1] as const;
+
+/**
+ * 「全部」分类的排序依据（Rei 2026-10-14）：先比 +5 的条数，多者靠前；相同再比 +4，以此类推到 +1。
+ * 打分本身不公开，公开的只有这组计数。
+ */
+export function rankByScores(scores: AdminScores): ScoreRanks {
+  const out: ScoreRanks = {};
+  for (const [k, v] of Object.entries(scores)) {
+    const key = splitScoreKey(k);
+    if (!key || !Number.isInteger(v) || v <= 0 || v > 5) continue;
+    const row = (out[key.pattern] ??= RANK_LEVELS.map(() => 0));
+    row[5 - v]++;
+  }
+  return out;
+}
+
+/** 排序比较：a 应排在 b 前面时返回负数；全部相等返回 0（调用方用稳定排序保留原顺序）。 */
+export function compareRanks(a: readonly number[] | undefined, b: readonly number[] | undefined): number {
+  for (let i = 0; i < RANK_LEVELS.length; i++) {
+    const d = (b?.[i] ?? 0) - (a?.[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/** 宽松清洗 GET /api/defaults 的 ranks。 */
+export function sanitizeRanks(raw: unknown): ScoreRanks {
+  const out: ScoreRanks = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!k || !Array.isArray(v)) continue;
+    out[k] = RANK_LEVELS.map((_, i) => {
+      const x = v[i];
+      return typeof x === 'number' && Number.isInteger(x) && x >= 0 ? x : 0;
+    });
+  }
   return out;
 }
 

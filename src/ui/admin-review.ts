@@ -22,6 +22,8 @@ import {
   mergeDefaults,
   mergeScores,
   pickTopPalettes,
+  rankByScores,
+  sanitizeRanks,
   sanitizePicks,
   sanitizeDefaultsMap,
   sanitizeScores,
@@ -42,6 +44,7 @@ import {
   getEffectiveDefaults,
   getBaseServerDefaults,
   setScorePicks,
+  setScoreRanks,
   getServerDefaultsUpdatedAt,
   paramsWith,
   recordFromConfig,
@@ -193,11 +196,12 @@ export async function loadDefaults(): Promise<void> {
     const res = await fetcher(DEFAULTS_ENDPOINT, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache });
     const type = res.headers.get('Content-Type') ?? '';
     if (!res.ok || !type.includes('application/json')) return null; // 纯 vite 预览没有 Worker
-    const body = (await res.json()) as { defaults?: unknown; updatedAt?: unknown; picks?: unknown };
+    const body = (await res.json()) as { defaults?: unknown; updatedAt?: unknown; picks?: unknown; ranks?: unknown };
     return {
       defaults: sanitizeDefaultsMap(body.defaults),
       updatedAt: typeof body.updatedAt === 'string' ? body.updatedAt : null,
       picks: sanitizePicks(body.picks),
+      ranks: sanitizeRanks(body.ranks),
     };
   };
   try {
@@ -205,7 +209,7 @@ export async function loadDefaults(): Promise<void> {
     const stamp = readDefaultsStamp();
     if (doc && stamp && (!doc.updatedAt || doc.updatedAt < stamp)) doc = (await get('reload')) ?? doc;
     if (!doc) return;
-    setServerDefaults(doc.defaults, doc.updatedAt, doc.picks);
+    setServerDefaults(doc.defaults, doc.updatedAt, doc.picks, doc.ranks);
     refreshUntouchedDefault();
   } catch {
     /* 拉不到：继续用内置默认 */
@@ -367,6 +371,7 @@ export async function setReviewMode(next: boolean): Promise<ReviewToggleResult> 
     setServerDefaults(merged, updatedAt);
     if (updatedAt && nPatterns > 0) writeDefaultsStamp(updatedAt);
     serverScores = j.adminScores !== undefined ? sanitizeScores(j.adminScores) : sanitizeScores(mergeScores(serverScores, sentScores));
+    setScoreRanks(rankByScores(serverScores)); // 「全部」排序跟着刷新
     setScorePicks(pickTopPalettes(serverScores)); // 默认配色用打分最高的色板，上传后马上生效
     // 上传期间又记下的改动（理论上 UI 不允许）保留
     pending = Object.fromEntries(Object.entries(pending).filter(([k, v]) => sentPending[k] !== v));

@@ -83,17 +83,17 @@ describe('GET /api/defaults', () => {
     const res = await call('GET', '/api/defaults');
     expect(res.status).toBe(200);
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=60');
-    expect(await res.json()).toEqual({ defaults: {}, updatedAt: null, picks: {} });
+    expect(await res.json()).toEqual({ defaults: {}, updatedAt: null, picks: {}, ranks: {} });
   });
 
   it('KV 未绑定 → 仍 200 空覆盖（前端照常用内置默认）', async () => {
     env.RATINGS = undefined;
-    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: {}, updatedAt: null, picks: {} });
+    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: {}, updatedAt: null, picks: {}, ranks: {} });
   });
 
   it('KV 里的损坏条目被清洗掉', async () => {
     kv.data.set(DEFAULTS_KV_KEY, JSON.stringify({ defaults: { 'good-one': { params: { n: 3 } }, 'Bad Id': {}, x: { params: 5 } }, updatedAt: 't' }));
-    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: { 'good-one': { params: { n: 3 } } }, updatedAt: 't', picks: {} });
+    expect(await (await call('GET', '/api/defaults')).json()).toEqual({ defaults: { 'good-one': { params: { n: 3 } } }, updatedAt: 't', picks: {}, ranks: {} });
   });
 });
 
@@ -188,5 +188,36 @@ describe('GET /api/defaults 的 picks', () => {
   it('只公开每个母题 × 底色打分最高的色板，不公开分数', async () => {
     const { pickTopPalettes } = await import('../shared/defaults-api');
     expect(pickTopPalettes({ 'p|ocean|light': 5, 'p|sand|light': 1 })).toEqual({ 'p|light': 'ocean' });
+  });
+});
+
+describe('「全部」排序：rankByScores / compareRanks（Rei 2026-10-14）', () => {
+  it('按 +5 条数、再 +4 …… 到 +1 依次比较；负分与 0 不计', async () => {
+    const { rankByScores, compareRanks, sanitizeRanks } = await import('../shared/defaults-api');
+    const r = rankByScores({
+      'a|ocean|light': 5,
+      'a|sand|dark': 3,
+      'b|ocean|light': 5,
+      'b|sand|light': 5,
+      'b|mint|dark': -4,
+      'c|ocean|light': 4,
+      'c|sand|light': 4,
+      'c|mint|light': 4,
+      'd|default|light': 5,
+      'd|ocean|dark': 4,
+    });
+    expect(r.a).toEqual([1, 0, 1, 0, 0]);
+    expect(r.b).toEqual([2, 0, 0, 0, 0]);
+    expect(r.d).toEqual([1, 1, 0, 0, 0]);
+    const order = ['c', 'a', 'x', 'd', 'b'].sort((p, q) => compareRanks(r[p], r[q]));
+    expect(order).toEqual(['b', 'd', 'a', 'c', 'x']);
+    // 全相同 → 0，保留原顺序
+    expect(compareRanks(undefined, [0, 0, 0, 0, 0])).toBe(0);
+    expect(sanitizeRanks({ a: [1, -2, 'x', 3.5, 2], bad: 'no' })).toEqual({ a: [1, 0, 0, 0, 2] });
+  });
+
+  it('GET /api/defaults 公开 ranks（只有计数，没有分数）', async () => {
+    const { rankByScores } = await import('../shared/defaults-api');
+    expect(rankByScores({ 'p|ocean|light': 5, 'p|sand|light': 1 })).toEqual({ p: [1, 0, 0, 0, 1] });
   });
 });

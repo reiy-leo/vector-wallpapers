@@ -8,7 +8,8 @@ import { useMemo } from 'react';
 import { CATEGORY_META } from '../shared/constants';
 import { registry } from '../patterns';
 import { createDefaultConfig, renderStandaloneSVG } from '../engine/render';
-import { defaultConfigFrom, getServerDefaults, useServerDefaultsVersion } from './defaults';
+import { defaultConfigFrom, getScoreRanks, getServerDefaults, useServerDefaultsVersion } from './defaults';
+import { compareRanks } from '../shared/defaults-api';
 import { svgToDataUri } from '../shared/download';
 import { useWorkbenchSelector, selectPattern, setCategory, setSearch } from './store';
 import { CountBadge, SearchInput } from './primitives';
@@ -67,10 +68,11 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
   const search = useWorkbenchSelector((s) => s.search);
 
   const thumbs = useThumbs(defs);
+  const serverVersion = useServerDefaultsVersion();
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return defs.filter((d) => {
+    const hits = defs.filter((d) => {
       if (category !== ALL && d.category !== category) return false;
       if (needle === '') return true;
       return (
@@ -79,7 +81,12 @@ export function PatternRail({ favorites }: { favorites: readonly string[] }) {
         d.description.toLowerCase().includes(needle)
       );
     });
-  }, [defs, category, search]);
+    // 「全部」按批改打分排序（Rei 2026-10-14）：+5 条数多的靠前，相同比 +4……到 +1；全相同保持登记顺序（sort 稳定）
+    if (category !== ALL) return hits;
+    const ranks = getScoreRanks();
+    return [...hits].sort((a, b) => compareRanks(ranks[a.id], ranks[b.id]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- serverVersion 是排序数据的版本号
+  }, [defs, category, search, serverVersion]);
 
   /** 按当前筛选顺序输出 {def, uri} —— 缩略图与筛选结果必须同序，否则点错。 */
   const items = useMemo(() => {
