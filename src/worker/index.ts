@@ -8,12 +8,14 @@
  *   POST /api/auth/logout
  *   POST /api/ratings · GET /api/ratings/mine · GET /api/ratings/summary   （见 ratings.ts）
  *   GET /api/defaults · PUT /api/defaults · GET /api/admin/scores           （见 defaults.ts）
+ *   GET /giscus/kumo-light.css · /giscus/kumo-dark.css                    （giscus Kumo 主题，见 giscus-theme.ts）
  */
 import type { MeResponse } from "../shared/auth-api";
 import { callback, getUser, login, logout } from "./auth";
 import { adminEmails, authMode } from "./env";
 import { getAdminScores, getDefaults, putDefaults } from "./defaults";
 import { getMyRatings, getSummary, postRating } from "./ratings";
+import { giscusThemeTone, serveGiscusTheme } from "./giscus-theme";
 import type { Env } from "./env";
 
 const json = (data: unknown, status = 200) =>
@@ -45,6 +47,11 @@ export function createHandler(serveStatic: ServeStatic) {
   return {
     async fetch(req: Request, env: Env): Promise<Response> {
       const { pathname } = new URL(req.url);
+      const giscusTone = giscusThemeTone(pathname);
+      if (giscusTone) {
+        const m = req.method.toUpperCase();
+        if (m === "GET" || m === "HEAD" || m === "OPTIONS") return serveGiscusTheme(req, giscusTone);
+      }
       switch (`${req.method.toUpperCase()} ${pathname}`) {
         case "GET /api/me":
           return handleMe(req, env);

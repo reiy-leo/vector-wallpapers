@@ -11,10 +11,14 @@ describe('留言区 giscus', () => {
     expect(GISCUS_ATTRS['data-lang']).toBe('zh-CN');
   });
   it('主题跟随网站', () => {
-    expect(giscusTheme(resolveDark('dark', false))).toBe('noborder_dark');
-    expect(giscusTheme(resolveDark('light', true))).toBe('noborder_light');
-    expect(giscusTheme(resolveDark('system', true))).toBe('noborder_dark');
-    expect(giscusTheme(resolveDark('system', false))).toBe('noborder_light');
+    const D = 'https://vector-wallpapers.rei8t.dev/giscus/kumo-dark.css';
+    const L = 'https://vector-wallpapers.rei8t.dev/giscus/kumo-light.css';
+    expect(giscusTheme(resolveDark('dark', false))).toBe(D);
+    expect(giscusTheme(resolveDark('light', true))).toBe(L);
+    expect(giscusTheme(resolveDark('system', true))).toBe(D);
+    expect(giscusTheme(resolveDark('system', false))).toBe(L);
+    // giscus 只接受绝对 URL 作为自定义主题
+    expect(new URL(D).protocol).toBe('https:');
   });
   it('CSP 放行 giscus', () => {
     const h = readFileSync('public/_headers', 'utf8');

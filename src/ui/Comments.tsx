@@ -10,6 +10,7 @@
  * ⭐ 外壳常驻 DOM，用 hidden 控制显隐（Kumo dialog-rendering），
  *   giscus 的 iframe 注入一次后保留，关了再开不会重新加载。
  * ⭐ 主题跟随网站：light/dark 直接对应，system 读 prefers-color-scheme；
+ *   主题是本站 Worker 提供的 Kumo 风格 CSS（绝对 URL，/giscus/kumo-{light,dark}.css）；
  *   切换时 postMessage 给 iframe（giscus 官方 setConfig 协议），不重建。
  * ⚠️ CSP：public/_headers 的 script-src / style-src / frame-src 已放行 https://giscus.app。
  */
@@ -36,9 +37,16 @@ export const GISCUS_ATTRS: Readonly<Record<string, string>> = {
   'data-loading': 'lazy',
 };
 
-/** 网站主题 → giscus 主题。noborder 系列与 Kumo 的「少边框」更协调。 */
+/**
+ * giscus 主题 CSS 的来源：本站 Worker（src/worker/giscus-theme.ts，Kumo 风格，Rei 2026-10-14）。
+ * giscus 要求自定义主题是**绝对 URL**，由 giscus.app 的 iframe 跨域加载（Worker 已带 CORS）。
+ * 固定用线上域名：本地 vite dev 不跑 Worker，用线上那份同样能预览。
+ */
+export const GISCUS_THEME_ORIGIN = 'https://vector-wallpapers.rei8t.dev';
+
+/** 网站主题 → giscus 主题（绝对 URL）。 */
 export function giscusTheme(dark: boolean): string {
-  return dark ? 'noborder_dark' : 'noborder_light';
+  return `${GISCUS_THEME_ORIGIN}/giscus/kumo-${dark ? 'dark' : 'light'}.css`;
 }
 
 export function resolveDark(theme: UIState['theme'], systemDark: boolean): boolean {
@@ -65,6 +73,9 @@ export function CommentsDrawer({ open, onClose }: { open: boolean; onClose: () =
   const gTheme = giscusTheme(resolveDark(theme, systemDark));
   const hostRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  // 最新主题；iframe 晚于主题切换才加载完时，在 load 事件里补发一次
+  const themeRef = useRef(gTheme);
+  themeRef.current = gTheme;
 
   // 首次打开才注入脚本
   useEffect(() => {
@@ -79,12 +90,32 @@ export function CommentsDrawer({ open, onClose }: { open: boolean; onClose: () =
     setMounted(true);
   }, [open, mounted, gTheme]);
 
-  // 主题变化 → 通知已加载的 iframe
+  // 主题变化 → 通知已加载的 iframe（giscus 官方 setConfig 协议）
   useEffect(() => {
     if (!mounted) return;
-    const frame = hostRef.current?.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
-    frame?.contentWindow?.postMessage({ giscus: { setConfig: { theme: gTheme } } }, GISCUS_ORIGIN);
+    postTheme(hostRef.current, gTheme);
   }, [gTheme, mounted]);
+
+  // iframe 由 client.js 异步插入：插入后挂 load 监听，加载完按「当前」主题再同步一次。
+  // 首次加载本身已按注入时的 data-theme 渲染（服务端直出主题 link），这里只兜底「加载途中切了主题」。
+  useEffect(() => {
+    if (!mounted || !hostRef.current) return;
+    const host = hostRef.current;
+    let frame: HTMLIFrameElement | null = null;
+    const onLoad = () => postTheme(host, themeRef.current);
+    const attach = () => {
+      if (frame) return;
+      frame = host.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+      frame?.addEventListener('load', onLoad);
+    };
+    attach();
+    const mo = new MutationObserver(attach);
+    mo.observe(host, { childList: true, subtree: true });
+    return () => {
+      mo.disconnect();
+      frame?.removeEventListener('load', onLoad);
+    };
+  }, [mounted]);
 
   // Esc 关闭
   useEffect(() => {
@@ -120,6 +151,11 @@ export function CommentsDrawer({ open, onClose }: { open: boolean; onClose: () =
       </aside>
     </div>
   );
+}
+
+function postTheme(host: HTMLElement | null, theme: string) {
+  const frame = host?.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+  frame?.contentWindow?.postMessage({ giscus: { setConfig: { theme } } }, GISCUS_ORIGIN);
 }
 
 /** 留言气泡图标（与 icons.tsx 同规格）。 */

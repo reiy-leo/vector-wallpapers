@@ -14,7 +14,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "html_handling": "auto-trailing-slash",
-    "run_worker_first": ["/api/*", "/auth/*"]
+    "run_worker_first": ["/api/*", "/auth/*", "/giscus/*"]
   },
 
   // 部署时保留控制台里加的变量（GOOGLE_CLIENT_ID 等），不被这里的 vars 覆盖
