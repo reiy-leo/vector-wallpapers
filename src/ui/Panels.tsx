@@ -27,7 +27,7 @@ import {
   usePatternDef,
   useWorkbenchSelector,
 } from './store';
-import { Button, Collapsible, CountBadge, Section, inputClass } from './primitives';
+import { Button, Collapsible, CountBadge, Section } from './primitives';
 import { IconDice } from './icons';
 import type { ColorStrategy } from '../engine/colors';
 import type { ElementRole, PatternDef } from '../patterns/types';
@@ -194,66 +194,48 @@ function useSetThumbs() {
  * ───────────────────────────────────────────────────────────────── */
 
 /**
- * 参数面板 —— **只剩随机种子**。
+ * 「参数」Tab 的顶部动作 + 母题可调项说明（Rei 2026-10-14：「配色」并进「参数」）。
  *
- * ⭐ 形态参数（线宽、密度、起伏…）已迁到画布工具条（见 ControlChips）：
- * 调形状是「边看边拧」的行为，甩到 360px 外的右栏会让眼睛反复横跳。
- *
- * 种子之所以**留在右栏**而不是跟着搬走：它服务的是「复现 / 分享」
- * （相同种子 + 相同配色 = 同一张壁纸），属于配置而非形态 ——
- * 混进工具条的形态滑块里，用户会误以为拧它会改变形状。
+ * 随机种子对多数人太 geek：不再显示数值和输入框，只留一个「重排图案」按钮
+ * （换 seed、不动配色）。种子仍在 URL 里，分享照常复现同一张。
  */
+export function ReshuffleButton() {
+  const seed = useWorkbenchSelector((s) => s.cfg.seed);
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      title="保留配色，重新排布图案细节"
+      onClick={() => setSeed(nextSeed(seed))}
+    >
+      <IconDice size={15} />
+      重排图案
+    </Button>
+  );
+}
+
+/** 当前母题可调项（只读说明；调节在画布工具条上）。 */
 export function ParamPanel() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
+  if (def.controls.length === 0) return null;
 
   return (
-    <Section title="随机种子" hint="决定图案的随机细节分布">
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={cfg.seed}
-          min={0}
-          max={999999}
-          aria-label="随机种子"
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= 0) setSeed(v);
-          }}
-          className={inputClass('vw-number w-28 font-mono text-[0.9em] tabular-nums')}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          title="换一个随机种子（不改变当前配色）"
-          onClick={() => setSeed(nextSeed(cfg.seed))}
-        >
-          <IconDice size={15} />
-          换种子
-        </Button>
-      </div>
+    <Collapsible title="当前母题可调项" count={def.controls.length}>
+      <ul className="grid gap-1">
+        {def.controls.map((c) => (
+          <li key={c.key} className="flex items-baseline justify-between gap-3">
+            <span className="text-base text-fg-soft">{c.label}</span>
+            <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">
+              {String(cfg.params[c.key])}
+            </code>
+          </li>
+        ))}
+      </ul>
       <p className="text-2xs text-fg-mute">
-        相同种子 + 相同配色 = 完全相同的壁纸，分享链接靠它复现画面。
+        这些调节项由母题自身定义，已放在画布下方的工具条上。
       </p>
-
-      {/* 形态参数的完整说明留在右栏：工具条上一排滑块没有空间解释每个参数，
-          而「参数是这个母题自己定义的」这条信息对用户理解产品很关键。 */}
-      <Collapsible title="当前母题可调项" count={def.controls.length}>
-        <ul className="grid gap-1">
-          {def.controls.map((c) => (
-            <li key={c.key} className="flex items-baseline justify-between gap-3">
-              <span className="text-base text-fg-soft">{c.label}</span>
-              <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">
-                {String(cfg.params[c.key])}
-              </code>
-            </li>
-          ))}
-        </ul>
-        <p className="text-2xs text-fg-mute">
-          这些调节项由母题自身定义，已放在画布下方的工具条上。
-        </p>
-      </Collapsible>
-    </Section>
+    </Collapsible>
   );
 }
 

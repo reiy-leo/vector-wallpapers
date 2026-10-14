@@ -16,7 +16,7 @@ import type { ColorStrategy } from '../engine/colors';
 import { detectPlatform } from '../shared/guards';
 import { CanvasStage } from './CanvasStage';
 import { ElementPanel } from './ElementPanel';
-import { CuratedSetsPanel, PalettePanel, ParamPanel } from './Panels';
+import { CuratedSetsPanel, PalettePanel, ParamPanel, ReshuffleButton } from './Panels';
 import { PatternRail } from './PatternRail';
 import { TopBar, type NoticeTone } from './TopBar';
 import { Toast } from './primitives';
@@ -34,7 +34,7 @@ import {
   useWorkbenchSelector,
 } from './store';
 
-type PanelTab = 'colors' | 'params' | 'palettes' | 'sets';
+type PanelTab = 'params' | 'palettes' | 'sets';
 
 /**
  * Tab 顺序 = 使用频率顺序。
@@ -42,7 +42,7 @@ type PanelTab = 'colors' | 'params' | 'palettes' | 'sets';
  * （PRD P0-2 元件级配色）—— 新用户最可能先碰的就是它。
  */
 const TABS: ReadonlyArray<{ id: PanelTab; label: string }> = [
-  { id: 'colors', label: '配色' },
+  // Rei 2026-10-14：「配色」并进「参数」（元件配色 + 重排图案 + 可调项说明）
   { id: 'params', label: '参数' },
   { id: 'palettes', label: '色板' },
   { id: 'sets', label: '合集' },
@@ -54,7 +54,7 @@ export function Workbench() {
   const strategy: ColorStrategy = 'palette';
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
   const [platform, setPlatform] = useState<'ios' | 'desktop'>('desktop');
-  const [tab, setTab] = useState<PanelTab>('colors');
+  const [tab, setTab] = useState<PanelTab>('params');
 
   const onNotice = useCallback((message: string, tone: NoticeTone = 'info') => {
     setNotice(message === '' ? null : { message, tone });
@@ -216,8 +216,15 @@ function PanelBody({
     <div className="grid gap-5">
       <TabBar tab={tab} onTab={onTab} />
 
-      {tab === 'colors' && <ElementPanel />}
-      {tab === 'params' && <ParamPanel />}
+      {tab === 'params' && (
+        <>
+          <div className="flex">
+            <ReshuffleButton />
+          </div>
+          <ElementPanel />
+          <ParamPanel />
+        </>
+      )}
       {tab === 'palettes' && <PalettePanel />}
       {tab === 'sets' && <CuratedSetsPanel />}
 
@@ -226,10 +233,6 @@ function PanelBody({
           检测到 iOS 设备：PNG 导出不可用，请使用 SVG（矢量、体积更小）。
         </p>
       )}
-
-      <p className="border-t border-line pt-3 text-2xs leading-relaxed text-fg-mute">
-        元件列表与参数控件均由母题定义自动生成 —— 新增母题无需改动界面代码。
-      </p>
     </div>
   );
 }

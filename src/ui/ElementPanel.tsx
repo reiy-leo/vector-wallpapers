@@ -15,13 +15,11 @@
  */
 import { useState } from 'react';
 import { isHexColor } from '../shared/guards';
-import { roleColors } from '../engine/elementStyle';
 import { isGradient, paintColors } from '../engine/colors';
-import { usePatternDef, useWorkbenchSelector, patchElement, setConfig } from './store';
-import { applyPaletteSlots } from './coloring';
+import { usePatternDef, useWorkbenchSelector, patchElement } from './store';
 import { CountBadge, IconButton, Section, SliderField, Tooltip } from './primitives';
 import { IconEye, IconLock } from './icons';
-import type { ElementConfig, PatternConfig } from '../engine/types';
+import type { ElementConfig } from '../engine/types';
 import type { ElementRole, PaintSpec } from '../patterns/types';
 
 /** role 的中文显示名 —— 顺序与 CATEGORY_META 一致的语义分层。 */
@@ -37,8 +35,6 @@ export function ElementPanel() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  const roleMap = roleColors(def, cfg);
 
   return (
     <Section
@@ -63,50 +59,8 @@ export function ElementPanel() {
         })}
       </ul>
 
-      {/* role 批量改色（PRD P0-2）：点一次改一组，是「不想逐个点」时的快路径 */}
-      {Object.keys(def.paletteSlots).length > 0 && (
-        <div className="grid gap-2 border-t border-line pt-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <h3 className="text-sm font-medium text-fg-soft">按角色批量设色</h3>
-            <span className="text-2xs text-fg-mute">一次改一组同角色元件</span>
-          </div>
-          <ul className="grid gap-1">
-            {(Object.entries(def.paletteSlots) as Array<[string, string[]]>).map(([role, members]) => {
-              const paint = roleMap[role as ElementRole];
-              /*
-               * ⭐ 槽位里的代表元件可能是**渐变**（dusk-ridges 的 bg 槽是
-               * 线性渐变的 sky）。此时必须渲染真实渐变，而不是退化成灰块 ——
-               * 灰色块会让人以为「这个角色没有颜色」，与画布里的实际效果矛盾。
-               */
-              const colors = paint ? paintColors(paint) : [];
-              const gradient = paint ? isGradient(paint) : false;
-              return (
-                <RoleRow
-                  key={role}
-                  role={role as ElementRole}
-                  count={members.length}
-                  colors={colors}
-                  gradient={gradient}
-                  onPick={(c) => setConfig(recolorRole(cfg, def, role as ElementRole, c))}
-                />
-              );
-            })}
-          </ul>
-        </div>
-      )}
     </Section>
   );
-}
-
-function recolorRole(
-  cfg: PatternConfig,
-  def: ReturnType<typeof usePatternDef>,
-  role: ElementRole,
-  color: string,
-): PatternConfig {
-  // 走 coloring.ts 的统一实现（按 paletteSlots 落到具体元件），
-  // 保证「批量设色」与「套用色板」的语义完全一致。
-  return applyPaletteSlots(cfg, def, { [role]: color });
 }
 
 function ElementRow({
@@ -392,36 +346,6 @@ function GradientStops({
   );
 }
 
-function RoleRow({
-  role,
-  count,
-  colors,
-  gradient,
-  onPick,
-}: {
-  role: ElementRole;
-  count: number;
-  colors: readonly string[];
-  gradient: boolean;
-  onPick: (hex: string) => void;
-}) {
-  const label = gradient ? '渐变' : colors[0] ?? '—';
-  return (
-    <li className="flex items-center gap-2 rounded-md bg-surface px-2 py-1.5 ring-1 ring-line">
-      <ColorSwatch colors={colors.length > 0 ? colors : ['#888888']} size={26} onPick={onPick} />
-      <span className="min-w-0 flex-1 truncate text-base text-fg-soft">{ROLE_LABEL[role]}</span>
-      <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">×{count}</code>
-      <code className="shrink-0 font-mono text-[0.9em] text-fg-mute">{label}</code>
-    </li>
-  );
-}
-
-/**
- * 只替换 solid 的颜色；渐变则替换**首个色标**。
- *
- * 与 `coloring.ts` 的 `retargetPaint` 同语义 —— 单个色块不该把
- * 一个精心设计的渐变压平成纯色，那是破坏而非调整。
- */
 function withColor(paint: PaintSpec, color: string): PaintSpec {
   if (paint.type === 'solid') return { type: 'solid', color };
   if (paint.type === 'linear' || paint.type === 'radial') {
