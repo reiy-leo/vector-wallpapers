@@ -244,20 +244,7 @@ function BarDivider() {
   return <div aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />;
 }
 
-/** 品牌标记：由两个偏移的圆角方块暗示「pattern 可叠加」的抽象图形。 */
+/** 品牌标记：网站图标（Rei 2026-10-14，与 favicon 同一张图）。 */
 function LogoMark() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className="shrink-0">
-      <rect x="1.5" y="1.5" width="11" height="11" rx="3" className="fill-brand" opacity="0.9" />
-      <rect
-        x="7.5"
-        y="7.5"
-        width="11"
-        height="11"
-        rx="3"
-        className="fill-brand"
-        opacity="0.45"
-      />
-    </svg>
-  );
+  return <img src="/logo-64.png" width={20} height={20} alt="" aria-hidden="true" className="shrink-0 select-none" draggable={false} />;
 }

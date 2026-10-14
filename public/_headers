@@ -24,7 +24,16 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
-/favicon.svg
+/favicon.ico
+  Cache-Control: public, max-age=86400
+
+/favicon-*.png
+  Cache-Control: public, max-age=86400
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400
+
+/logo-64.png
   Cache-Control: public, max-age=86400
 
 /theme-boot.js

@@ -598,7 +598,7 @@ vector-wallpapers/
 ├── public/
 │   ├── _headers                   # CSP + 缓存策略
 │   ├── robots.txt
-│   └── favicon.svg
+│   └── favicon.ico · favicon-32/48.png · apple-touch-icon.png · logo-64.png
 ├── scripts/
 │   └── prerender.mjs              # P2 可选：构建期 SEO 预渲染
 └── src/
@@ -1054,7 +1054,7 @@ sequenceDiagram
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
-/favicon.svg
+/favicon.ico
   Cache-Control: public, max-age=86400
 ```
 
