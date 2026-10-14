@@ -214,14 +214,14 @@ export function ReshuffleButton() {
   );
 }
 
-/** 当前母题可调项（只读说明；调节在画布工具条上）。 */
+/** 当前母题可调项（只读说明；调节在画布工具条上）。Rei 2026-10-14：常显，不折叠。 */
 export function ParamPanel() {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
   if (def.controls.length === 0) return null;
 
   return (
-    <Collapsible title="当前母题可调项" count={def.controls.length}>
+    <Section title="当前母题可调项" action={<CountBadge>{def.controls.length}</CountBadge>}>
       <ul className="grid gap-1">
         {def.controls.map((c) => (
           <li key={c.key} className="flex items-baseline justify-between gap-3">
@@ -235,7 +235,7 @@ export function ParamPanel() {
       <p className="text-2xs text-fg-mute">
         这些调节项由母题自身定义，已放在画布下方的工具条上。
       </p>
-    </Collapsible>
+    </Section>
   );
 }
 
