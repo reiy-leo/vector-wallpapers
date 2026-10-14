@@ -14,6 +14,13 @@
 
 export type Verdict = 'good' | 'bad';
 
+/**
+ * 浅底 / 深底分开评（Rei 2026-10-14）：键 `pattern|palette|light|dark`。
+ * 旧的两段键（不带底色）仍然合法，视为两个底色都评过（回显 + 换一版排除）。
+ */
+export type RatingTone = 'light' | 'dark';
+export const isRatingTone = (v: unknown): v is RatingTone => v === 'light' || v === 'dark';
+
 export interface RatingEntry {
   v: Verdict;
   /** 毫秒时间戳（服务端写入时间）。 */
@@ -28,6 +35,8 @@ export interface RatingSubmit {
   pattern: string;
   palette: string;
   verdict: Verdict;
+  /** 底色；旧前端不带。 */
+  tone?: RatingTone;
 }
 
 /** POST /api/ratings 的请求体：数组（批量）；兼容单个对象。同一对在数组里出现多次时后者覆盖前者。 */
@@ -73,14 +82,16 @@ export const isRatingId = (v: unknown): v is string =>
 export const isVerdict = (v: unknown): v is Verdict => v === 'good' || v === 'bad';
 
 /** 文档内的键。`|` 不在 id 字符集里，天然无歧义。 */
-export const pairKey = (pattern: string, palette: string): string => `${pattern}|${palette}`;
+export const pairKey = (pattern: string, palette: string, tone?: RatingTone): string =>
+  tone ? `${pattern}|${palette}|${tone}` : `${pattern}|${palette}`;
 
-export function splitPairKey(key: string): { pattern: string; palette: string } | null {
-  const i = key.indexOf('|');
-  if (i <= 0) return null;
-  const pattern = key.slice(0, i);
-  const palette = key.slice(i + 1);
-  return isRatingId(pattern) && isRatingId(palette) ? { pattern, palette } : null;
+export function splitPairKey(key: string): { pattern: string; palette: string; tone?: RatingTone } | null {
+  const parts = key.split('|');
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  const [pattern, palette, tone] = parts;
+  if (!isRatingId(pattern) || !isRatingId(palette)) return null;
+  if (parts.length === 3) return isRatingTone(tone) ? { pattern, palette, tone } : null;
+  return { pattern, palette };
 }
 
 /** 从任意 JSON 里清洗出合法的 RatingsDoc（KV 里的旧值 / 损坏值、/mine 响应都过一遍）。 */

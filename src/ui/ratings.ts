@@ -36,6 +36,7 @@ import {
 import { enqueueRating, removeSent, shouldSubmit, takeBatch, type RatingQueue } from './rating-queue';
 import { adminRerollExclusions, subscribeReview } from './admin-review';
 import { DEFAULT_PALETTE_ID } from '../shared/defaults-api';
+import type { RatingTone } from '../shared/ratings-api';
 import { colorsMatchDefault, getBaseServerDefaults, pickedPaletteFor } from './defaults';
 import { bgTone } from './coloring';
 import { registry } from '../patterns';
@@ -194,9 +195,28 @@ function dispatch(e: RatingEvent): void {
   if (changed) listeners.forEach((l) => l());
 }
 
+/** 当前画布的底色（浅底 / 深底分开评，Rei 2026-10-14）。 */
+function currentTone(patternId?: string): RatingTone | undefined {
+  const cfg = getConfig();
+  if (patternId !== undefined && patternId !== cfg.patternId) return undefined;
+  const def = registry.get(cfg.patternId);
+  return def ? bgTone(cfg, def) : undefined;
+}
+
+/**
+ * 切了浅底 / 深底：同一套色板翻明度后是另一底色的那一对 → 评分条跟过去（上一底色的选择照常提交）。
+ * 切到默认配色时随后的 noteDefaultColoring 会再换成「默认」那一对。
+ */
+function followTone(): void {
+  const c = state.current;
+  const tone = currentTone();
+  if (!c || !tone || !c.tone || c.tone === tone || c.pattern !== getConfig().patternId) return;
+  dispatch({ type: 'show', pattern: c.pattern, palette: c.palette, tone });
+}
+
 /** 换一版之后：paletteId 为 null（非色板来源）时隐藏评分条。 */
 export function noteReroll(patternId: string, paletteId: string | null): void {
-  dispatch(paletteId ? { type: 'show', pattern: patternId, palette: paletteId } : { type: 'clear' });
+  dispatch(paletteId ? { type: 'show', pattern: patternId, palette: paletteId, tone: currentTone(patternId) } : { type: 'clear' });
 }
 
 /**
@@ -211,17 +231,17 @@ export function noteDefaultColoring(): void {
   // 默认展示的是打分选中的色板 → 评分条打分的是那套色板本身
   const pickedId = pickedPaletteFor(cfg, def);
   if (pickedId) {
-    dispatch({ type: 'show', pattern: cfg.patternId, palette: pickedId });
+    dispatch({ type: 'show', pattern: cfg.patternId, palette: pickedId, tone: bgTone(cfg, def) });
     return;
   }
   // 「默认」= 上传覆盖 / 内置（不含批改模式待上传叠层：那是正在改的这张，0ca7004）
   if (!colorsMatchDefault(getBaseServerDefaults(), cfg, def, bgTone(cfg, def))) return;
-  dispatch({ type: 'show', pattern: cfg.patternId, palette: DEFAULT_PALETTE_ID });
+  dispatch({ type: 'show', pattern: cfg.patternId, palette: DEFAULT_PALETTE_ID, tone: bgTone(cfg, def) });
 }
 
 /** 色板面板手动套用之后。 */
 export function notePalette(patternId: string, paletteId: string): void {
-  dispatch({ type: 'show', pattern: patternId, palette: paletteId });
+  dispatch({ type: 'show', pattern: patternId, palette: paletteId, tone: currentTone(patternId) });
 }
 
 export function chooseVerdict(verdict: Verdict): void {
@@ -233,7 +253,9 @@ export function chooseVerdict(verdict: Verdict): void {
  * ∪ 管理员批改模式打分 ≤ −3 的色板（仅管理员本人，见 admin-review.ts）。
  */
 export function rerollExclusions(patternId: string): Set<string> {
-  const out = excludedPalettes(state, patternId);
+  const cfg = getConfig();
+  const def = registry.get(patternId);
+  const out = excludedPalettes(state, patternId, def && cfg.patternId === patternId ? bgTone(cfg, def) : undefined);
   for (const p of adminRerollExclusions(patternId)) out.add(p);
   return out;
 }
@@ -294,6 +316,7 @@ export function installRatingListeners(): void {
       lastPattern = p;
       dispatch({ type: 'pattern', pattern: p });
     }
+    followTone();
     noteDefaultColoring();
   });
   subscribeReview(noteDefaultColoring);

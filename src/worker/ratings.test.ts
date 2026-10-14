@@ -234,7 +234,7 @@ describe('GET /api/ratings/summary', () => {
   it('?format=csv 下载 CSV', async () => {
     const res = await call('GET', '/api/ratings/summary?format=csv', { email: 'other@x.io' });
     expect(res.headers.get('Content-Type')).toContain('text/csv');
-    expect(await res.text()).toBe('pattern,palette,good,bad\nflow-lines,monet,1,0\npolka-dots,nord,1,2\n');
+    expect(await res.text()).toBe('pattern,palette,tone,good,bad\nflow-lines,monet,,1,0\npolka-dots,nord,,1,2\n');
   });
 });
 
@@ -259,6 +259,18 @@ describe('纯函数', () => {
   });
 
   it('summarize / CSV 对空数据', () => {
-    expect(summaryToCsv(summarize([]))).toBe('pattern,palette,good,bad\n');
+    expect(summaryToCsv(summarize([]))).toBe('pattern,palette,tone,good,bad\n');
+  });
+});
+
+describe('浅底 / 深底分开评', () => {
+  it('parseSubmit 收 tone 与「默认」；mergeRatings 用三段键；汇总 / CSV 带底色', async () => {
+    const m = await import('./ratings');
+    expect(m.parseSubmit({ pattern: 'p', palette: 'default', verdict: 'good', tone: 'dark' })).toEqual({ pattern: 'p', palette: 'default', verdict: 'good', tone: 'dark' });
+    expect(m.parseSubmit({ pattern: 'p', palette: 'default', verdict: 'good', tone: 'dim' })).toBe('invalid tone');
+    const doc = m.mergeRatings({}, [{ pattern: 'p', palette: 'nord', verdict: 'bad', tone: 'light' }], 5)!;
+    expect(Object.keys(doc)).toEqual(['p|nord|light']);
+    const csv = m.summaryToCsv(m.summarize([{ ...doc, 'p|nord': { v: 'good', ts: 1 } }], new Date(0)));
+    expect(csv).toBe('pattern,palette,tone,good,bad\np,nord,,1,0\np,nord,light,0,1\n');
   });
 });

@@ -20,7 +20,7 @@ export type RatingQueue = RatingsDoc;
 
 /** 入队（后写覆盖前写）。同一对重复入队：先删后插，键序 = 最近一次评分的先后。 */
 export function enqueueRating(q: RatingQueue, c: RatingCommit, ts: number): RatingQueue {
-  const k = pairKey(c.pattern, c.palette);
+  const k = pairKey(c.pattern, c.palette, c.tone);
   const next: RatingQueue = { ...q };
   delete next[k];
   next[k] = { v: c.verdict, ts };
@@ -47,7 +47,7 @@ export function takeBatch(q: RatingQueue, max = RATING_BATCH_MAX): RatingBatchPl
   for (const k of keys) {
     const pair = splitPairKey(k);
     if (!pair) continue;
-    items.push({ pattern: pair.pattern, palette: pair.palette, verdict: q[k].v });
+    items.push(pair.tone ? { pattern: pair.pattern, palette: pair.palette, tone: pair.tone, verdict: q[k].v } : { pattern: pair.pattern, palette: pair.palette, verdict: q[k].v });
     sent[k] = q[k].ts;
   }
   return { items, sent };

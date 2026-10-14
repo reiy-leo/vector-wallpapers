@@ -13,6 +13,7 @@ import { PALETTES, VIVID_PALETTES } from "../patterns/palettes";
 import {
   RATING_BATCH_MAX,
   isRatingId,
+  isRatingTone,
   isVerdict,
   pairKey,
   sanitizeDoc,
@@ -23,6 +24,7 @@ import {
   type RatingsDoc,
   type RatingsSummary,
 } from "../shared/ratings-api";
+import { DEFAULT_PALETTE_ID } from "../shared/defaults-api";
 import { getUser } from "./auth";
 import { adminEmails, type Env, type KVLike } from "./env";
 
@@ -32,7 +34,7 @@ export const MAX_ENTRIES_PER_USER = 5000;
 export const MAX_BODY_BYTES = 192 * 1024;
 
 /** 已知色板 id：展示色板 + 「换一版」专用的高饱和色板。 */
-const KNOWN_PALETTES: ReadonlySet<string> = new Set([...PALETTES, ...VIVID_PALETTES].map((p) => p.id));
+const KNOWN_PALETTES: ReadonlySet<string> = new Set([...PALETTES, ...VIVID_PALETTES].map((p) => p.id).concat(DEFAULT_PALETTE_ID));
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -56,14 +58,15 @@ async function readDoc(kv: KVLike, key: string): Promise<RatingsDoc> {
 }
 
 /** 校验请求体。返回错误文案或清洗后的值。 */
-export function parseSubmit(raw: unknown): { pattern: string; palette: string; verdict: "good" | "bad" } | string {
+export function parseSubmit(raw: unknown): RatingSubmit | string {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "body must be a JSON object";
-  const { pattern, palette, verdict } = raw as Record<string, unknown>;
+  const { pattern, palette, verdict, tone } = raw as Record<string, unknown>;
   if (!isRatingId(pattern)) return "invalid pattern";
   if (!isRatingId(palette)) return "invalid palette";
   if (!KNOWN_PALETTES.has(palette)) return "unknown palette";
   if (!isVerdict(verdict)) return "invalid verdict";
-  return { pattern, palette, verdict };
+  if (tone !== undefined && !isRatingTone(tone)) return "invalid tone";
+  return tone ? { pattern, palette, verdict, tone } : { pattern, palette, verdict };
 }
 
 /**
@@ -72,7 +75,7 @@ export function parseSubmit(raw: unknown): { pattern: string; palette: string; v
 export function mergeRatings(doc: RatingsDoc, items: readonly RatingSubmit[], now: number): RatingsDoc | null {
   let next: RatingsDoc | null = null;
   for (const it of items) {
-    const k = pairKey(it.pattern, it.palette);
+    const k = pairKey(it.pattern, it.palette, it.tone);
     const cur = (next ?? doc)[k];
     if (cur?.v === it.verdict) continue;
     next ??= { ...doc };
@@ -164,7 +167,7 @@ export function summarize(docs: readonly RatingsDoc[], now = new Date()): Rating
       const pair = splitPairKey(k);
       if (!pair) continue;
       const byPalette = (patterns[pair.pattern] ??= {});
-      const c = (byPalette[pair.palette] ??= { good: 0, bad: 0 });
+      const c = (byPalette[pair.tone ? `${pair.palette}|${pair.tone}` : pair.palette] ??= { good: 0, bad: 0 });
       c[e.v] += 1;
     }
   }
@@ -172,12 +175,13 @@ export function summarize(docs: readonly RatingsDoc[], now = new Date()): Rating
 }
 
 export function summaryToCsv(s: RatingsSummary): string {
-  const rows = ["pattern,palette,good,bad"];
+  const rows = ["pattern,palette,tone,good,bad"];
   for (const pattern of Object.keys(s.patterns).sort()) {
     const byPalette = s.patterns[pattern];
     for (const palette of Object.keys(byPalette).sort()) {
       const c = byPalette[palette];
-      rows.push(`${pattern},${palette},${c.good},${c.bad}`);
+      const [id, tone = ""] = palette.split("|");
+      rows.push(`${pattern},${id},${tone},${c.good},${c.bad}`);
     }
   }
   return rows.join("\n") + "\n";

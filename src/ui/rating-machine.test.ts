@@ -144,3 +144,30 @@ describe('换一版排除 👎', () => {
     expect(excludedPalettes(s, 'p1').size).toBe(0);
   });
 });
+
+describe('浅底 / 深底分开评（Rei 2026-10-14）', () => {
+  it('同一色板两个底色各自一条；切底色时上一底色的选择提交，另一底色从空开始', () => {
+    let t = reduceRating(initialRatingState, { type: 'show', pattern: 'p', palette: 'nord', tone: 'light' });
+    t = reduceRating(t.state, { type: 'choose', verdict: 'good' });
+    t = reduceRating(t.state, { type: 'show', pattern: 'p', palette: 'nord', tone: 'dark' });
+    expect(t.commits).toEqual([{ pattern: 'p', palette: 'nord', tone: 'light', verdict: 'good' }]);
+    expect(t.state.current?.verdict).toBeNull();
+    t = reduceRating(t.state, { type: 'choose', verdict: 'bad' });
+    expect(excludedPalettes(t.state, 'p', 'dark').has('nord')).toBe(true);
+    expect(excludedPalettes(t.state, 'p', 'light').has('nord')).toBe(false);
+    t = reduceRating(t.state, { type: 'flush' });
+    expect(t.state.submitted).toEqual({ 'p|nord|light': 'good', 'p|nord|dark': 'bad' });
+  });
+
+  it('旧的不分底色评分：两个底色都回显 / 排除；带底色的新评分优先', () => {
+    let t = reduceRating(initialRatingState, { type: 'loaded', ratings: { 'p|nord': { v: 'bad', ts: 1 } } });
+    expect(excludedPalettes(t.state, 'p', 'light').has('nord')).toBe(true);
+    expect(excludedPalettes(t.state, 'p', 'dark').has('nord')).toBe(true);
+    t = reduceRating(t.state, { type: 'show', pattern: 'p', palette: 'nord', tone: 'dark' });
+    expect(t.state.current?.verdict).toBe('bad');
+    t = reduceRating(t.state, { type: 'choose', verdict: 'good' });
+    t = reduceRating(t.state, { type: 'flush' });
+    expect(excludedPalettes(t.state, 'p', 'dark').has('nord')).toBe(false);
+    expect(excludedPalettes(t.state, 'p', 'light').has('nord')).toBe(true);
+  });
+});
