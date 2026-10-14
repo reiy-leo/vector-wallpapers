@@ -66,7 +66,7 @@ export function ControlsPopover() {
   );
 }
 
-export function ControlChips() {
+export function ControlChips({ fill = false }: { fill?: boolean } = {}) {
   const def = usePatternDef();
   const cfg = useWorkbenchSelector((s) => s.cfg);
 
@@ -78,7 +78,7 @@ export function ControlChips() {
     <div
       role="group"
       aria-label="形态参数"
-      className="grid w-80 gap-y-3"
+      className={`grid gap-y-3 ${fill ? 'w-full' : 'w-80'}`}
     >
       {controls.map((c) => (
         <ControlChip key={c.key} control={c} cfg={cfg} />
