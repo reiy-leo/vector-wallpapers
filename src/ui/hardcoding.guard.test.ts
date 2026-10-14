@@ -66,6 +66,8 @@ const RESERVED_CONTROL_KEYS: ReadonlySet<string> = new Set([
   'angle', 'round', 'height', 'width', 'size',
   'color', 'fill', 'stroke', 'index', 'type', 'name', 'value', 'data', 'item', 'key',
   'scale', 'spread', 'ratio', 'shift', 'depth', 'turns', 'points', 'density', 'step',
+  // Base UI Slider 的 thumbAlignment 取值（KumoSlider）
+  'edge',
 ]);
 
 describe('UI 层零硬编码（工程铁律 10）', () => {

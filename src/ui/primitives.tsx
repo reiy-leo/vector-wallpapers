@@ -3,7 +3,6 @@
  *
  * 每条 Kumo 规则的落点都在下方逐条标注，评审时可直接对照。
  */
-import { Slider } from '@cloudflare/kumo/primitives/slider';
 import {
   useCallback,
   useEffect,
@@ -16,6 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { IconCheck, IconChevron, IconClose } from './icons';
+import { KumoSlider } from './KumoSlider';
 
 /* ─────────────────────────────────────────────────────────────────
  * 面板容器
@@ -459,59 +459,6 @@ function SearchGlyph() {
 }
 
 /**
- * 滑块本体 —— Kumo 的 Slider（`@cloudflare/kumo/primitives/slider`，Base UI Slider；Rei 2026-10-14）。
- * Kumo 只提供无样式的 primitive，这里按 Kumo token 上色：4px 轨道 + 品牌色已填充段 + 14px 拇指。
- * 只对拇指位置无过渡、颜色瞬时切换（Kumo `hover-color-transitions`）。
- */
-export function KumoSlider({
-  id,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  disabled = false,
-  label,
-  valueText,
-  className = '',
-}: {
-  id?: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  label?: string;
-  valueText?: string;
-  className?: string;
-}) {
-  return (
-    <Slider.Root
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      onValueChange={(v) => onChange(Array.isArray(v) ? Number(v[0]) : Number(v))}
-      className={`w-full min-w-0 ${className}`}
-    >
-      <Slider.Control className="flex h-5 w-full cursor-pointer touch-none items-center select-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
-        <Slider.Track className="relative h-1 w-full rounded-full bg-surface-3">
-          <Slider.Indicator className="rounded-full bg-brand" />
-          <Slider.Thumb
-            id={id}
-            aria-label={label}
-            getAriaValueText={valueText ? () => valueText : undefined}
-            className="size-3.5 rounded-full bg-brand outline-none hover:bg-brand-hover focus-visible:ring-2 focus-visible:ring-brand/40"
-          />
-        </Slider.Track>
-      </Slider.Control>
-    </Slider.Root>
-  );
-}
-
-/**
  * 滑块行。
  *
  * ⭐ Kumo `related-text-spacing`：标签与滑块属于一组，用 gap-1.5；
@@ -548,15 +495,16 @@ export function SliderField({
         </label>
         <code className="font-mono text-[0.9em] text-fg-mute">{format ? format(value) : String(value)}</code>
       </div>
-      <KumoSlider
+      <input
         id={id}
-        label={label}
+        type="range"
+        className="vw-slider"
         min={min}
         max={max}
         step={step}
         value={value}
         disabled={disabled}
-        onChange={onChange}
+        onChange={(e) => onChange(Number(e.target.value))}
       />
     </div>
   );
@@ -607,7 +555,7 @@ export function SliderChip({
       </label>
       <KumoSlider
         id={id}
-        label={label}
+        ariaLabel={label}
         min={min}
         max={max}
         step={step}
