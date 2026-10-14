@@ -37,6 +37,17 @@ describe('giscus Kumo 主题', () => {
     expect(css).not.toMatch(/gsc-reactions[^{]*\{[^}]*display:\s*none/);
   });
 
+  it('评论输入框只有一层边框：write 外框 + focus-within；textarea / Markdown 栏无边框无虚线', () => {
+    for (const tone of ['light', 'dark'] as const) {
+      const css = giscusThemeCss(tone);
+      expect(css).toMatch(/\.gsc-comment-box-write\{border:1px solid/);
+      expect(css).toMatch(/\.gsc-comment-box-write:focus-within\{/);
+      expect(css).toMatch(/\.gsc-comment-box-textarea:focus-visible[^{]*\{border:0!important;[^}]*outline:none!important;box-shadow:none!important/);
+      expect(css).toMatch(/\.gsc-comment-box-textarea-extras[^{]*\{border:0!important;border-style:none!important/);
+      expect(css).not.toMatch(/dashed/);
+    }
+  });
+
   it('路由：两份 CSS，Content-Type / CORS / 缓存正确', async () => {
     expect(giscusThemeTone('/giscus/kumo-light.css')).toBe('light');
     expect(giscusThemeTone('/giscus/kumo-dark.css')).toBe('dark');

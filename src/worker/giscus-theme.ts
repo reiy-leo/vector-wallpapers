@@ -170,15 +170,30 @@ main .gsc-comments-count,main .gsc-comments-count-separator{font-size:14px;font-
 main .gsc-header{padding-bottom:0}
 
 /* ── 圆角 / 细边框 / 无投影 ── */
-main .gsc-comment-box,main .gsc-comment>div:not(.gsc-comment-author-avatar),main .gsc-comment-box:not(.gsc-comment-box-is-reply){border-radius:8px;border-width:1px;border-color:var(--color-border-default);box-shadow:none}
-main .gsc-comment-box-tabs{border-top-left-radius:8px;border-top-right-radius:8px;background:var(--color-canvas-subtle)}
-main .gsc-comment-box-tabs button{border-radius:6px 6px 0 0;font-size:14px}
-main .gsc-comment-box-textarea,main .gsc-comment-box-textarea-extras,main .form-control{border-radius:6px;border-color:var(--color-border-default);background:var(--color-canvas-default);box-shadow:none;font-size:14px}
-main .form-control:focus,main .gsc-comment-box-textarea:focus{outline:2px solid ${v('brand-tint')};outline-offset:0;border-color:var(--color-accent-fg)}
-main .gsc-comment-box-textarea-extras{border-top-left-radius:0;border-top-right-radius:0}
+main .gsc-comment>div:not(.gsc-comment-author-avatar){border-radius:8px;border-width:1px;border-color:var(--color-border-default);box-shadow:none}
+
+/* ── 评论输入框：只保留一层边框（Rei 2026-10-14）──
+ * 默认是「表单外框 + textarea 自己的框 + Markdown 栏上方虚线」三层线。
+ * 现在：表单本身无框无底；唯一一圈细边框画在 .gsc-comment-box-write 上，聚焦时只这一圈变色 + ring；
+ * textarea 与底部 Markdown 栏自身一律无 border / outline / box-shadow，也没有虚线分隔。 */
+main .gsc-comment-box,main .gsc-comment-box:not(.gsc-comment-box-is-reply),main .gsc-comment-box-is-reply{border:0!important;border-radius:0;background:transparent!important;box-shadow:none}
+main .gsc-comment-box-tabs{border:0!important;background:transparent!important;border-radius:0;align-items:center}
+main .gsc-comment-box-tabs>div:first-child{margin:0 0 8px!important;display:flex;gap:4px}
+main .gsc-comment-box-tabs button{border:0!important;border-radius:6px;padding:4px 10px;font-size:14px;line-height:20px;background:transparent;color:var(--color-fg-muted)}
+main .gsc-comment-box-tabs button.color-bg-canvas,main .gsc-comment-box-tabs button.color-text-primary{background:var(--color-segmented-control-bg)!important;color:var(--color-fg-default)}
+main .gsc-comment-box-md-toolbar{margin:0 0 8px;padding:0}
+main .gsc-comment-box-main{padding:0!important;margin:0!important}
+main .gsc-comment-box-bottom{padding:0!important;margin:8px 0 0!important;border:0!important}
+main .gsc-comment-box-write{border:1px solid var(--color-border-default);border-radius:8px;background:var(--color-canvas-default);box-shadow:none;outline:none;overflow:hidden}
+main .gsc-comment-box-write:focus-within{border-color:var(--color-accent-fg);box-shadow:0 0 0 3px ${v('brand-tint')};outline:none}
+main .gsc-comment-box-textarea,main .gsc-comment-box-textarea:hover,main .gsc-comment-box-textarea:focus,main .gsc-comment-box-textarea:focus-visible,main .gsc-comment-box-textarea:disabled{border:0!important;border-style:none!important;outline:none!important;box-shadow:none!important;border-radius:0;background:transparent!important;font-size:14px;line-height:20px;padding:8px 12px}
+main .gsc-comment-box-textarea-extras,main .gsc-comment-box-textarea-extras:focus,main .gsc-comment-box-textarea-extras:focus-within{border:0!important;border-style:none!important;outline:none!important;box-shadow:none!important;border-radius:0;background:transparent!important;padding:4px 10px 6px}
+main .gsc-comment-box-preview{border:0!important;box-shadow:none}
+main .form-control:not(.gsc-comment-box-textarea):not(.gsc-comment-box-textarea-extras){border-radius:6px;border-color:var(--color-border-default);background:var(--color-canvas-default);box-shadow:none;font-size:14px}
+main .form-control:not(.gsc-comment-box-textarea):not(.gsc-comment-box-textarea-extras):focus{outline:none;border-color:var(--color-accent-fg);box-shadow:0 0 0 3px ${v('brand-tint')}}
 main .btn{border-radius:6px;font-size:14px;font-weight:500;line-height:20px;padding:5px 12px;box-shadow:none;transition:none}
 main .btn-primary{border-color:transparent}
-main .gsc-reactions-popover,main .gsc-reply-box,main .gsc-comment-box-is-reply{border-radius:8px;border-color:var(--color-border-default)}
+main .gsc-reactions-popover,main .gsc-reply-box{border-radius:8px;border-color:var(--color-border-default)}
 main .gsc-social-reaction-summary-item{border-radius:999px;border-color:var(--color-border-default)}
 main .gsc-emoji-button{border-radius:6px}
 main a,main .color-text-link{color:var(--color-accent-fg)}
